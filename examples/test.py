@@ -1,4 +1,5 @@
-from t import Bits, Enum, Struct, Union, match
+from t import Bits, Enum, Tuple, Union, match
+from t import is_bits, is_enum, is_tuple, is_union
 
 Reg = Bits(4)
 
@@ -6,14 +7,14 @@ class Op(Enum):
     add = 0
     sub = 1
 
-class Data(Struct):
+class Data(Tuple):
     op : Op
     r0: Reg
     r1: Reg
 
 Addr = Bits(5)
 
-class Load(Struct):
+class Load(Tuple):
     reg: Reg
     addr: Addr
 
@@ -34,3 +35,11 @@ def print_load(inst):
 for inst in [inst0, inst1, inst2]:
     match(inst, {Data: print_data, Load: print_load})
 
+assert is_bits(Reg)
+assert is_enum(Op)
+
+assert is_union(Inst)
+print(Inst._subs_tree())
+
+assert is_tuple(Data)
+print(Data.__annotations__)
