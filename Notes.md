@@ -1,7 +1,17 @@
-https://github.com/phanrahan/mantle/blob/master/examples/fsm/top.py
+Examples
+- pico40
+- pe
+- risc5
 
-Shows example of using 
+Sum
+Product
+Bits(n)
+Enum(values)
 
-- m.Enum
+match(expr, pattern)
 
-- @m.circuit.combinational
+pattern
+    int
+    type
+    [pattern ...] - Sum type
+    (pattern ...) - Product type
