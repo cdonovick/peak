@@ -1,9 +1,11 @@
 # peak
 Peak : Processor Specification Language ala Newell and Bell's ISP
 
-Implement my only Sum and Product types.
-- Allow specific bit-field encodings
-- Match language
+Implement instructions formats using Sum and Product types.
++ Unique interpretation of each instruction. This enforces
+the constraint that there is only one interpretation for
+every instruction.
++ Can check that all instructions are matched
 
 Encode Pico
 - generate assembly
@@ -11,6 +13,8 @@ Encode Pico
 - generate simulator
 
 Encode PE
+
+Encode patt's 16-bit process
 
 Encode Risc5
 

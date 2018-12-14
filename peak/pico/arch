@@ -1,0 +1,23 @@
+word 16
+registers 16
+
+0000aaaabbbb0000 "mov"
+0001aaaabbbb0000 "and_"
+0010aaaabbbb0000 "or_"
+0011aaaabbbb0000 "xor"
+
+0100aaaabbbb0000 "add"
+0101aaaabbbb0000 "sub"
+0110aaaabbbb0000 "adc"
+0111aaaabbbb0000 "sbc"
+
+1000aaaaiiiiiiii "ldlo"
+1001aaaaiiiiiiii "ldhi"
+1010aaaaiiiiiiii "ld"
+1011aaaaiiiiiiii "st"
+
+1100cccciiiiiiii "jmpc" 
+1101cccciiiiiiii "callc"
+1110cccc00000000 "retc"
+
+
