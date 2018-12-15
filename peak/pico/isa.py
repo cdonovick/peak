@@ -47,21 +47,24 @@ class Logic_Op(Enum):
     XOr = 3
 
 class Cond_Op(Enum):
-    Z = 0
-    Z_n = 1
-    C = 2
-    C_n = 3
-    N = 4
-    N_n = 5
-    V = 6
-    V_n = 7
-    Hi = 8
-    Ls = 9
-    GE = 10
-    LT = 11
-    GT = 12
-    LE = 13
-    Any = 14
+    Z = 0    # EQ
+    Z_n = 1  # NE
+    C = 2    # UGE
+    C_n = 3  # ULT
+    N = 4    # <  0
+    N_n = 5  # >= 0
+    V = 6    # Overflow
+    V_n = 7  # No overflow
+    UGE = 2
+    ULT = 3
+    UGT = 8
+    ULE = 9
+    SGE = 10
+    SLT = 11
+    SGT = 12
+    SLE = 13
+    Never = 14
+    Always = 15
 
 @dataclass
 class LogicInst:
@@ -113,7 +116,7 @@ MemInst = (LDLO, LDHI, LD, ST)
 @dataclass
 class Jump:
     imm:Imm
-    cond:Cond_Op = Cond_Op.Any
+    cond:Cond_Op = Cond_Op.Always
 
     def __call__(self, imm):
         self.imm = Byte(imm)
@@ -122,7 +125,7 @@ class Jump:
 @dataclass
 class Call:
     imm:Imm
-    cond:Cond_Op = Cond_Op.Any
+    cond:Cond_Op = Cond_Op.Always
 
     def __call__(self, imm):
         self.imm = Byte(imm)
@@ -130,7 +133,7 @@ class Call:
 
 @dataclass
 class Ret:
-    cond:Cond_Op = Cond_Op.Any
+    cond:Cond_Op = Cond_Op.Always
 
 ControlInst = (Jump, Call, Ret)
 
@@ -142,6 +145,11 @@ mov = LogicInst(op=Logic_Op.Mov)
 and_ = LogicInst(op=Logic_Op.And)
 or_ = LogicInst(op=Logic_Op.Or)
 xor = LogicInst(op=Logic_Op.XOr)
+
+add = ArithInst(op=Arith_Op.Add)
+sub = ArithInst(op=Arith_Op.Sub)
+adc = ArithInst(op=Arith_Op.Adc)
+sbc = ArithInst(op=Arith_Op.Sbc)
 
 ldlo = LDLO
 ldhi = LDHI

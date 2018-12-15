@@ -12,7 +12,7 @@ class ROM(Peak):
         return self.mem[int(addr)]()
 
 class RAM(ROM):
-    def __call__(self, addr, data=None, wen=0):
+    def __call__(self, addr, data=None, wen=1):
         return self.mem[int(addr)](data, wen)
 
 Memory = RAM
