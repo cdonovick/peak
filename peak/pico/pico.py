@@ -1,3 +1,4 @@
+from bit_vector import BitVector
 from .isa import *
 from .. import Peak, Register, RAM, ROM
 
@@ -5,13 +6,22 @@ LR = Reg4(15)
 ZERO = Bit(0)
 ONE = Bit(1)
 
+def zext(x,n):
+    return BitVector(x.bits()+n*[0])
+
 def adc(a:Word,b:Word,c:Bit):
-    a = a.zext(1)
-    b = b.zext(1)
-    c = c.zext(16)
+    #print('a',a.bits(),len(a))
+    #print('b',b.bits())
+    #print('c',c.bits())
+    a = zext(a,1)
+    b = zext(b,1)
+    c = zext(c,16)
+    #print('a',a.bits(),len(a))
+    #print('b',b.bits())
+    #print('c',c.bits())
     res = a + b + c
-    print(a,b,c,res)
-    return res[0:-1], res[-1]
+    #print('res',res.bits())
+    return res[0:-1], Bit(res[-1])
 
 class Arith(Peak):
     def __call__(self, inst:Inst, a:Word, b:Word, c:Bit):
@@ -130,6 +140,9 @@ class Pico(Peak):
                 self.reg(inst.ra,Word(inst.imm))
             elif type(inst) == LDHI:
                 self.reg(inst.ra,Word(inst.imm << 8))
+            elif type(inst) == ST:
+                if inst.imm == 0:
+                    print(f'st {self.reg(inst.ra)}')
             else:
                 raise NotImplemented(inst)
             self.PC(self.PC()+1)

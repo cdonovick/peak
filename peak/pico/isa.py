@@ -153,6 +153,7 @@ sbc = ArithInst(op=Arith_Op.Sbc)
 
 ldlo = LDLO
 ldhi = LDHI
+st = ST
 
 jmp = Jump
 

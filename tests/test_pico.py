@@ -45,7 +45,7 @@ def alu(mem, op, ra, rb):
 
 inst = namedtuple("inst", ["name", "func"])
 
-NVALUES = 4
+NVALUES = 8
 def random16():
     return random.randint(0,1<<16-1)
 testvectors = [(random16(), random16()) for i in range(NVALUES)]
@@ -55,13 +55,23 @@ testvectors = [(random16(), random16()) for i in range(NVALUES)]
     inst('and_', lambda x, y: x&y),
     inst('or_',  lambda x, y: x|y),
     inst('xor',  lambda x, y: x^y),
-    #inst('add',  lambda x, y: x+y),
-    #inst('adc',  lambda x, y: x+y),
-    #inst('sub',  lambda x, y: x-y),
-    #inst('sbc',  lambda x, y: x-y),
+    inst('add',  lambda x, y: x+y),
+    inst('adc',  lambda x, y: x+y),
+    inst('sub',  lambda x, y: x-y),
+    inst('sbc',  lambda x, y: x-y),
 ])
 @pytest.mark.parametrize("ab", testvectors)
 def test_alu(op,ab):
     alu( [getattr(isa,op.name)(0,1)], op.func, ab[0], ab[1] )
 
+def test_cond():
+    pico = Pico([isa.mov(0,1)])
+    pico.poke_reg(1,-1)
+    pico()
+    assert pico.peak_flag('Z') == 0
+    assert pico.peak_flag('N') == 1
 
+def test_st():
+    pico = Pico([isa.st(0,0)])
+    pico.poke_reg(0,0xf)
+    pico()
