@@ -132,10 +132,10 @@ class Call:
         return self
 
 @dataclass
-class Ret:
+class Return:
     cond:Cond_Op = Cond_Op.Always
 
-ControlInst = (Jump, Call, Ret)
+ControlInst = (Jump, Call, Return)
 
 
 Inst = (LogicInst, ArithInst, MemInst, ControlInst)
@@ -156,6 +156,8 @@ ldhi = LDHI
 st = ST
 
 jmp = Jump
+call = Call
+ret = Return
 
 #print(mov(0,1))
 #print(ldlo(0,10))

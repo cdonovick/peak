@@ -75,3 +75,15 @@ def test_st():
     pico = Pico([isa.st(0,0)])
     pico.poke_reg(0,0xf)
     pico()
+
+def test_call():
+    pico = Pico([isa.call(2),isa.mov(0,0),isa.ret()])
+    pico()
+    assert pico.peak_pc() == 2
+    assert pico.peak_reg(15) == 1
+    pico()
+    assert pico.peak_pc() == 1
+    pico()
+    assert pico.peak_pc() == 2
+
+

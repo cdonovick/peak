@@ -151,9 +151,9 @@ class Pico(Peak):
                 if     type(inst) == Jump:
                     self.PC(Word(inst.imm))
                 elif   type(inst) == Call:
-                    self.reg(LR, pc)
+                    self.reg(LR, pc+1)
                     self.PC(Word(inst.imm))
-                elif   type(inst) == Ret:
+                elif   type(inst) == Return:
                     self.PC(self.reg(LR))
                 else:
                     raise NotImplemented(inst)
