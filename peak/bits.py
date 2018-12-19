@@ -1,6 +1,6 @@
 from bit_vector import BitVector as BV, UIntVector, SIntVector
 
-__all__ =  ['Bit', 'UInt', 'SInt', 'Bits', 'is_bits']
+__all__ =  ['BV', 'Bit', 'UInt', 'SInt', 'Bits', 'is_bits']
 
 def Bits(n):
     class _Bits(BV):
@@ -22,5 +22,5 @@ def SInt(n):
 
 Bit = Bits(1)
 
-def is_bits(t):
-    return issubclass(t,BV)
+def is_bits(bits):
+    return isinstance(bits,BV)

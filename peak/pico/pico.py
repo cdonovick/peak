@@ -111,7 +111,8 @@ class Pico(Peak):
             if   type == LDLO:
                 self.reg(inst.ra,Word(inst.imm))
             elif type == LDHI:
-                self.reg(inst.ra,Word(inst.imm << 8))
+                print('ldhi',int(inst.imm)<<8)
+                self.reg(inst.ra,Word(int(inst.imm) << 8))
             elif type == ST:
                 if inst.imm == 0:
                     print(f'st {self.reg(inst.ra)}')

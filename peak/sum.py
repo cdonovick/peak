@@ -1,4 +1,4 @@
-__all__ =  ['Sum']
+__all__ =  ['Sum', 'is_sum']
 
 class Sum:
     fields = None
@@ -15,5 +15,8 @@ class Sum:
 
     def match(self):
         return type(self.a), self.a
+
+def is_sum(sum):
+    return isinstance(sum, Sum)
 
 
