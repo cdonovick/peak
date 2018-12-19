@@ -4,13 +4,6 @@ from peak.pico import Pico, Word
 import peak.pico.isa as isa
 import pytest
 
-def test_jmp():
-    mem = [isa.jmp(0)]
-    pico = Pico(mem)
-    assert pico.peak_pc() == 0
-    pico()
-    assert pico.peak_pc() == 0
-
 def test_ldlo():
     mem = [isa.ldlo(0,10)]
     pico = Pico(mem)
@@ -25,7 +18,7 @@ def test_ldhi():
     assert pico.peak_pc() == 1
     assert pico.peak_reg(0) == 10 << 8
 
-def test_lohi():
+def test_ld():
     mem = [isa.ldlo(0,1),isa.ldhi(1,2),isa.or_(0,1)]
     pico = Pico(mem)
     pico()
@@ -34,6 +27,10 @@ def test_lohi():
     assert pico.peak_pc() == 3
     assert pico.peak_reg(0) == (2<<8)|1
 
+def test_st():
+    pico = Pico([isa.st(0,0)])
+    pico.poke_reg(0,0xf)
+    pico()
 
 def alu(mem, op, ra, rb):
     pico = Pico(mem)
@@ -71,10 +68,13 @@ def test_cond():
     assert pico.peak_flag('Z') == 0
     assert pico.peak_flag('N') == 1
 
-def test_st():
-    pico = Pico([isa.st(0,0)])
-    pico.poke_reg(0,0xf)
+
+def test_jump():
+    mem = [isa.jmp(0)]
+    pico = Pico(mem)
+    assert pico.peak_pc() == 0
     pico()
+    assert pico.peak_pc() == 0
 
 def test_call():
     pico = Pico([isa.call(2),isa.mov(0,0),isa.ret()])
@@ -86,4 +86,12 @@ def test_call():
     pico()
     assert pico.peak_pc() == 2
 
+#test_jump()
+#test_call()
 
+#test_ldlo()
+#test_ldhi()
+#test_ld()
+#test_st()
+
+#test_cond()

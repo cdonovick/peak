@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from peak import Bit, Bits, Enum
+from peak import Bit, Bits, Enum, Sum
 
 #word 16
 #registers 16
@@ -69,26 +69,14 @@ class Cond_Op(Enum):
 @dataclass
 class LogicInst:
     op:Logic_Op
-    ra:RegA = RegA(0)
-    rb:RegB = RegB(0)
-
-    def __call__(self, ra, rb):
-        self.ra = RegA(ra)
-        self.rb = RegB(rb)
-        return self
+    ra:RegA
+    rb:RegB
 
 @dataclass
 class ArithInst:
     op:Arith_Op
-    ra:RegA = RegA(0)
-    rb:RegB = RegB(0)
-
-    def __call__(self, ra, rb):
-        self.ra = RegA(ra)
-        self.rb = RegB(rb)
-        return self
-
-ALUInst = (ArithInst, LogicInst)
+    ra:RegA
+    rb:RegB
 
 @dataclass
 class LDLO:
@@ -110,55 +98,60 @@ class ST:
     ra:RegA
     imm:Imm
 
-MemInst = (LDLO, LDHI, LD, ST)
+class MemInst(Sum):
+    fields = (LDLO, LDHI, LD, ST)
 
 
 @dataclass
 class Jump:
     imm:Imm
-    cond:Cond_Op = Cond_Op.Always
-
-    def __call__(self, imm):
-        self.imm = Byte(imm)
-        return self
+    cond:Cond_Op
 
 @dataclass
 class Call:
     imm:Imm
-    cond:Cond_Op = Cond_Op.Always
-
-    def __call__(self, imm):
-        self.imm = Byte(imm)
-        return self
+    cond:Cond_Op
 
 @dataclass
 class Return:
-    cond:Cond_Op = Cond_Op.Always
+    cond:Cond_Op
 
-ControlInst = (Jump, Call, Return)
-
-
-Inst = (LogicInst, ArithInst, MemInst, ControlInst)
+class ControlInst(Sum):
+    fields = (Jump, Call, Return)
 
 
-mov = LogicInst(op=Logic_Op.Mov)
-and_ = LogicInst(op=Logic_Op.And)
-or_ = LogicInst(op=Logic_Op.Or)
-xor = LogicInst(op=Logic_Op.XOr)
+class Inst(Sum):
+    fields = (LogicInst, ArithInst, MemInst, ControlInst)
 
-add = ArithInst(op=Arith_Op.Add)
-sub = ArithInst(op=Arith_Op.Sub)
-adc = ArithInst(op=Arith_Op.Adc)
-sbc = ArithInst(op=Arith_Op.Sbc)
+def mov(ra,rb):
+    return Inst(LogicInst(Logic_Op.Mov, ra, rb))
+def and_(ra, rb):
+    return Inst(LogicInst(Logic_Op.And, ra, rb))
+def or_(ra, rb):
+    return Inst(LogicInst(Logic_Op.Or, ra, rb))
+def xor(ra, rb):
+    return Inst(LogicInst(Logic_Op.XOr, ra, rb))
 
-ldlo = LDLO
-ldhi = LDHI
-st = ST
+def add(ra, rb):
+    return Inst(ArithInst(Arith_Op.Add, ra, rb))
+def sub(ra, rb):
+    return Inst(ArithInst(Arith_Op.Sub, ra, rb))
+def adc(ra, rb):
+    return Inst(ArithInst(Arith_Op.Adc, ra, rb))
+def sbc(ra, rb):
+    return Inst(ArithInst(Arith_Op.Sbc, ra, rb))
 
-jmp = Jump
-call = Call
-ret = Return
+def ldlo(ra, imm):
+    return Inst(MemInst(LDLO(ra, imm)))
+def ldhi(ra, imm):
+    return Inst(MemInst(LDHI(ra, imm)))
+def st(ra, imm):
+    return Inst(MemInst(ST(ra, imm)))
 
-#print(mov(0,1))
-#print(ldlo(0,10))
-#print(jmp(10))
+def jmp(imm, cond=Cond_Op.Always):
+    return Inst(ControlInst(Jump(imm, cond)))
+def call(imm, cond=Cond_Op.Always):
+    return Inst(ControlInst(Call(imm, cond)))
+def ret(cond=Cond_Op.Always):
+    return Inst(ControlInst(Return(cond)))
+

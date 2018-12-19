@@ -10,68 +10,35 @@ def zext(x,n):
     return BitVector(x.bits()+n*[0])
 
 def adc(a:Word,b:Word,c:Bit):
-    #print('a',a.bits(),len(a))
-    #print('b',b.bits())
-    #print('c',c.bits())
     a = zext(a,1)
     b = zext(b,1)
     c = zext(c,16)
-    #print('a',a.bits(),len(a))
-    #print('b',b.bits())
-    #print('c',c.bits())
     res = a + b + c
-    #print('res',res.bits())
     return res[0:-1], Bit(res[-1])
 
-class Arith(Peak):
-    def __call__(self, inst:Inst, a:Word, b:Word, c:Bit):
-        if   inst.op == Arith_Op.Add:
-            return adc(a,b,ZERO)
-        elif inst.op == Arith_Op.Sub:
-            return adc(a,~b,ONE)
-        elif inst.op == Arith_Op.Adc:
-            return adc(a,b,c)
-        elif inst.op == Arith_Op.Sbc:
-            return adc(a,~b,~c)
-        else:
-            raise NotImplemented(inst.op)
+def arith(op:Arith_Op, a:Word, b:Word, c:Bit) :
+    if   op == Arith_Op.Add:
+        return adc(a,b,ZERO)
+    elif op == Arith_Op.Sub:
+        return adc(a,~b,ONE)
+    elif op == Arith_Op.Adc:
+        return adc(a,b,c)
+    elif op == Arith_Op.Sbc:
+        return adc(a,~b,~c)
+    else:
+        raise NotImplemented(inst.op)
 
-class Logic(Peak):
-    def __call__(self, inst:Inst, a:Word, b:Word):
-        if   inst.op == Logic_Op.Mov:
+def logic(op:Logic_Op, a:Word, b:Word):
+        if   op == Logic_Op.Mov:
             return b
-        elif inst.op == Logic_Op.And:
+        elif op == Logic_Op.And:
             return a & b
-        elif inst.op == Logic_Op.Or:
+        elif op == Logic_Op.Or:
             return a | b
-        elif inst.op == Logic_Op.XOr:
+        elif op == Logic_Op.XOr:
             return a ^ b
         else:
             raise NotImplemented(inst.op)
-
-class ALU(Peak):
-    def __init__(self):
-        self.arith = Arith()
-        self.logic = Logic()
-
-    def __call__(self, alu, a:Word, b:Word, C:Bit):
-
-        if type(alu) == LogicInst:
-            res = self.logic(alu, a, b)
-            Z = res == 0
-            N = res[-1]
-            C = None
-            V = None
-        elif  type(alu) == ArithInst:
-            res, res_p = self.arith(alu, a, b, C)
-            Z = res == 0
-            N = res[-1]
-            C = res_p
-            V = (a[-1] & b[-1] & ~N) or (~a[-1] & ~b[-1] & N)
-        else:
-            raise NotImplementedError(alu)
-
-        return res, Z, N, C, V
 
 def cond(code, Z, N, C, V):
     if   code == Cond_Op.Z:
@@ -119,46 +86,58 @@ class Pico(Peak):
         self.C = Register(Bit,ZERO)
         self.V = Register(Bit,ZERO)
 
-        self.alu = ALU()
-
     def __call__(self):
         pc = self.PC()
         inst = self.mem(pc)
-        insttype = type(inst)
-        if insttype in ALUInst:
-            ra = self.reg(inst.ra)
-            rb = self.reg(inst.rb)
-            res, Z, N, C, V = self.alu(inst, ra, rb, self.C())
+        type, inst = inst.match()
+        if type == LogicInst or type == ArithInst:
+            a = self.reg(inst.ra)
+            b = self.reg(inst.rb)
+            if type == LogicInst:
+                res = logic(inst.op, a, b)
+            else:
+                res, res_p = arith(inst.op, a, b, self.C())
             self.reg(inst.ra,res)
-            self.Z(Z)
-            self.N(N)
-            self.C(C, C is not None)
-            self.V(V, V is not None)
+            self.Z(res==0)
+            N = self.N(Bit(res[-1]))
+            if type == ArithInst:
+                self.C(res_p)
+                msba = Bit(a[-1])
+                msbb = Bit(b[-1])
+                self.V( (msba & msbb & ~N) or (~msba & ~msbb & N) )
             self.PC(self.PC()+1)
-        elif insttype in MemInst:
-            if   type(inst) == LDLO:
+        elif type == MemInst:
+            type, inst = inst.match()
+            if   type == LDLO:
                 self.reg(inst.ra,Word(inst.imm))
-            elif type(inst) == LDHI:
+            elif type == LDHI:
                 self.reg(inst.ra,Word(inst.imm << 8))
-            elif type(inst) == ST:
+            elif type == ST:
                 if inst.imm == 0:
                     print(f'st {self.reg(inst.ra)}')
             else:
                 raise NotImplemented(inst)
             self.PC(self.PC()+1)
-        elif insttype in ControlInst:
-            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                if     type(inst) == Jump:
+        elif type == ControlInst:
+            type, inst = inst.match()
+            if     type == Jump:
+                if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
                     self.PC(Word(inst.imm))
-                elif   type(inst) == Call:
+                else:
+                    self.PC(self.PC()+1)
+            elif   type == Call:
+                if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
                     self.reg(LR, pc+1)
                     self.PC(Word(inst.imm))
-                elif   type(inst) == Return:
+                else:
+                    self.PC(self.PC()+1)
+            elif   type == Return:
+                if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
                     self.PC(self.reg(LR))
                 else:
-                    raise NotImplemented(inst)
+                    self.PC(self.PC()+1)
             else:
-                self.PC(self.PC()+1)
+                raise NotImplemented(inst)
         else:
             raise NotImplemented(inst)
 
