@@ -1,18 +1,31 @@
 from dataclasses import dataclass
-from peak import Bits, Enum
+from peak import Bits, Enum, Product
 
 # https://github.com/StanfordAHA/CGRAGenerator/wiki/PE-Spec
 
-DATAWIDTH = 16
-
 Bit = Bits(1)
-Data = Bits(DATAWIDTH)
 
-class Mode(Enum):
+DATAWIDTH = 16
+Data = Bits(DATAWIDTH)
+Data0 = Bits(DATAWIDTH)
+Data1 = Bits(DATAWIDTH)
+Data2 = Bits(DATAWIDTH)
+Bit0 = Bits(1)
+Bit1 = Bits(1)
+Bit2 = Bits(1)
+
+class Mode:
     CONST = 0
     VALID = 1
     BYPASS = 2
     DELAY = 3
+
+RegA = Bits(2)
+RegB = Bits(2)
+RegC = Bits(2)
+RegD = Bits(2)
+RegE = Bits(2)
+RegF = Bits(2)
 
 class ALU_Op(Enum):
     Add = 0
@@ -29,8 +42,9 @@ class ALU_Op(Enum):
     Or = 0x12
     And = 0x13
     XOr = 0x14
+    Neg = 0x11
 
-Signed = Bit
+Signed = Bits(1)
 
 class Cond_Op(Enum):
     Z = 0
@@ -53,23 +67,23 @@ class Cond_Op(Enum):
 LUT_Op = Bits(8)
 
 @dataclass
-class Inst:
-    signed:Signed = Bit(0)
+class Inst(Product):
+    signed:Signed = Signed(0)
     alu:ALU_Op = ALU_Op.Add
     lut:LUT_Op = LUT_Op(0)
     cond:Cond_Op = Cond_Op.Z
-    data0:Data = Data(0)
-    data1:Data = Data(0)
-    data2:Data = Data(0)
-    bit0:Bit = Bit(0)
-    bit1:Bit = Bit(0)
-    bit2:Bit = Bit(0)
-    rega:Mode = Mode.BYPASS
-    regb:Mode = Mode.BYPASS
-    regc:Mode = Mode.BYPASS
-    regd:Mode = Mode.BYPASS
-    rege:Mode = Mode.BYPASS
-    regf:Mode = Mode.BYPASS
+    data0:Data0 = Data0(0)
+    data1:Data1 = Data1(0)
+    data2:Data2 = Data2(0)
+    bit0:Bit0 = Bit0(0)
+    bit1:Bit1 = Bit1(0)
+    bit2:Bit2 = Bit2(0)
+    rega:RegA = RegA(Mode.BYPASS)
+    regb:RegB = RegB(Mode.BYPASS)
+    regc:RegC = RegC(Mode.BYPASS)
+    regd:RegD = RegD(Mode.BYPASS)
+    rege:RegE = RegE(Mode.BYPASS)
+    regf:RegF = RegF(Mode.BYPASS)
 
     def __call__(self):
         return self
@@ -84,24 +98,24 @@ class Inst:
         return self
 
     def reg(self, i, mode, data=0):
-        if i == 0:
-            self.rega = mode
-            self.data0 = Data(data)
-        elif i == 1:
-            self.regb = mode
-            self.data1 = Data(data)
-        elif i == 2:
-            self.regc = mode
-            self.data2 = Data(data)
-        elif i == 3:
-            self.regd = mode
-            self.bit0 = Bit(data)
-        elif i == 4:
-            self.rege = mode
-            self.bit1 = Bit(data)
-        elif i == 5:
-            self.regf = mode
-            self.bit2 = Bit(data)
+        if i == 0 or i == 'a':
+            self.rega = RegA(mode)
+            self.data0 = Data0(data)
+        elif i == 1 or i == 'b':
+            self.regb = RegB(mode)
+            self.data1 = Data1(data)
+        elif i == 2 or i == 'c':
+            self.regc = RegC(mode)
+            self.data2 = Data2(data)
+        elif i == 3 or i == 'd':
+            self.regd = RegD(mode)
+            self.bit0 = Bit0(data)
+        elif i == 4 or i == 'e':
+            self.rege = RegE(mode)
+            self.bit1 = Bit1(data)
+        elif i == 5 or i == 'f':
+            self.regf = RegF(mode)
+            self.bit2 = Bit2(data)
         else:
             raise NotImplemented(i)
         return self

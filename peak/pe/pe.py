@@ -1,5 +1,6 @@
 from .isa import *
 from .. import Peak
+from bit_vector import BitVector
 
 class Register(Peak):
     def __init__(self, type, init = 0):
@@ -38,40 +39,74 @@ class RegisterMode(Peak):
 class ALU(Peak):
     def __call__(self, alu:ALU_Op, signed:Signed, a:Data, b:Data, d:Bit):
 
+        def zext(x,n):
+            return BitVector(x.bits()+n*[0])
+        def adc(a:Data,b:Data,c:Bit):
+            a = zext(a,1)
+            b = zext(b,1)
+            c = zext(c,16)
+            res = a + b + c
+            return res[0:-1], Bit(res[-1])
+        def mul(a, b, c, d):
+            a, b = a.ext(16), b.ext(16)
+            return a*b
+        def mult0(a, b, c, d):
+            return mul(a, b, c, d)[:16], 0
+        def mult1(a, b, c, d):
+            return mul(a, b, c, d)[8:24], 0
+        def mult2(a, b, c, d):
+            return mul(a, b, c, d)[16:32], 0
+
+
         if signed:
             a = SInt(a)
             b = SInt(b)
             c = SInt(c)
 
-        if alu == ALU_Op.Add:
-            res = a + b
-            res_p = 0
+        if   alu == ALU_Op.Add:
+            res, res_p = adc(a, b, Bit(0))
         elif alu == ALU_Op.Sub:
-            res = a - b
-            res_p = 0
+            res, res_p = adc(a, ~b, Bit(1))
+        elif alu == ALU_Op.Mult0:
+            res, res_p = mul0(a, b, c, d)
+        elif alu == ALU_Op.Mult1:
+            res, res_p = mul1(a, b, c, d)
+        elif alu == ALU_Op.Mult2:
+            res, res_p = mul1(a, b, c, d)
+        elif alu == ALU_Op.GTE_Max:
+            res, res_p = a if a >= b else b, a >= b
+        elif alu == ALU_Op.LTE_Min:
+            res, res_p = a if a <= b else b, a <= b
+        elif alu == ALU_Op.Abs:
+            res, res_p = a if a >= 0 else -a, Bit(a[-1])
+        elif alu == ALU_Op.Sel:
+            res, res_p = a if d else b, 0
         elif alu == ALU_Op.And:
-            res = a & b
-            res_p = 0
+            res, res_p = a & b, 0
         elif alu == ALU_Op.Or:
-            res = a | b
-            res_p = 0
+            res, res_p = a | b, 0
         elif alu == ALU_Op.XOr:
-            res = a ^ b
-            res_p = 0
+            res, res_p = a ^ b, 0
+        elif alu == ALU_Op.SHR:
+            res, res_p = a >> b[:4], 0
+        elif alu == ALU_Op.SHL:
+            res, res_p = a << b[:4], 0
         else:
             raise NotImplementedError(alu)
 
         Z = res == 0
-        N = res[-1]
+        N = Bit(res[-1])
         C = res_p
-        V = (a[-1] & b[-1] & ~N) or (~a[-1] & ~b[-1] & N)
+        msba = Bit(a[-1])
+        msbb = Bit(b[-1])
+        V = (msba & msbb & ~N) or (~msba & ~msbb & N)
 
         return res, res_p, Z, N, C, V
 
 class LUT(Peak):
     def __call__(self, lut:LUT_Op, bit0:Bit, bit1:Bit, bit2:Bit) -> Bit:
         i = (int(bit2)<<2) | (int(bit1)<<1) | int(bit0)
-        return lut & (1 << i)
+        return Bit(lut & (1 << i))
     
 class Cond(Peak):
     def __call__(self, op:Cond_Op, 
