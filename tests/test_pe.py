@@ -1,9 +1,9 @@
 from peak.pe import PE, Bit, Data
-from peak.pe.isa import add, sub, and_, or_, xor
+import peak.pe.isa as isa
 
 def test_and():
     pe = PE()
-    inst = and_()
+    inst = isa.and_()
     res, res_p, irq = pe(inst, Data(1), Data(3))
     assert res==1
     assert res_p==0
@@ -11,7 +11,7 @@ def test_and():
 
 def test_or():
     pe = PE()
-    inst = or_()
+    inst = isa.or_()
     res, res_p, irq = pe(inst, Data(1),Data(3))
     assert res==3
     assert res_p==0
@@ -19,23 +19,31 @@ def test_or():
 
 def test_xor():
     pe = PE()
-    inst = xor()
+    inst = isa.xor()
     res, res_p, irq = pe(inst, Data(1),Data(3))
     assert res==2
     assert res_p==0
     assert irq==0
 
-#def test_inv():
-#    pe = PE()
-#    inst = inv()
-#    res, res_p, irq = pe(inst, Data(1),Data(3))
-#    assert res==0xfffe
-#    assert res_p==0
-#    assert irq==0
+def test_inv():
+    pe = PE()
+    inst = isa.sub()
+    res, res_p, irq = pe(inst, Data(-1),Data(1))
+    assert res==0xfffe
+    assert res_p==0
+    assert irq==0
+
+def test_neg():
+    pe = PE()
+    inst = isa.sub()
+    res, res_p, irq = pe(inst, Data(0),Data(1))
+    assert res==0xffff
+    assert res_p==0
+    assert irq==0
 
 def test_add():
     pe = PE()
-    inst = add()
+    inst = isa.add()
     res, res_p, irq = pe(inst, Data(1),Data(3))
     assert res==4
     assert res_p==0
@@ -43,67 +51,103 @@ def test_add():
 
 def test_sub():
     pe = PE()
-    inst = sub()
+    inst = isa.sub()
     res, res_p, irq = pe(inst, Data(1),Data(3))
     assert res==-2
     assert res_p==0
     assert irq==0
 
+def test_lsl():
+    pe = PE()
+    inst = isa.lsl()
+    res, res_p, irq = pe(inst, Data(2),Data(1))
+    assert res==4
+    assert res_p==0
+    assert irq==0
 
-#def test_lshl():
-#    a = pe.lshl()
-#    res, res_p, irq = a(2,1)
-#    assert res==4
-#    assert res_p==0
+def test_lsr():
+    pe = PE()
+    inst = isa.lsr()
+    res, res_p, irq = pe(inst, Data(2),Data(1))
+    assert res==1
+    assert res_p==0
+    assert irq==0
 
-#def test_shr():
-#    a = pe.shr(False)
-#    res, res_p, irq = a(2,1)
-#    assert res==1
-#    assert res_p==0
+def test_asr():
+    pe = PE()
+    inst = isa.asr()
+    res, res_p, irq = pe(inst, Data(-2),Data(1))
+    assert res==65535
+    assert res_p==0
+    assert irq==0
 
-## def test_ashr():
-##     a = pe.ashr()
-##     res, res_p, irq = a(-2,1)
-##     assert res==65535
-##     assert res_p==0
+def test_sel():
+    pe = PE()
+    inst = isa.sel()
+    res, res_p, irq = pe(inst, Data(1),Data(2),Bit(0))
+    assert res==2
+    assert res_p==0
+    assert irq==0
 
-#def test_sel():
-#    a = pe.sel()
-#    res, res_p, irq = a(1,2,0,0)
-#    assert res==2
+def test_umin():
+    pe = PE()
+    inst = isa.umin()
+    res, res_p, irq = pe(inst, Data(1),Data(2))
+    assert res==1
+    assert res_p==0
+    assert irq==0
 
-#def test_min():
-#    a = pe.min(signed=0)
-#    res, res_p, irq = a(1,2)
-#    assert res==1
-#    assert res_p==False
+def test_umax():
+    pe = PE()
+    inst = isa.umax()
+    res, res_p, irq = pe(inst, Data(1),Data(2))
+    assert res==2
+    assert res_p==0
+    assert irq==0
 
-#def test_max():
-#    a = pe.max(signed=0)
-#    res, res_p, irq = a(1,2)
-#    assert res==2
-#    assert res_p==0
+def test_abs():
+    pe = PE()
+    inst = isa.abs()
+    res, res_p, irq = pe(inst,Data(-1))
+    assert res==1
+    assert res_p==0
+    assert irq==0
 
-#def test_abs():
-#    a = pe.abs()
-#    res, res_p, irq = a(-1)
-#    assert res==1
+def test_eq():
+    pe = PE()
+    inst = isa.sub.flag(isa.Cond_Op.EQ)
+    res, res_p, irq = pe(inst,Data(1),Data(1))
+    assert res_p==1
 
-## TODO: eq implemented with sub + Z flag
-## def test_eq():
-##     a = pe.eq()
-##     res, res_p, irq = a(1,2)
-##     assert res_p==0
+def test_ne():
+    pe = PE()
+    inst = isa.sub.flag(isa.Cond_Op.NE)
+    res, res_p, irq = pe(inst,Data(1),Data(1))
+    assert res_p==0
 
-#def test_ge():
-#    a = pe.ge(signed=0)
-#    res, res_p, irq = a(1,2)
-#    assert res_p==0
+def test_uge():
+    pe = PE()
+    inst = isa.sub.flag(isa.Cond_Op.UGE)
+    res, res_p, irq = pe(inst,Data(1),Data(1))
+    assert res_p==1
 
-#def test_le():
-#    a = pe.le(signed=0)
-#    res, res_p, irq = a(1,2)
-#    assert res_p==False
+def test_ule():
+    pe = PE()
+    inst = isa.sub.flag(isa.Cond_Op.ULE)
+    res, res_p, irq = pe(inst,Data(1),Data(1))
+    assert res_p==1
+
+def test_ugt():
+    pe = PE()
+    inst = isa.sub.flag(isa.Cond_Op.UGT)
+    res, res_p, irq = pe(inst,Data(1),Data(1))
+    assert res_p==0
+
+def test_ult():
+    pe = PE()
+    inst = isa.sub.flag(isa.Cond_Op.ULT)
+    res, res_p, irq = pe(inst,Data(1),Data(1))
+    assert res_p==0
+
 
 
