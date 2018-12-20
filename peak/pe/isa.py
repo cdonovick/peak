@@ -62,7 +62,7 @@ class Cond_Op(Enum):
     GT = 12
     LE = 13
     LUT = 14
-    PE = 15
+    ALU = 15
 
 LUT_Op = Bits(8)
 

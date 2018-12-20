@@ -119,10 +119,10 @@ def cond(code:Cond_Op, alu:Bit, lut:Bit, Z:Bit, N:Bit, C:Bit, V:Bit) -> Bit:
         return not Z and (N == V)
     elif code == Cond_Op.SLE:
         return Z or (N != V)
-    elif code == Cond_Op.Never:
-        return Bit(0)
-    elif code == Cond_Op.Always:
-        return Bit(1)
+    elif code == Cond_Op.ALU:
+        return alu
+    elif code == Cond_Op.LUT:
+        return lut
     raise NotImplementedError(op)
 
 
