@@ -1,21 +1,6 @@
 from .isa import *
-from .. import Peak
+from .. import Peak, Register
 from bit_vector import BitVector
-
-class Register(Peak):
-    def __init__(self, type, init = 0):
-        self.type = type
-        self.init = init
-        self.reset()
-
-    def reset(self):
-        self.value = self.init
-
-    def __call__(self, value, clk_en:Bit) -> Data:
-        retvalue = self.value
-        if clk_en:
-            self.value = type(value)
-        return retvalue
 
 class RegisterMode(Peak):
     def __init__(self, init = 0):
