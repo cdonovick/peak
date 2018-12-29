@@ -1,178 +1,58 @@
-from .isa import *
-from .. import Peak, Register
 from bit_vector import BitVector, SIntVector
+from .. import Peak
+from .mode import RegisterMode
+from .cond import cond
+from .lut import lut
+from .isa import *
 
-class RegisterMode(Peak):
-    def __init__(self, init = 0):
-        self.register = Register(init)
+def gen_pe(isa, num_inputs):
 
-    def reset(self):
-        self.register.reset()
+    class PE(Peak):
 
-    def __call__(self, mode:Mode, const, value, clk_en:Bit):
-        if   mode == Mode.CONST:
-            return const
-        elif mode == Mode.BYPASS:
-            return value
-        elif mode == Mode.DELAY:
-            return self.register(value, mode == Mode.DELAY)
-        elif mode == Mode.VALID:
-            return self.register(value, clk_en)
-        else:
-            raise NotImplementedError()
+        def __init__(self):
+            self.ops = isa.fields
+            
+            # Data registers
+            self.regdata = [(RegisterMode(Data)) for i in range(num_inputs)]
 
-def alu(alu:ALU_Op, signed:Signed, a:Data, b:Data, d:Bit):
+            # Bit Registers
+            self.regbit0 = RegisterMode(Bit)
+            self.regbit1 = RegisterMode(Bit)
+            self.regbit2 = RegisterMode(Bit)
 
-    def zext(x,n):
-        return BitVector(x.bits()+n*[0])
-    def adc(a:Data,b:Data,c:Bit):
-        msba = Bit(a[-1])
-        msbb = Bit(b[-1])
-        a = zext(a,1)
-        b = zext(b,1)
-        c = zext(c,16)
-        res = a + b + c
-        C = Bit(res[-1])
-        res = res[0:-1]
-        N = Bit(res[-1])
-        V = (msba & msbb & ~N) or (~msba & ~msbb & N)
-        return res, C, V
-    def mul(a, b):
-        a, b = a.ext(16), b.ext(16)
-        return a*b
-    def mult0(a, b):
-        res = mul(a, b)
-        return res[:16], 0, 0 # wrong C, V
-    def mult1(a, b, d):
-        res = mul(a, b)
-        return res[8:24], 0, 0 # wrong C, V
-    def mult2(a, b, c, d):
-        res = mul(a, b)
-        return res[16:32], 0, 0 # wrong C, V
+        def alu(self, inst, args):
+            res, res_p, C, V = inst.eval(*args)
 
-    if signed:
-        a = SIntVector(a)
-        b = SIntVector(b)
+            Z = res == 0
+            N = Bit(res[-1])
 
-    C = 0
-    V = 0
-    if   alu == ALU_Op.Add:
-        res, C, V = adc(a, b, Bit(0))
-        res_p = C
-    elif alu == ALU_Op.Sub:
-        res, C, V = adc(a, ~b, Bit(1)) 
-        res_p = C
-    elif alu == ALU_Op.Mult0:
-        res, C, V = mul0(a, b)
-        res_p = C
-    elif alu == ALU_Op.Mult1:
-        res, C, V = mul1(a, b)
-        res_p = C
-    elif alu == ALU_Op.Mult2:
-        res, C, V = mul1(a, b) 
-        res_p = C
-    elif alu == ALU_Op.GTE_Max:
-        # C, V = a-b?
-        res, res_p = a if a >= b else b, a >= b
-    elif alu == ALU_Op.LTE_Min:
-        # C, V = a-b?
-        res, res_p = a if a <= b else b, a <= b
-    elif alu == ALU_Op.Abs:
-        res, res_p = a if a >= 0 else -a, Bit(a[-1])
-    elif alu == ALU_Op.Sel:
-        res, res_p = a if d else b, 0
-    elif alu == ALU_Op.And:
-        res, res_p = a & b, 0
-    elif alu == ALU_Op.Or:
-        res, res_p = a | b, 0
-    elif alu == ALU_Op.XOr:
-        res, res_p = a ^ b, 0
-    elif alu == ALU_Op.SHR:
-        res, res_p = a >> b[:4], 0
-    elif alu == ALU_Op.SHL:
-        res, res_p = a << b[:4], 0
-    elif alu == ALU_Op.Neg:
-        if signed:
-            res, res_p = ~a+Bit(1), 0
-        else:
-            res, res_p = ~a, 0
-    else:
-        raise NotImplementedError(alu)
+            return res, res_p, Z, N, C, V
 
-    Z = res == 0
-    N = Bit(res[-1])
+        def __call__(self, inst: Inst, \
+                        data, \
+                        bit0: Bit = Bit(0), \
+                        bit1: Bit = Bit(0), \
+                        bit2: Bit = Bit(0), \
+                        clk_en: Bit = Bit(1)):
 
-    return res, res_p, Z, N, C, V
+            data = [self.regdata[i](inst.data_mode[i],
+                                    inst.data[i],
+                                    data[i],
+                                    clk_en) 
+                                    for i in range(num_inputs)]
 
-def lut( lut:LUT_Op, bit0:Bit, bit1:Bit, bit2:Bit) -> Bit:
-    i = (int(bit2)<<2) | (int(bit1)<<1) | int(bit0)
-    return Bit(lut & (1 << i))
-    
-def cond(code:Cond_Op, alu:Bit, lut:Bit, Z:Bit, N:Bit, C:Bit, V:Bit) -> Bit:
-    if   code == Cond_Op.Z:
-        return Z
-    elif code == Cond_Op.Z_n:
-        return not Z
-    elif code == Cond_Op.C or code == Cond_Op.UGE:
-        return C
-    elif code == Cond_Op.C_n or code == Cond_Op.ULT:
-        return not C
-    elif code == Cond_Op.N:
-        return N
-    elif code == Cond_Op.N_n:
-        return not N
-    elif code == Cond_Op.V:
-        return V
-    elif code == Cond_Op.V_n:
-        return not V
-    elif code == Cond_Op.UGT:
-        return C and not Z
-    elif code == Cond_Op.ULE:
-        return not C or Z
-    elif code == Cond_Op.SGE:
-        return N == V
-    elif code == Cond_Op.SLT:
-        return N != V
-    elif code == Cond_Op.SGT:
-        return not Z and (N == V)
-    elif code == Cond_Op.SLE:
-        return Z or (N != V)
-    elif code == Cond_Op.ALU:
-        return alu
-    elif code == Cond_Op.LUT:
-        return lut
-    raise NotImplementedError(op)
+            bit0 = self.regbit0(inst.bit0_mode, inst.bit0, bit0, clk_en)
+            bit1 = self.regbit1(inst.bit1_mode, inst.bit1, bit1, clk_en)
+            bit2 = self.regbit2(inst.bit2_mode, inst.bit2, bit2, clk_en)
 
+            alu_res, alu_res_p, Z, N, C, V = self.alu(inst, data + [bit0])
 
-class PE(Peak):
+            lut_res = lut(inst.lut, bit0, bit1, bit2)
+            res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
+            irq = Bit(0)
 
-    def __init__(self):
-        # Data registers
-        self.rega = RegisterMode(Data)
-        self.regb = RegisterMode(Data)
+            return alu_res, res_p, irq
 
-        # Bit Registers
-        self.regd = RegisterMode(Bit)
-        self.rege = RegisterMode(Bit)
-        self.regf = RegisterMode(Bit) 
-
-    def __call__(self, inst: Inst, \
-        data0: Data, data1: Data = Data(0), \
-        bit0: Bit = Bit(0), bit1: Bit = Bit(0), bit2: Bit = Bit(0), \
-        clk_en: Bit = Bit(1)):
-
-        ra = self.rega(inst.rega, inst.data0, data0, clk_en)
-        rb = self.regb(inst.regb, inst.data1, data1, clk_en)
-
-        rd = self.regd(inst.regd, inst.bit0, bit0, clk_en)
-        re = self.rege(inst.rege, inst.bit1, bit1, clk_en)
-        rf = self.regf(inst.regf, inst.bit2, bit2, clk_en)
-
-        alu_res, alu_res_p, Z, N, C, V= alu(inst.alu, inst.signed, ra, rb, rd)
-        lut_res = lut(inst.lut, rd, re, rf)
-        res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
-        irq = Bit(0)
-
-        return alu_res, res_p, irq
+    return PE
 
 
