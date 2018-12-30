@@ -16,62 +16,62 @@ def adc(a:Word,b:Word,c:Bit):
     res = a + b + c
     return res[0:-1], Bit(res[-1])
 
-def arith(op:Arith_Op, a:Word, b:Word, c:Bit) :
-    if   op == Arith_Op.Add:
+def arith(type, a:Word, b:Word, c:Bit) :
+    if   type == Add:
         return adc(a,b,ZERO)
-    elif op == Arith_Op.Sub:
+    elif type == Sub:
         return adc(a,~b,ONE)
-    elif op == Arith_Op.Adc:
+    elif type == Adc:
         return adc(a,b,c)
-    elif op == Arith_Op.Sbc:
+    elif type == Sbc:
         return adc(a,~b,~c)
     else:
-        raise NotImplemented(inst.op)
+        raise NotImplemented(type)
 
-def logic(op:Logic_Op, a:Word, b:Word):
-        if   op == Logic_Op.Mov:
-            return b
-        elif op == Logic_Op.And:
-            return a & b
-        elif op == Logic_Op.Or:
-            return a | b
-        elif op == Logic_Op.XOr:
-            return a ^ b
-        else:
-            raise NotImplemented(inst.op)
+def logic(type, a:Word, b:Word):
+    if   type == Mov:
+        return b
+    elif type == And:
+        return a & b
+    elif type == Or:
+        return a | b
+    elif type == XOr:
+        return a ^ b
+    else:
+        raise NotImplemented(type)
 
 def cond(code, Z, N, C, V):
-    if   code == Cond_Op.Z:
+    if   code == Cond.Z:
         return Z
-    elif code == Cond_Op.Z_n:
+    elif code == Cond.Z_n:
         return not Z
-    elif code == Cond_Op.C or code == Cond_Op.UGE:
+    elif code == Cond.C or code == Cond.UGE:
         return C
-    elif code == Cond_Op.C_n or code == Cond_Op.ULT:
+    elif code == Cond.C_n or code == Cond.ULT:
         return not C
-    elif code == Cond_Op.N:
+    elif code == Cond.N:
         return N
-    elif code == Cond_Op.N_n:
+    elif code == Cond.N_n:
         return not N
-    elif code == Cond_Op.V:
+    elif code == Cond.V:
         return V
-    elif code == Cond_Op.V_n:
+    elif code == Cond.V_n:
         return not V
-    elif code == Cond_Op.UGT:
+    elif code == Cond.UGT:
         return C and not Z
-    elif code == Cond_Op.ULE:
+    elif code == Cond.ULE:
         return not C or Z
-    elif code == Cond_Op.SGE:
+    elif code == Cond.SGE:
         return N == V
-    elif code == Cond_Op.SLT:
+    elif code == Cond.SLT:
         return N != V
-    elif code == Cond_Op.SGT:
+    elif code == Cond.SGT:
         return not Z and (N == V)
-    elif code == Cond_Op.SLE:
+    elif code == Cond.SLE:
         return Z or (N != V)
-    elif code == Cond_Op.Never:
+    elif code == Cond.Never:
         return Bit(0)
-    elif code == Cond_Op.Always:
+    elif code == Cond.Always:
         return Bit(1)
 
 class Pico(Peak):
@@ -90,57 +90,69 @@ class Pico(Peak):
         pc = self.PC()
         inst = self.mem(pc)
         type, inst = inst.match()
-        if type == LogicInst or type == ArithInst:
-            a = self.reg(inst.ra)
-            b = self.reg(inst.rb)
-            if type == LogicInst:
-                res = logic(inst.op, a, b)
-            else:
-                res, res_p = arith(inst.op, a, b, self.C())
-            self.reg(inst.ra,res)
-            self.Z(res==0)
-            N = self.N(Bit(res[-1]))
-            if type == ArithInst:
-                self.C(res_p)
-                msba = Bit(a[-1])
-                msbb = Bit(b[-1])
-                self.V( (msba & msbb & ~N) or (~msba & ~msbb & N) )
-            self.PC(self.PC()+1)
-        elif type == MemInst:
-            type, inst = inst.match()
-            if   type == LDLO:
-                self.reg(inst.ra,Word(inst.imm))
-            elif type == LDHI:
-                print('ldhi',int(inst.imm)<<8)
-                self.reg(inst.ra,Word(int(inst.imm) << 8))
-            elif type == ST:
-                if inst.imm == 0:
-                    print(f'st {self.reg(inst.ra)}')
-            else:
-                raise NotImplemented(inst)
-            self.PC(self.PC()+1)
-        elif type == ControlInst:
-            type, inst = inst.match()
-            if     type == Jump:
-                if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                    self.PC(Word(inst.imm))
-                else:
-                    self.PC(self.PC()+1)
-            elif   type == Call:
-                if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                    self.reg(LR, pc+1)
-                    self.PC(Word(inst.imm))
-                else:
-                    self.PC(self.PC()+1)
-            elif   type == Return:
-                if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                    self.PC(self.reg(LR))
-                else:
-                    self.PC(self.PC()+1)
-            else:
-                raise NotImplemented(inst)
+        if type == Logic or type == Arith:
+            self.alu(type, inst)
+        elif type == Memory:
+            self.memory(inst)
+        elif type == Control:
+            self.control(inst)
         else:
             raise NotImplemented(inst)
+
+    def alu(self, type, inst):
+        subtype, inst = inst.match()
+        a = self.reg(inst.ra)
+        b = self.reg(inst.rb)
+        if type == Logic:
+            res = logic(subtype, a, b)
+        else:
+            res, res_p = arith(subtype, a, b, self.C())
+        self.reg(inst.ra,res)
+        self.Z(res==0)
+        N = self.N(Bit(res[-1]))
+        if type == Arith:
+            self.C(res_p)
+            msba = Bit(a[-1])
+            msbb = Bit(b[-1])
+            self.V( (msba & msbb & ~N) or (~msba & ~msbb & N) )
+        self.PC(self.PC()+1)
+
+    def memory(self, inst):
+        type, inst = inst.match()
+        if   type == LDLO:
+            self.reg(inst.ra,Word(inst.imm))
+        elif type == LDHI:
+            print('ldhi',int(inst.imm)<<8)
+            self.reg(inst.ra,Word(int(inst.imm) << 8))
+        elif type == ST:
+            if inst.imm == 0:
+                print(f'st {self.reg(inst.ra)}')
+        else:
+            raise NotImplemented(inst)
+        self.PC(self.PC()+1)
+
+    def control(self, inst):
+        type, inst = inst.match()
+        if     type == Jump:
+            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
+                self.PC(Word(inst.imm))
+            else:
+                self.PC(self.PC()+1)
+        elif   type == Call:
+            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
+                self.reg(LR, self.PC()+1)
+                self.PC(Word(inst.imm))
+            else:
+                self.PC(self.PC()+1)
+        elif   type == Return:
+            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
+                self.PC(self.reg(LR))
+            else:
+                self.PC(self.PC()+1)
+        else:
+            raise NotImplemented(inst)
+
+    # testing interface
 
     def peak_flag(self, flag):
         if   flag == 'Z':

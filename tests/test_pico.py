@@ -2,24 +2,25 @@ import random
 from collections import namedtuple
 from peak.pico import Pico, Word
 import peak.pico.isa as isa
+import peak.pico.asm as asm
 import pytest
 
 def test_ldlo():
-    mem = [isa.ldlo(0,10)]
+    mem = [asm.ldlo(0,10)]
     pico = Pico(mem)
     pico()
     assert pico.peak_pc() == 1
     assert pico.peak_reg(0) == 10
 
 def test_ldhi():
-    mem = [isa.ldhi(0,10)]
+    mem = [asm.ldhi(0,10)]
     pico = Pico(mem)
     pico()
     assert pico.peak_pc() == 1
     assert pico.peak_reg(0) == 10 << 8
 
 def test_ld():
-    mem = [isa.ldlo(0,1),isa.ldhi(1,2),isa.or_(0,1)]
+    mem = [asm.ldlo(0,1),asm.ldhi(1,2),asm.or_(0,1)]
     pico = Pico(mem)
     pico()
     pico()
@@ -28,7 +29,7 @@ def test_ld():
     assert pico.peak_reg(0) == (2<<8)|1
 
 def test_st():
-    pico = Pico([isa.st(0,0)])
+    pico = Pico([asm.st(0,0)])
     pico.poke_reg(0,0xf)
     pico()
 
@@ -59,10 +60,10 @@ testvectors = [(random16(), random16()) for i in range(NVALUES)]
 ])
 @pytest.mark.parametrize("ab", testvectors)
 def test_alu(op,ab):
-    alu( [getattr(isa,op.name)(0,1)], op.func, ab[0], ab[1] )
+    alu( [getattr(asm,op.name)(0,1)], op.func, ab[0], ab[1] )
 
 def test_cond():
-    pico = Pico([isa.mov(0,1)])
+    pico = Pico([asm.mov(0,1)])
     pico.poke_reg(1,-1)
     pico()
     assert pico.peak_flag('Z') == 0
@@ -70,14 +71,14 @@ def test_cond():
 
 
 def test_jump():
-    mem = [isa.jmp(0)]
+    mem = [asm.jmp(0)]
     pico = Pico(mem)
     assert pico.peak_pc() == 0
     pico()
     assert pico.peak_pc() == 0
 
 def test_call():
-    pico = Pico([isa.call(2),isa.mov(0,0),isa.ret()])
+    pico = Pico([asm.call(2),asm.mov(0,0),asm.ret()])
     pico()
     assert pico.peak_pc() == 2
     assert pico.peak_reg(15) == 1

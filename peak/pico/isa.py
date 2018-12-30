@@ -32,25 +32,10 @@ Word = Half
 Reg4 = Nibble
 RegA = bitfield(8)(Bits(4))
 RegB = bitfield(4)(Bits(4))
-
 Imm = bitfield(0)(Bits(8))
 
-@bitfield(12)
-class Arith_Op(Enum):
-    Add = 0
-    Sub = 1
-    Adc = 2
-    Sbc = 3
-
-@bitfield(12)
-class Logic_Op(Enum):
-    Mov = 0
-    And = 1
-    Or  = 2
-    XOr = 3
-
 @bitfield(8)
-class Cond_Op(Enum):
+class Cond(Enum):
     Z = 0    # EQ
     Z_n = 1  # NE
     C = 2    # UGE
@@ -71,100 +56,86 @@ class Cond_Op(Enum):
     Always = 15
 
 @dataclass
-class LogicInst(Product):
-    op:Logic_Op
+class ALU(Product):
     ra:RegA
     rb:RegB
 
-@dataclass
-class ArithInst(Product):
-    op:Arith_Op
-    ra:RegA
-    rb:RegB
+class Mov(ALU):
+    pass
 
-@dataclass
-class LDLO(Product):
-    ra:RegA
-    imm:Imm
+class And(ALU):
+    pass
 
-@dataclass
-class LDHI(Product):
-    ra:RegA
-    imm:Imm
+class Or(ALU):
+    pass
 
-@dataclass
-class LD(Product):
-    ra:RegA
-    imm:Imm
-
-@dataclass
-class ST(Product):
-    ra:RegA
-    imm:Imm
+class XOr(ALU):
+    pass
 
 @bitfield(12)
-class MemInst(Sum):
+class Logic(Sum):
+    fields = (Mov, And, Or, XOr)
+
+
+class Add(ALU):
+    pass
+
+class Sub(ALU):
+    pass
+
+class Adc(ALU):
+    pass
+
+class Sbc(ALU):
+    pass
+
+@bitfield(12)
+class Arith(Sum):
+    fields = (Add, Sub, Adc, Sbc)
+
+
+@dataclass
+class _Memory(Product):
+    ra:RegA
+    imm:Imm
+
+class LDLO(_Memory):
+    pass
+
+class LDHI(_Memory):
+    pass
+
+class LD(_Memory):
+    pass
+
+class ST(_Memory):
+    pass
+
+@bitfield(12)
+class Memory(Sum):
     fields = (LDLO, LDHI, LD, ST)
 
 
 @dataclass
-class Jump(Product):
+class _Control(Product):
     imm:Imm
-    cond:Cond_Op
+    cond:Cond
 
-@dataclass
-class Call(Product):
-    imm:Imm
-    cond:Cond_Op
+class Jump(_Control):
+    pass
 
-@dataclass
-class Return(Product):
-    cond:Cond_Op
+class Call(_Control):
+    pass
+
+class Return(_Control):
+    pass
 
 @bitfield(12)
-class ControlInst(Sum):
+class Control(Sum):
     fields = (Jump, Call, Return)
 
 
 @bitfield(14)
 class Inst(Sum):
-    fields = (LogicInst, ArithInst, MemInst, ControlInst)
-
-def logicinst(op, ra, rb):
-    return Inst(LogicInst(op, RegA(ra), RegB(rb)))
-    
-def mov(ra,rb):
-    return logicinst(Logic_Op.Mov, ra, rb)
-def and_(ra, rb):
-    return logicinst(Logic_Op.And, ra, rb)
-def or_(ra, rb):
-    return logicinst(Logic_Op.Or, ra, rb)
-def xor(ra, rb):
-    return logicinst(Logic_Op.XOr, ra, rb)
-
-def arithinst(op, ra, rb):
-    return Inst(ArithInst(op, RegA(ra), RegB(rb)))
-    
-def add(ra, rb):
-    return arithinst(Arith_Op.Add, ra, rb)
-def sub(ra, rb):
-    return arithinst(Arith_Op.Sub, ra, rb)
-def adc(ra, rb):
-    return arithinst(Arith_Op.Adc, ra, rb)
-def sbc(ra, rb):
-    return arithinst(Arith_Op.Sbc, ra, rb)
-
-def ldlo(ra, imm):
-    return Inst(MemInst(LDLO(RegA(ra), Imm(imm))))
-def ldhi(ra, imm):
-    return Inst(MemInst(LDHI(RegA(ra), Imm(imm))))
-def st(ra, imm):
-    return Inst(MemInst(ST(RegA(ra), Imm(imm))))
-
-def jmp(imm, cond=Cond_Op.Always):
-    return Inst(ControlInst(Jump(Imm(imm), cond)))
-def call(imm, cond=Cond_Op.Always):
-    return Inst(ControlInst(Call(Imm(imm), cond)))
-def ret(cond=Cond_Op.Always):
-    return Inst(ControlInst(Return(cond)))
+    fields = (Logic, Arith, Memory, Control)
 
