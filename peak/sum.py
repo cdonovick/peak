@@ -10,6 +10,9 @@ class Sum:
     def __str__(self):
         return str(self.a)
 
+    def __repr__(self):
+        return repr(self.a)
+
     def __call__(self, *largs, **kwargs):
         return self(*largs, **kwargs)
 

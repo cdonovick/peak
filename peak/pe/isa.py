@@ -10,64 +10,63 @@ NUM_INPUTS = 2
 DATAWIDTH = 16
 
 Bit = Bits(1)
-
 Data = Bits(DATAWIDTH)
-Bit0 = Bits(1)
-Bit1 = Bits(1)
-Bit2 = Bits(1)
 
+Data_Const = Bits(DATAWIDTH)
 Data_Mode = Bits(2)
+
+Bit0_Const = Bits(1)
+Bit1_Const = Bits(1)
+Bit2_Const = Bits(1)
 Bit0_Mode = Bits(2)
 Bit1_Mode = Bits(2)
 Bit2_Mode = Bits(2)
 
 @dataclass
-class BaseInst(Product):
-    data = [Data(0) for i in range(NUM_INPUTS)]
-    data_mode = [Data_Mode(Mode.BYPASS) for i in range(NUM_INPUTS)]
+class LUT(Product):
+    bit0_mode:Bit0_Mode 
+    bit0_const:Bit0_Const 
+    bit1_mode:Bit1_Mode
+    bit1_const:Bit1_Const
+    bit2_mode:Bit2_Mode
+    bit2_const:Bit2_Const 
+    table:Bits(8) 
 
-    lut:LUT = LUT(0)
-    bit0:Bit0 = Bit0(0)
-    bit1:Bit1 = Bit1(0)
-    bit2:Bit2 = Bit2(0)
-    bit0_mode:Bit0_Mode = Bit0_Mode(Mode.BYPASS)
-    bit1_mode:Bit1_Mode = Bit1_Mode(Mode.BYPASS)
-    bit2_mode:Bit2_Mode = Bit2_Mode(Mode.BYPASS)
+@dataclass
+class _ALU(Product):
+    data_modes:[Data_Mode]
+    data_consts:[Data_Const]
 
-    cond:Cond = Cond.Z
-
-    def __call__(self):
-        return self
-
-    def reg(self, i, mode, data=0):
-        if isinstance(i, int):
-            self.data_mode[i] = Data_Mode(mode)
-            self.data[i] = Data(data)
-        elif i == 'bit0':
-            self.bit0_mode = Bit0_Mode(mode)
-            self.bit0 = Bit0(data)
-        elif i == 'bit1':
-            self.bit1_mode = Bit1_Mode(mode)
-            self.bit1 = Bit1(data)
-        elif  i == 'bit2':
-            self.bit2_mode = Bit2_Mode(mode)
-            self.bit2 = Bit2(data)
-        else:
-            raise NotImplemented(i)
-        return self
-
-    def flag(self, cond:Cond):
-        self.cond = cond
-        return self
-
-class Add(BaseInst):
+class Add(_ALU):
+  # returns res, res_p, C, V
   def eval(self, a, b, bit):
        return a+b, Bit(0), Bit(0), Bit(0)
 
-class Sub(BaseInst):
+class Sub(_ALU):
   def eval(self, a, b, bit):
        return a-b, Bit(0), Bit(0), Bit(0)
 
-class Inst(Sum):
-    fields = (Add, Sub)
+class And(_ALU):
+  # returns res, res_p, C, V
+  def eval(self, a, b, bit):
+       return a&b, Bit(0), Bit(0), Bit(0)
+
+class Or(_ALU):
+  # returns res, res_p, C, V
+  def eval(self, a, b, bit):
+       return a|b, Bit(0), Bit(0), Bit(0)
+
+class XOr(_ALU):
+  # returns res, res_p, C, V
+  def eval(self, a, b, bit):
+       return a^b, Bit(0), Bit(0), Bit(0)
+
+class ALU(Sum):
+    fields = (Add, Sub, And, Or, XOr)
+
+@dataclass
+class Inst:
+    alu:ALU
+    lut:LUT
+    cond:Cond
 
