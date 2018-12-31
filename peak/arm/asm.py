@@ -48,11 +48,21 @@ def mov(ra, rb, rc=None, shift=0, imm=0, s=0, cond=Cond.Always):
 def add(ra, rb, rc=None, shift=0, imm=0, s=0, cond=Cond.Always):
     return data(ADD, ra, rb, rc=rc, shift=shift, imm=imm, s=s, cond=cond)
 
+def and_(ra, rb, rc=None, shift=0, imm=0, s=0, cond=Cond.Always):
+    return data(AND, ra, rb, rc=rc, shift=shift, imm=imm, s=s, cond=cond)
+
+def or_(ra, rb, rc=None, shift=0, imm=0, s=0, cond=Cond.Always):
+    return data(ORR, ra, rb, rc=rc, shift=shift, imm=imm, s=s, cond=cond)
+
+def eor(ra, rb, rc=None, shift=0, imm=0, s=0, cond=Cond.Always):
+    return data(EOR, ra, rb, rc=rc, shift=shift, imm=imm, s=s, cond=cond)
+
 
 def b(offset, link=0, cond=Cond.Always):
     offset = Offset(offset)
     link = L(link)
     return Inst(BaseInst(B(offset,link)),cond)
+
 
 def ldst(Op, ra, rb, rc, shift, imm, cond):
     ra = RegA(ra)

@@ -1,4 +1,5 @@
 import peak.pico.isa as isa
+import peak.pico.asm as asm
 from peak.bitfield import encode
 import pytest
 
@@ -13,6 +14,6 @@ def test_imm():
     assert encode(imm) == 2
 
 def test_jmp():
-    inst = isa.jmp(0)
+    inst = asm.jmp(0)
     assert encode(inst) == 0xcf00
 
