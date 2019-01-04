@@ -1,39 +1,95 @@
 from dataclasses import dataclass
-from .. import Bits, Enum, Product
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT
+from .isa import *
 
 # https://github.com/StanfordAHA/CGRAGenerator/wiki/PE-Spec
 
 def inst(alu, signed=0, lut=0, cond=Cond.Z,
-    ra_mode=Mode.Bypass, rb_mode, rc_mode, rd_mode, re_mode, rf_mode,
-    ra_const, rb_const, rc_const, rd_const, re_const, rf_const):
+    ra_mode=Mode.BYPASS, ra_const=0,
+    rb_mode=Mode.BYPASS, rb_const=0,
+    rd_mode=Mode.BYPASS, rd_const=0,
+    re_mode=Mode.BYPASS, re_const=0,
+    rf_mode=Mode.BYPASS, rf_const=0
+    ):
 
-    return Inst(ALU(alu), Signed(signed), LUT(lut), Cond(cond),
-        RegA_Mode(ra_mode), RegB_Mode(rb_mode), RegC_Mode(rc_mode),
-        RegD_Mode(rd_mode), RegE_Mode(re_mode), RegF_Mode(rf_mode),
-        RegA_Const(ra_const), RegB_Const(rb_const), RegC_Const(rc_const),
-        RegD_Const(rd_const), RegE_Const(re_const), RegF_Const(rf_const) )
+    return Inst(alu, Signed(signed), LUT(lut), cond,
+        RegA_Mode(ra_mode), RegA_Const(ra_const),
+        RegB_Mode(rb_mode), RegB_Const(rb_const),
+        RegD_Mode(rd_mode), RegD_Const(rd_const),
+        RegE_Mode(re_mode), RegE_Const(re_const),
+        RegF_Mode(rf_mode), RegF_Const(rf_const) )
 
 def add():
     return inst(ALU.Add)
 
-sub = Inst().op(ALU_Op.Sub)
+def sub ():
+    return inst(ALU.Sub)
 
-and_ = Inst().op(ALU_Op.And)
-or_ = Inst().op(ALU_Op.Or)
-xor = Inst().op(ALU_Op.XOr)
+def and_():
+    return inst(ALU.And)
 
-lsl = Inst().op(ALU_Op.SHL)
-lsr = Inst().op(ALU_Op.SHR)
-asr = Inst().op(ALU_Op.SHR, signed=1)
+def or_():
+    return inst(ALU.Or)
 
-sel = Inst().op(ALU_Op.Sel)
-abs = Inst().op(ALU_Op.Abs, signed=1)
+def xor():
+    return inst(ALU.XOr)
 
-umin = Inst().op(ALU_Op.LTE_Min)
-umax = Inst().op(ALU_Op.GTE_Max)
+def lsl():
+    return inst(ALU.SHL)
 
-smin = Inst().op(ALU_Op.LTE_Min, signed=1)
-smax = Inst().op(ALU_Op.GTE_Max, signed=1)
+def lsr():
+    return inst(ALU.SHR)
+
+def asr():
+    return inst(ALU.SHR, signed=1)
+
+def sel():
+    return inst(ALU.Sel)
+
+def abs():
+    return inst(ALU.Abs, signed=1)
+
+def umin():
+    return inst(ALU.LTE_Min)
+
+def umax():
+    return inst(ALU.GTE_Max)
+
+def smin():
+    return inst(ALU.LTE_Min, signed=1)
+
+def smax():
+    return inst(ALU.GTE_Max, signed=1)
+
+def eq():
+    return inst(ALU.Sub, cond=Cond.Z)
+
+def ne():
+    return inst(ALU.Sub, cond=Cond.Z_N)
+
+def ult():
+    return inst(ALU.Sub, cond=Cond.ULT)
+
+def ule():
+    return inst(ALU.Sub, cond=Cond.ULE)
+
+def ugt():
+    return inst(ALU.Sub, cond=Cond.UGT)
+
+def uge():
+    return inst(ALU.Sub, cond=Cond.UGE)
+
+def slt():
+    return inst(ALU.Sub, cond=Cond.SLT)
+
+def sle():
+    return inst(ALU.Sub, cond=Cond.SLE)
+
+def sgt():
+    return inst(ALU.Sub, cond=Cond.SGT)
+
+def sge():
+    return inst(ALU.Sub, cond=Cond.SGE)
+

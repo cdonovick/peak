@@ -8,19 +8,20 @@ from .lut import Bit, LUT
 
 DATAWIDTH = 16
 Data = Bits(DATAWIDTH)
-Data0 = Bits(DATAWIDTH)
-Data1 = Bits(DATAWIDTH)
-Bit0 = Bits(1)
-Bit1 = Bits(1)
-Bit2 = Bits(1)
 
-RegA = Bits(2)
-RegB = Bits(2)
-RegD = Bits(2)
-RegE = Bits(2)
-RegF = Bits(2)
+RegA_Const = Bits(DATAWIDTH)
+RegB_Const = Bits(DATAWIDTH)
+RegD_Const = Bits(1)
+RegE_Const = Bits(1)
+RegF_Const = Bits(1)
 
-class ALU_Op(Enum):
+RegA_Mode = Bits(2)
+RegB_Mode = Bits(2)
+RegD_Mode = Bits(2)
+RegE_Mode = Bits(2)
+RegF_Mode = Bits(2)
+
+class ALU(Enum):
     Add = 0
     Sub = 1
     Abs = 3
@@ -40,69 +41,18 @@ Signed = Bits(1)
 
 @dataclass
 class Inst(Product):
-    signed:Signed = Signed(0)
-    alu:ALU_Op = ALU_Op.Add
-    lut:LUT = LUT(0)
-    cond:Cond = Cond.Z
-    data0:Data0 = Data0(0)
-    data1:Data1 = Data1(0)
-    bit0:Bit0 = Bit0(0)
-    bit1:Bit1 = Bit1(0)
-    bit2:Bit2 = Bit2(0)
-    rega:RegA = RegA(Mode.BYPASS)
-    regb:RegB = RegB(Mode.BYPASS)
-    regd:RegD = RegD(Mode.BYPASS)
-    rege:RegE = RegE(Mode.BYPASS)
-    regf:RegF = RegF(Mode.BYPASS)
+    alu:ALU
+    signed:Signed
+    lut:LUT
+    cond:Cond
+    rega:RegA_Mode
+    data0:RegA_Const
+    regb:RegB_Mode
+    data1:RegB_Const
+    regd:RegD_Mode
+    bit0:RegD_Const
+    rege:RegE_Mode
+    bit1:RegE_Const
+    regf:RegF_Mode
+    bit2:RegF_Const
 
-    def __call__(self):
-        return self
-
-    def op(self, alu:ALU_Op, signed:Signed=0):
-        self.alu = alu
-        self.signed = Bit(signed)
-        return self
-
-    def flag(self, cond:Cond):
-        self.cond = cond
-        return self
-
-    def reg(self, i, mode, data=0):
-        if i == 0 or i == 'a':
-            self.rega = RegA(mode)
-            self.data0 = Data0(data)
-        elif i == 1 or i == 'b':
-            self.regb = RegB(mode)
-            self.data1 = Data1(data)
-        elif i == 3 or i == 'd':
-            self.regd = RegD(mode)
-            self.bit0 = Bit0(data)
-        elif i == 4 or i == 'e':
-            self.rege = RegE(mode)
-            self.bit1 = Bit1(data)
-        elif i == 5 or i == 'f':
-            self.regf = RegF(mode)
-            self.bit2 = Bit2(data)
-        else:
-            raise NotImplemented(i)
-        return self
-
-add = Inst().op(ALU_Op.Add)
-sub = Inst().op(ALU_Op.Sub)
-
-and_ = Inst().op(ALU_Op.And)
-or_ = Inst().op(ALU_Op.Or)
-xor = Inst().op(ALU_Op.XOr)
-
-lsl = Inst().op(ALU_Op.SHL)
-lsr = Inst().op(ALU_Op.SHR)
-asr = Inst().op(ALU_Op.SHR, signed=1)
-
-sel = Inst().op(ALU_Op.Sel)
-abs = Inst().op(ALU_Op.Abs, signed=1)
-
-umin = Inst().op(ALU_Op.LTE_Min)
-umax = Inst().op(ALU_Op.GTE_Max)
-
-smin = Inst().op(ALU_Op.LTE_Min, signed=1)
-smax = Inst().op(ALU_Op.GTE_Max, signed=1)

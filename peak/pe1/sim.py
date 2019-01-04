@@ -1,26 +1,12 @@
-from bit_vector import BitVector, SIntVector
+from bit_vector import BitVector, SIntVector, overflow
 from .. import Peak
 from .mode import Mode, RegisterMode
 from .lut import Bit, LUT, lut
 from .cond import Cond, cond
-from .isa1 import *
+from .isa import *
 
-def alu(alu:ALU_Op, signed:Signed, a:Data, b:Data, d:Bit):
+def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
-    def zext(x,n):
-        return BitVector(x.bits()+n*[0])
-    def adc(a:Data,b:Data,c:Bit):
-        msba = Bit(a[-1])
-        msbb = Bit(b[-1])
-        a = zext(a,1)
-        b = zext(b,1)
-        c = zext(c,16)
-        res = a + b + c
-        C = Bit(res[-1])
-        res = res[0:-1]
-        N = Bit(res[-1])
-        V = (msba & msbb & ~N) or (~msba & ~msbb & N)
-        return res, C, V
     def mul(a, b):
         a, b = a.ext(16), b.ext(16)
         return a*b
@@ -40,42 +26,45 @@ def alu(alu:ALU_Op, signed:Signed, a:Data, b:Data, d:Bit):
 
     C = 0
     V = 0
-    if   alu == ALU_Op.Add:
-        res, C, V = adc(a, b, Bit(0))
+    if   alu == ALU.Add:
+        res, C = a.adc(b, Bit(0))
+        V = overflow(a, b, res)
         res_p = C
-    elif alu == ALU_Op.Sub:
-        res, C, V = adc(a, ~b, Bit(1)) 
+    elif alu == ALU.Sub:
+        b_not = ~b
+        res, C = a.adc(b_not, Bit(1)) 
+        V = overflow(a, b_not, res)
         res_p = C
-    elif alu == ALU_Op.Mult0:
+    elif alu == ALU.Mult0:
         res, C, V = mul0(a, b)
         res_p = C
-    elif alu == ALU_Op.Mult1:
+    elif alu == ALU.Mult1:
         res, C, V = mul1(a, b)
         res_p = C
-    elif alu == ALU_Op.Mult2:
+    elif alu == ALU.Mult2:
         res, C, V = mul1(a, b) 
         res_p = C
-    elif alu == ALU_Op.GTE_Max:
+    elif alu == ALU.GTE_Max:
         # C, V = a-b?
         res, res_p = a if a >= b else b, a >= b
-    elif alu == ALU_Op.LTE_Min:
+    elif alu == ALU.LTE_Min:
         # C, V = a-b?
         res, res_p = a if a <= b else b, a <= b
-    elif alu == ALU_Op.Abs:
+    elif alu == ALU.Abs:
         res, res_p = a if a >= 0 else -a, Bit(a[-1])
-    elif alu == ALU_Op.Sel:
+    elif alu == ALU.Sel:
         res, res_p = a if d else b, 0
-    elif alu == ALU_Op.And:
+    elif alu == ALU.And:
         res, res_p = a & b, 0
-    elif alu == ALU_Op.Or:
+    elif alu == ALU.Or:
         res, res_p = a | b, 0
-    elif alu == ALU_Op.XOr:
+    elif alu == ALU.XOr:
         res, res_p = a ^ b, 0
-    elif alu == ALU_Op.SHR:
+    elif alu == ALU.SHR:
         res, res_p = a >> b[:4], 0
-    elif alu == ALU_Op.SHL:
+    elif alu == ALU.SHL:
         res, res_p = a << b[:4], 0
-    elif alu == ALU_Op.Neg:
+    elif alu == ALU.Neg:
         if signed:
             res, res_p = ~a+Bit(1), 0
         else:
@@ -112,7 +101,7 @@ class PE(Peak):
         re = self.rege(inst.rege, inst.bit1, bit1, clk_en)
         rf = self.regf(inst.regf, inst.bit2, bit2, clk_en)
 
-        alu_res, alu_res_p, Z, N, C, V= alu(inst.alu, inst.signed, ra, rb, rd)
+        alu_res, alu_res_p, Z, N, C, V = alu(inst.alu, inst.signed, ra, rb, rd)
         lut_res = lut(inst.lut, rd, re, rf)
         res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
         irq = Bit(0)
