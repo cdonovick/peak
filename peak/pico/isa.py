@@ -24,12 +24,9 @@ from peak.bitfield import bitfield
 #1101cccciiiiiiii "callc"
 #1110cccc00000000 "retc"
 
-Nibble = Bits(4)
-Byte = Bits(8)
-Half = Bits(16)
-Word = Half
+Word = Bits(16)
 
-Reg4 = Nibble
+Reg4 = Bits(4)
 RegA = bitfield(8)(Bits(4))
 RegB = bitfield(4)(Bits(4))
 Imm = bitfield(0)(Bits(8))

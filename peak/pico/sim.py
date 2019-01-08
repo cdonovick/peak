@@ -1,4 +1,4 @@
-from bit_vector import BitVector
+from bit_vector import BitVector, overflow
 from .isa import *
 from .. import Peak, Register, RAM, ROM
 
@@ -6,39 +6,29 @@ LR = Reg4(15)
 ZERO = Bit(0)
 ONE = Bit(1)
 
-def zext(x,n):
-    return BitVector(x.bits()+n*[0])
-
-def adc(a:Word,b:Word,c:Bit):
-    a = zext(a,1)
-    b = zext(b,1)
-    c = zext(c,16)
-    res = a + b + c
-    return res[0:-1], Bit(res[-1])
-
-def arith(type, a:Word, b:Word, c:Bit) :
-    if   type == Add:
-        return adc(a,b,ZERO)
-    elif type == Sub:
-        return adc(a,~b,ONE)
-    elif type == Adc:
-        return adc(a,b,c)
-    elif type == Sbc:
-        return adc(a,~b,~c)
+def arith(inst, a:Word, b:Word, c:Bit) :
+    if   inst == Add:
+        return a.adc(b,ZERO)
+    elif inst == Sub:
+        return a.adc(~b,ONE)
+    elif inst == Adc:
+        return a.adc(b,c)
+    elif inst == Sbc:
+        return a.adc(~b,~c)
     else:
-        raise NotImplemented(type)
+        raise NotImplemented(inst)
 
-def logic(type, a:Word, b:Word):
-    if   type == Mov:
+def logic(inst, a:Word, b:Word):
+    if   inst == Mov:
         return b
-    elif type == And:
+    elif inst == And:
         return a & b
-    elif type == Or:
+    elif inst == Or:
         return a | b
-    elif type == XOr:
+    elif inst == XOr:
         return a ^ b
     else:
-        raise NotImplemented(type)
+        raise NotImplemented(inst)
 
 def cond(code, Z, N, C, V):
     if   code == Cond.Z:
@@ -109,12 +99,10 @@ class Pico(Peak):
             res, res_p = arith(subtype, a, b, self.C())
         self.reg(inst.ra,res)
         self.Z(res==0)
-        N = self.N(Bit(res[-1]))
+        self.N(Bit(res[-1]))
         if type == Arith:
             self.C(res_p)
-            msba = Bit(a[-1])
-            msbb = Bit(b[-1])
-            self.V( (msba & msbb & ~N) or (~msba & ~msbb & N) )
+            self.V(overflow(a,b,res))
         self.PC(self.PC()+1)
 
     def memory(self, inst):
@@ -122,7 +110,6 @@ class Pico(Peak):
         if   type == LDLO:
             self.reg(inst.ra,Word(inst.imm))
         elif type == LDHI:
-            print('ldhi',int(inst.imm)<<8)
             self.reg(inst.ra,Word(int(inst.imm) << 8))
         elif type == ST:
             if inst.imm == 0:

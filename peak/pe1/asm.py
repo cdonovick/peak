@@ -67,7 +67,7 @@ def eq():
     return inst(ALU.Sub, cond=Cond.Z)
 
 def ne():
-    return inst(ALU.Sub, cond=Cond.Z_N)
+    return inst(ALU.Sub, cond=Cond.Z_n)
 
 def ult():
     return inst(ALU.Sub, cond=Cond.ULT)
