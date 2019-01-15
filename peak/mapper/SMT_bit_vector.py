@@ -7,6 +7,8 @@ import re
 import warnings
 import weakref
 
+__ALL__ = ['SMTBitVector', 'SMTNumVector', 'SMTSIntVector', 'SMTUIntVector']
+
 _var_counter = it.count()
 _name_table = weakref.WeakValueDictionary()
 
@@ -48,7 +50,7 @@ def auto_cast_bool(fn):
         args = map(cast, args)
         r = fn(self, *args)
         bit = solver.BitVec(1)
-        r = solver.Ite(r, solver.TheoryConst(1, bit), solver.TheoryConst(0, bit))
+        r = solver.Ite(r, solver.TheoryConst(bit, 1), solver.TheoryConst(bit, 0))
         return SMTBitVector(solver, r, 1)
     return wrapped
 
@@ -70,7 +72,19 @@ class SMTBitVector:
             if name is None:
                 name = _gen_name()
             self._value = solver.DeclareConst(name, sort)
-            self._raw_value = None
+            self._const_value = None
+
+        elif isinstance(value, SMTBitVector):
+            self._value = value.value
+            if num_bits is not None and value.num_bits != num_bits:
+                warnings.warn("inconsistent bitwidth")
+            self._num_bits = value.num_bits
+            if name is None:
+                name = value._name
+            else:
+                warnings.warn('Changing the name of a SMTBitVector does not cause a new underlying smt variable to be created')
+            self._const_value = value._const_value
+
         elif isinstance(value, ss.terms.TermBase):
             #Value is a smt expression
             if isinstance(value.sort, ss.sorts.Bool):
@@ -85,7 +99,7 @@ class SMTBitVector:
 
             self._sort = value.sort
             self._value  = value
-            self._raw_value = None
+            self._const_value = None
         else:
             if isinstance(value, bool):
                 if num_bits is None:
@@ -102,7 +116,7 @@ class SMTBitVector:
                 raise TypeError(f'Unexpected type {type(value)}')
             self._num_bits = num_bits
             self._sort = sort = solver.BitVec(num_bits)
-            self._raw_value = value
+            self._const_value = value
             self._value = solver.TheoryConst(sort, value)
 
         self._name = name
@@ -424,10 +438,10 @@ class SMTNumVector(SMTBitVector):
     pass
 
 
-class UIntVector(SMTNumVector):
+class SMTUIntVector(SMTNumVector):
     pass
 
-class SMTUIntVector(SMTNumVector):
+class SMTSIntVector(SMTNumVector):
     def __rshift__(self, other):
         return self.bvashr(other)
 
