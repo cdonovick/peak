@@ -20,7 +20,6 @@ def _gen_name():
 
 _name_re = re.compile(r'V_\d+')
 
-
 def auto_cast(fn):
     @ft.wraps(fn)
     def wrapped(self, *args):
@@ -79,6 +78,7 @@ class SMTBitVector:
             if num_bits is not None and value.num_bits != num_bits:
                 warnings.warn("inconsistent bitwidth")
             self._num_bits = value.num_bits
+            self._sort = value._sort
             if name is None:
                 name = value._name
             else:
@@ -205,7 +205,7 @@ class SMTBitVector:
 
     @auto_cast
     def bvnand(self, other):
-        return self.bvand(other).bvnot()
+        return self.solver.BVNot(self.bvand(other))
 
     @auto_cast
     def bvor(self, other):
@@ -213,7 +213,7 @@ class SMTBitVector:
 
     @auto_cast
     def bvnor(self, other):
-        return self.bvor(other).bvnot()
+        return self.solver.BVNot(self.bvor(other))
 
     @auto_cast
     def bvxor(self, other):
@@ -221,7 +221,7 @@ class SMTBitVector:
 
     @auto_cast
     def bvxnor(self, other):
-        return self.bvxor(other).bvnot()
+        return self.solver.BVNot(self.bvxor(other))
 
     @auto_cast
     def bvshl(self, other):
@@ -249,7 +249,7 @@ class SMTBitVector:
 
     @auto_cast_bool
     def bvne(self, other):
-        return self.bveq(other).bvnot()
+        return self.solver.BVNot(self.bveq(other))
 
     @auto_cast_bool
     def bvult(self, other):
@@ -306,8 +306,6 @@ class SMTBitVector:
         res = a + b + c
         return res[0:-1], res[-1]
 
-
-
     @auto_cast
     def bvadd(self, other):
         return self.solver.BVAdd(self.value, other.value)
@@ -330,7 +328,7 @@ class SMTBitVector:
 
     @auto_cast
     def bvsdiv(self, other):
-        # currently not in smt switch 
+        # currently not in smt switch
         raise NotImplementedError()
         return self.solver.BVSdiv(self.value, other.value)
 
@@ -465,4 +463,4 @@ class SMTSIntVector(SMTNumVector):
 
 
 def overflow(a, b, res):
-   raise NotImplementedError() 
+   raise NotImplementedError()
