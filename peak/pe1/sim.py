@@ -5,6 +5,7 @@ from .lut import Bit, LUT, lut
 from .cond import Cond, cond
 from .isa import *
 
+
 def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
     def mul(a, b):
@@ -19,6 +20,11 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
     def mult2(a, b, c, d):
         res = mul(a, b)
         return res[16:32], 0, 0 # wrong C, V
+    def overflow(a, b, res):
+        msb_a = Bit(a[-1])
+        msb_b = Bit(b[-1])
+        N = Bit(res[-1])
+        return (msb_a & msb_b & ~N) or (~msb_a & ~msb_b & N)
 
     if signed:
         a = SIntVector(a)
