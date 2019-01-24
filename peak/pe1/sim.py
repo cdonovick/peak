@@ -46,14 +46,17 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
         res_p = C
     elif alu == ALU.GTE_Max:
         # C, V = a-b?
-        res, res_p = a if a >= b else b, a >= b
+        pred = a >= b
+        res, res_p = pred.ite(a,b), a >= b
     elif alu == ALU.LTE_Min:
         # C, V = a-b?
-        res, res_p = a if a <= b else b, a <= b
+        pred = a <= b
+        res, res_p = pred.ite(a,b), a >= b
     elif alu == ALU.Abs:
-        res, res_p = a if a >= 0 else -a, Bit(a[-1])
+        pred = a >= 0
+        res, res_p = pred.ite(a,-a), Bit(a[-1])
     elif alu == ALU.Sel:
-        res, res_p = a if d else b, 0
+        res, res_p = d.ite(a,b), 0
     elif alu == ALU.And:
         res, res_p = a & b, 0
     elif alu == ALU.Or:
