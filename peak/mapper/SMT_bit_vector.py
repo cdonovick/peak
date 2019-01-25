@@ -249,7 +249,7 @@ class SMTBitVector:
 
     @auto_cast_bool
     def bvne(self, other):
-        return self.solver.BVNot(self.bveq(other))
+        return self.solver.Not(self.solver.Equals(self.value, other.value))
 
     @auto_cast_bool
     def bvult(self, other):
