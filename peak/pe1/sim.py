@@ -33,21 +33,21 @@ def gen_alu(BV_t=BitVector, Sign_t=SIntVector, Unsigned_t=UIntVector):
         V = 0
         if   alu == ALU.Add:
             res, C = a.adc(b, Bit(0))
-            V = overflow(a, b, res)
+            #V = overflow(a, b, res)
             res_p = C
         elif alu == ALU.Sub:
             b_not = ~b
             res, C = a.adc(b_not, Bit(1))
-            V = overflow(a, b_not, res)
+            #V = overflow(a, b_not, res)
             res_p = C
         elif alu == ALU.Mult0:
-            res, C, V = mul0(a, b)
+            res, C, V = mult0(a, b)
             res_p = C
         elif alu == ALU.Mult1:
-            res, C, V = mul1(a, b)
+            res, C, V = mult0(a, b)
             res_p = C
         elif alu == ALU.Mult2:
-            res, C, V = mul1(a, b)
+            res, C, V = mult0(a, b)
             res_p = C
         elif alu == ALU.GTE_Max:
             # C, V = a-b?
@@ -66,9 +66,9 @@ def gen_alu(BV_t=BitVector, Sign_t=SIntVector, Unsigned_t=UIntVector):
         elif alu == ALU.XOr:
             res, res_p = a ^ b, 0
         elif alu == ALU.SHR:
-            res, res_p = a >> b[:4], 0
+            res, res_p = a >> b, 0
         elif alu == ALU.SHL:
-            res, res_p = a << b[:4], 0
+            res, res_p = a << b, 0
         elif alu == ALU.Neg:
             if signed:
                 res, res_p = ~a+Bit(1), 0
