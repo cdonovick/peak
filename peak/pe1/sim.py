@@ -11,14 +11,11 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
     def mul(a, b):
         a, b = a.ext(16), b.ext(16)
         return a*b
-    def mult0(a, b):
-        res = mul(a, b)
+    def mult0(res):
         return res[:16], 0, 0 # wrong C, V
-    def mult1(a, b, d):
-        res = mul(a, b)
+    def mult1(res):
         return res[8:24], 0, 0 # wrong C, V
-    def mult2(a, b, c, d):
-        res = mul(a, b)
+    def mult2(res):
         return res[16:32], 0, 0 # wrong C, V
     def overflow(a, b, res):
         msb_a = Bit(a[-1])
@@ -29,6 +26,8 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
     if signed:
         a = SIntVector(a)
         b = SIntVector(b)
+
+    m = mul(a,b)
 
     C = 0
     V = 0
@@ -42,13 +41,13 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
         V = overflow(a, b_not, res)
         res_p = C
     elif alu == ALU.Mult0:
-        res, C, V = mul0(a, b)
+        res, C, V = mul0(m)
         res_p = C
     elif alu == ALU.Mult1:
-        res, C, V = mul1(a, b)
+        res, C, V = mul1(m)
         res_p = C
     elif alu == ALU.Mult2:
-        res, C, V = mul1(a, b) 
+        res, C, V = mul2(m) 
         res_p = C
     elif alu == ALU.GTE_Max:
         # C, V = a-b?
