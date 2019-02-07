@@ -1,6 +1,9 @@
 from peak import Enum
 from .lut import Bit
 
+#
+# Condition code field - selects which 1-bit result is retuned
+#
 class Cond(Enum):
     Z = 0    # EQ
     Z_n = 1  # NE
@@ -23,6 +26,12 @@ class Cond(Enum):
     LUT = 14
     ALU = 15
 
+#
+# Implement condition code logic
+#
+# Inputs are the condition code field, the alu result, the lut result,
+# and the flags Z, N, C, V
+#
 def cond(code:Cond, alu:Bit, lut:Bit, Z:Bit, N:Bit, C:Bit, V:Bit) -> Bit:
     if   code == Cond.Z:
         return Z

@@ -6,6 +6,25 @@ from .cond import Cond, cond
 from .isa import *
 
 
+# simulate the PE ALU
+#
+#   inputs
+#
+#   alu is the ALU operations
+#   signed is whether the inputs are unsigned or signed
+#   a, b - 16-bit operands
+#   d - 1-bit operatnd
+#
+#
+#   returns res, res_p, Z, N, C, V
+#
+#   res - 16-bit result
+#   res_p - 1-bit result
+#   Z (result is 0)
+#   N (result is negative)
+#   C (carry generated)
+#   V (overflow generated)
+#
 def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
     def mul(a, b):
@@ -88,6 +107,8 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 class PE(Peak):
 
     def __init__(self):
+        # Declare PE state
+
         # Data registers
         self.rega = RegisterMode(Data)
         self.regb = RegisterMode(Data)
@@ -102,6 +123,8 @@ class PE(Peak):
         bit0: Bit = Bit(0), bit1: Bit = Bit(0), bit2: Bit = Bit(0), \
         clk_en: Bit = Bit(1)):
 
+        # Simulate one clock cycle
+
         ra = self.rega(inst.rega, inst.data0, data0, clk_en)
         rb = self.regb(inst.regb, inst.data1, data1, clk_en)
 
@@ -109,11 +132,19 @@ class PE(Peak):
         re = self.rege(inst.rege, inst.bit1, bit1, clk_en)
         rf = self.regf(inst.regf, inst.bit2, bit2, clk_en)
 
+        # calculate alu results
         alu_res, alu_res_p, Z, N, C, V = alu(inst.alu, inst.signed, ra, rb, rd)
-        lut_res = lut(inst.lut, rd, re, rf)
-        res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
-        irq = Bit(0)
 
+        # calculate lut results
+        lut_res = lut(inst.lut, rd, re, rf)
+
+        # calculate 1-bit result
+        res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
+
+        # calculate interrupt request 
+        irq = Bit(0) # NYI
+
+        # return 16-bit result, 1-bit result, irq
         return alu_res, res_p, irq
 
 
