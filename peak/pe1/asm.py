@@ -35,6 +35,25 @@ def sub ():
 def neg ():
     return inst(ALU.Sub)
 
+def umult0 ():
+    return inst(ALU.Mult0)
+
+def umult1 ():
+    return inst(ALU.Mult1)
+
+def umult2 ():
+    return inst(ALU.Mult2)
+
+def smult0 ():
+    return inst(ALU.Mult0, signed=1)
+
+def smult1 ():
+    return inst(ALU.Mult1, signed=1)
+
+def smult2 ():
+    return inst(ALU.Mult2, signed=1)
+
+
 
 def and_():
     return inst(ALU.And)

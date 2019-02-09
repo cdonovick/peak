@@ -27,26 +27,14 @@ from .isa import *
 #
 def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
-    def mul(a, b):
-        a, b = a.ext(16), b.ext(16)
-        return a*b
-    def mult0(res):
-        return res[:16], 0, 0 # wrong C, V
-    def mult1(res):
-        return res[8:24], 0, 0 # wrong C, V
-    def mult2(res):
-        return res[16:32], 0, 0 # wrong C, V
-    def overflow(a, b, res):
-        msb_a = Bit(a[-1])
-        msb_b = Bit(b[-1])
-        N = Bit(res[-1])
-        return (msb_a & msb_b & ~N) or (~msb_a & ~msb_b & N)
-
     if signed:
         a = SIntVector(a)
         b = SIntVector(b)
+        mula, mulb = a.sext(16), b.sext(16)
+    else:
+        mula, mulb = a.zext(16), b.zext(16)
 
-    m = mul(a,b)
+    mul = mula * mulb
 
     C = 0
     V = 0
@@ -60,13 +48,13 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
         V = overflow(a, b_not, res)
         res_p = C
     elif alu == ALU.Mult0:
-        res, C, V = mul0(m)
+        res, C, V = mul[:16], 0, 0 # wrong C, V
         res_p = C
     elif alu == ALU.Mult1:
-        res, C, V = mul1(m)
+        res, C, V = mul[8:24], 0, 0 # wrong C, V
         res_p = C
     elif alu == ALU.Mult2:
-        res, C, V = mul2(m) 
+        res, C, V = mul[16:32], 0, 0 # wrong C, V
         res_p = C
     elif alu == ALU.GTE_Max:
         # C, V = a-b?

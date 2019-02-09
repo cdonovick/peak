@@ -38,7 +38,7 @@ def test_inv():
 
 def test_neg():
     pe = PE()
-    inst = asm.sub()
+    inst = asm.neg()
     res, res_p, irq = pe(inst, Data(0),Data(1))
     assert res==0xffff
     assert res_p==0
@@ -59,6 +59,52 @@ def test_sub():
     assert res==-2
     assert res_p==0
     assert irq==0
+
+def test_mult0():
+    pe = PE()
+
+    inst = asm.umult0()
+    res, res_p, irq = pe(inst, Data(2),Data(3))
+    assert res==6
+    assert res_p==0
+    assert irq==0
+
+    inst = asm.smult0()
+    res, res_p, irq = pe(inst, Data(-2),Data(3))
+    assert res==-6
+    assert res_p==0
+    assert irq==0
+
+def test_mult1():
+    pe = PE()
+
+    inst = asm.umult1()
+    res, res_p, irq = pe(inst, Data(0x200),Data(3))
+    assert res==6
+    assert res_p==0
+    assert irq==0
+
+    inst = asm.smult1()
+    res, res_p, irq = pe(inst, Data(-512),Data(3))
+    assert res==-6
+    assert res_p==0
+    assert irq==0
+
+def test_mult2():
+    pe = PE()
+
+    inst = asm.umult2()
+    res, res_p, irq = pe(inst, Data(0x200),Data(0x300))
+    assert res==6
+    assert res_p==0
+    assert irq==0
+
+    inst = asm.smult2()
+    res, res_p, irq = pe(inst, Data(-2*256),Data(3*256))
+    assert res==-6
+    assert res_p==0
+    assert irq==0
+
 
 def test_lsl():
     pe = PE()
