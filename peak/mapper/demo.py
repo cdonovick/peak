@@ -1,32 +1,23 @@
 import functools as ft
-from peak.pe1 import sim
-from peak.pe1 import isa
-from SMT_bit_vector import SMTBitVector, SMTSIntVector, SMTUIntVector, ss
-from mapper import gen_mapping
+from peak.demo_pe import sim
+from peak.demo_pe import isa
+from peak.mapper import SMTBitVector, ss
+from peak.mapper import gen_mapping
 import coreir
 
+__COREIR_MODELS = {
+        'add' : lambda in0, in1: in0.bvadd(in1),
+        'sub' : lambda in0, in1: in0.bvsub(in1),
+        'mul' : lambda in0, in1: in0.bvmul(in1),
+        'shr' : lambda in0, in1: in0.bvashr(in1),
+        'shl' : lambda in0, in1: in0.bvshl(in1),
+        'or'  : lambda in0, in1: in0.bvor(in1),
+        'and' : lambda in0, in1: in0.bvand(in1),
+        'xor' : lambda in0, in1: in0.bvxor(in1),
+        'not' : lambda in_: in_.bvnot(),
+}
 
 solver = ss.smt('Z3')
-
-bound_BV = ft.partial(SMTBitVector, solver)
-bound_SInt = ft.partial(SMTSIntVector, solver)
-bound_UInt = ft.partial(SMTUIntVector, solver)
-
-alu = sim.gen_alu(bound_BV, bound_SInt, bound_UInt)
-
-static_inputs = {
-    'signed' : 0,
-    'd' : 0,
-}
-
-free_inputs = {
-    'b' : bound_BV(None, sim.DATAWIDTH, name='x'),
-    'a' : bound_BV(None, sim.DATAWIDTH, name='y'),
-}
-
-
-instructions = isa.ALU
-
 context = coreir.Context()
 lib = context.get_namespace('coreir')
 mods = []
@@ -34,11 +25,21 @@ for gen in lib.generators.values():
     if gen.params.keys() == {'width'}:
         mods.append(gen(width=sim.DATAWIDTH))
 
-mappings = gen_mapping(solver, alu, instructions, static_inputs, free_inputs, mods)
+for mod in mods:
+    if mod.name in __COREIR_MODELS:
+        found = False
+        for mapping in gen_mapping(
+                solver,
+                sim.gen_alu,
+                isa.INST,
+                mod,
+                __COREIR_MODELS[mod.name],
+                1,):
+            print(f'Mapping found for {mod.name}')
+            print(mapping)
+            print()
+            found = True
+        if not found:
+            print(f'No Mapping found for {mod.name}\n')
+        solver.Reset()
 
-for k,v in mappings.items():
-    if v is not None:
-        print(f'Mapping found for coreir module named {k.name}')
-        for k,v in v.items():
-            print(f'\t{k} : {v}')
-        print()

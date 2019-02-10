@@ -161,12 +161,15 @@ class SMTBitVector:
             if step is None:
                 step = 1
             elif step != 1:
-                raise ValueError('SMT extract does not support step != 1')
+                raise IndexError('SMT extract does not support step != 1')
 
             v = self.value[stop-1 : start]
         else:
             if index < 0:
                 index = num_bits+index
+
+            if not (0 <= index < num_bits):
+                raise IndexError()
 
             v = self.value[index]
 
