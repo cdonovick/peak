@@ -3,7 +3,6 @@ import typing as tp
 from dataclasses import is_dataclass, fields, dataclass
 from enum import Enum, auto
 
-
 __all__ =  ['Product', 'is_product', 'product']
 __all__ += ['Union', 'is_union', 'new_inst']
 
@@ -49,12 +48,15 @@ def product(cls):
     if not issubclass(cls, Product):
         raise TypeError()
     cls = dataclass(cls)
-    return cls 
+    return cls
 
 class Union(ISABuilder, Enum):
     @classmethod
     def enumerate(cls) -> tp.Iterable:
         yield from it.chain(*cls._elements(cls, lambda elem : elem.value))
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}.{self.name}>'
 
 def is_union(union) -> bool:
     return isinstance(union, Union)
