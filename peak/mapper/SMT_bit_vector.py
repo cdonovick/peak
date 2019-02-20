@@ -3,6 +3,7 @@ import itertools as it
 import functools as ft
 import smt_switch as ss
 import bit_vector as bv
+from abc import abstractmethod
 import re
 import warnings
 import weakref
@@ -24,13 +25,11 @@ def auto_cast(fn):
     @ft.wraps(fn)
     def wrapped(self, *args):
         T = type(self)
-        solver = self.solver
-        num_bits = self.num_bits
         def cast(x):
             if isinstance(x, T):
                 return x
             else:
-                return T(solver, x, num_bits)
+                return T(x)
         args = map(cast, args)
         return cast(fn(self, *args))
     return wrapped
@@ -38,23 +37,23 @@ def auto_cast(fn):
 def auto_cast_bool(fn):
     @ft.wraps(fn)
     def wrapped(self, *args):
-        T = type(self)
         solver = self.solver
-        num_bits = self.num_bits
+        T = type(self)
         def cast(x):
             if isinstance(x, T):
                 return x
             else:
-                return T(solver, x, num_bits)
+                return T(x)
         args = map(cast, args)
         r = fn(self, *args)
         bit = solver.BitVec(1)
         r = solver.Ite(r, solver.TheoryConst(bit, 1), solver.TheoryConst(bit, 0))
-        return SMTBitVector(solver, r, 1)
+        return T.unsized_t[1](r)
     return wrapped
 
-class SMTBitVector:
-    def __init__(self, solver:ss.smt, value:tp.Union[None, bool, int, bv.BitVector, ss.terms.TermBase] = None, num_bits:tp.Optional[int] = None, *, name:tp.Optional[str] = None):
+class SMTBitVector(bv.AbstractBitVector):
+    @abstractmethod
+    def __init__(self, solver:ss.smt, value:tp.Union[None, bool, int, bv.BitVector, ss.terms.TermBase] = None,  *, name:tp.Optional[str] = None):
         self._solver = solver
 
         if name is not None:
@@ -63,11 +62,8 @@ class SMTBitVector:
             elif _name_re.fullmatch(name):
                 warnings.warn('Name looks like an auto generated name, this might break things')
 
-        if value is None and num_bits is None:
-            raise ValueError("Must supply either value or num_bits")
-        elif value is None:
-            self._num_bits = num_bits
-            self._sort = sort = solver.BitVec(num_bits)
+        if value is None:
+            self._sort = sort = solver.BitVec(self.size)
             if name is None:
                 name = _gen_name()
             self._value = solver.DeclareConst(name, sort)
@@ -75,9 +71,8 @@ class SMTBitVector:
 
         elif isinstance(value, SMTBitVector):
             self._value = value.value
-            if num_bits is not None and value.num_bits != num_bits:
-                warnings.warn("inconsistent bitwidth")
-            self._num_bits = value.num_bits
+            if value.size != self.size:
+                raise TypeError("inconsistent bitwidth")
             self._sort = value._sort
             if name is None:
                 name = value._name
@@ -87,35 +82,22 @@ class SMTBitVector:
 
         elif isinstance(value, ss.terms.TermBase):
             #Value is a smt expression
-            if isinstance(value.sort, ss.sorts.Bool):
-                self._num_bits =  1
-            elif isinstance(value.sort, ss.sorts.BitVec):
-                self._num_bits = value.sort.width
-            else:
-                raise TypeError()
-
-            if num_bits is not None and self._num_bits != num_bits:
-                warnings.warn("inconsistent bitwidth")
+            if isinstance(value.sort, ss.sorts.Bool) and self.size != 1:
+                raise TypeError("inconsistent bitwidth")
+            elif isinstance(value.sort, ss.sorts.BitVec) and value.sort.width != self.size:
+                raise TypeError("inconsistent bitwidth")
 
             self._sort = value.sort
             self._value  = value
             self._const_value = None
         else:
             if isinstance(value, bool):
-                if num_bits is None:
-                    num_bits = 1
                 value = int(value)
-            elif isinstance(value, int):
-                if num_bits is None:
-                    num_bits = max(1, value.bit_length())
             elif isinstance(value, bv.BitVector):
-                if num_bits is None:
-                    num_bits = value.num_bits
                 value = value.as_uint()
-            else:
+            elif not isinstance(value, int):
                 raise TypeError(f'Unexpected type {type(value)}')
-            self._num_bits = num_bits
-            self._sort = sort = solver.BitVec(num_bits)
+            self._sort = sort = solver.BitVec(self.size)
             self._const_value = value
             self._value = solver.TheoryConst(sort, value)
 
@@ -123,13 +105,18 @@ class SMTBitVector:
         if name is not None:
             _name_table[name] = self
 
+    def make_constant(self, value, size:tp.Optional[int]=None):
+        if size is None:
+            size = self.size
+        return type(self).unsized_t[size](value)
+
     @property
     def value(self):
         return self._value
 
     @property
     def num_bits(self):
-        return self._num_bits
+        return self.size
 
     @property
     def solver(self):
@@ -142,21 +129,21 @@ class SMTBitVector:
             return repr(self._value)
 
     def __getitem__(self, index):
-        num_bits = self.num_bits
+        size = self.size
         if isinstance(index, slice):
             start, stop, step = index.start, index.stop, index.step
 
             if start is None:
                 start = 0
             elif start < 0:
-                start = num_bits + start
+                start = size + start
 
             if stop is None:
-                stop = num_bits
+                stop = size
             elif stop < 0:
-                stop = num_bits + stop
+                stop = size + stop
 
-            stop = min(stop, num_bits)
+            stop = min(stop, size)
 
             if step is None:
                 step = 1
@@ -166,14 +153,14 @@ class SMTBitVector:
             v = self.value[stop-1 : start]
         else:
             if index < 0:
-                index = num_bits+index
+                index = size+index
 
-            if not (0 <= index < num_bits):
+            if not (0 <= index < size):
                 raise IndexError()
 
             v = self.value[index]
 
-        return SMTBitVector(self.solver, v)
+        return type(self).unsized_t[v.sort.width](v)
 
     def __setitem__(self, index, value):
         #not sure what a set item should mean
@@ -182,8 +169,8 @@ class SMTBitVector:
     def __len__(self):
         return self.num_bits
 
-    @staticmethod
-    def concat(x, y):
+    @classmethod
+    def concat(cls, x, y):
         if isinstance(x, SMTBitVector) and isinstance(y, SMTBitVector):
             if x.solver is not y.solver:
                 raise ValueError('x and y bound to different solvers')
@@ -196,7 +183,7 @@ class SMTBitVector:
             x = SMTBitVector(solver, x)
         else:
             raise ValueError('x or y must be an SMTBitVector')
-        return SMTBitVector(solver, solver.Concat(x.value, y.value))
+        return cls.unsized_t[x.size + y.size](solver.Concat(x.value, y.value))
 
     @auto_cast
     def bvnot(self):
@@ -292,22 +279,41 @@ class SMTBitVector:
 
     def adc(self, b, c):
         T = type(self)
-        num_bits = self.num_bits
-        solver = self.solver
         if not isinstance(b, T):
-            b = T(self, b, num_bits)
+            b = T(b)
 
-        if not isinstance(c, T):
-            c = T(solver, c)
+        if not isinstance(c, T.unsized_t[1]):
+            c = T.unsized_t[1](c)
 
         if c.num_bits != 1:
             warnings.warn('carry is not single bit something weird might happen')
 
         a = self.zext(1)
         b = b.zext(1)
-        c = c.zext(1+num_bits-c.num_bits)
+        c = c.zext(1+self.size-c.size)
         res = a + b + c
         return res[0:-1], res[-1]
+
+    def ite(self, t, e):
+        T = type(self).unsized_t
+        if not isinstance(t, T) and not isinstance(e, T):
+            t = int(t)
+            e = int(e)
+            size = max(t.bit_length(), e.bit_length())
+            TS = type(self).unsized_t[size]
+            t = T(e)
+            e = T(e)
+        elif not isinstance(t, T):
+            TS = type(e)
+            t =  T(t)
+        elif not isinstance(e, T):
+            TS = type(t)
+            e = T(e)
+        else:
+            if t.size != e.size:
+                raise TypeError()
+            TS = type(t)
+        return TS(self.solver.Ite(self.value != self.make_constant(0).value, t.value, e.value))
 
     @auto_cast
     def bvadd(self, other):
@@ -410,15 +416,18 @@ class SMTBitVector:
 
         TODO: Do this implicit conversion for built-in types like UIntVector.
         """
-        if other < 0:
+        T = type(self).unsized_t
+        ext = int(other)
+        if ext < 0:
             raise ValueError()
-        elif other == 0:
+        elif ext == 0:
             return self
         else:
             x = self[self.num_bits - 1]
-            for i in range(1, other):
-                x = SMTBitVector.concat(x, x)
-        return SMTBitVector.concat(x, self)
+            XT = type(x).unsized_t
+            for i in range(1, ext):
+                x = XT.concat(x, x)
+        return T.concat(x, self)
 
     def ext(self, other):
         """
@@ -432,7 +441,14 @@ class SMTBitVector:
         **NOTE:** Does not cast, returns a raw BitVector instead.  See
         docstring for `sext` for more info.
         """
-        return SMTBitVector.concat(SMTBitVector(self.solver, 0, other), self)
+        T = type(self).unsized_t
+        ext = int(other)
+        if ext < 0:
+            raise ValueError()
+        elif ext == 0:
+            return self
+
+        return T.concat(T[ext](0), self)
 
 
 class SMTNumVector(SMTBitVector):
@@ -464,6 +480,12 @@ class SMTSIntVector(SMTNumVector):
     def __le__(self, other):
         return self.bvsle(other)
 
+def bind_solver(T : tp.Type[SMTBitVector], solver) -> tp.Type[SMTBitVector]:
+    class BoundVector(T):
+        def __init__(self, *args, **kwargs):
+            super().__init__(solver, *args, **kwargs)
+    return BoundVector
 
 def overflow(a, b, res):
    raise NotImplementedError()
+
