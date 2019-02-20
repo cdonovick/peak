@@ -1,10 +1,11 @@
 import itertools as it
 import typing as tp
 from dataclasses import is_dataclass, fields, dataclass
-from enum import Enum, auto
+from enum import auto
+from enum import Enum as pyEnum
 
 __all__ =  ['Product', 'is_product', 'product']
-__all__ += ['Union', 'is_union', 'new_inst']
+__all__ += ['Sum', 'is_sum', 'new_inst']
 
 
 def _issubclass(sub : tp.Any, parent : type) -> bool:
@@ -50,7 +51,7 @@ def product(cls):
     cls = dataclass(cls)
     return cls
 
-class Union(ISABuilder, Enum):
+class Enum(ISABuilder, pyEnum):
     @classmethod
     def enumerate(cls) -> tp.Iterable:
         yield from it.chain(*cls._elements(cls, lambda elem : elem.value))
@@ -58,7 +59,19 @@ class Union(ISABuilder, Enum):
     def __repr__(self):
         return f'<{self.__class__.__name__}.{self.name}>'
 
-def is_union(union) -> bool:
-    return isinstance(union, Union)
+class Sum(Enum):
+    def __new__(cls, t):
+        if not _issubclass(t, ISABuilder):
+            raise TypeError()
 
-new_inst = auto
+    @classmethod
+    def enumerate(cls) -> tp.Iterable:
+        yield from it.chain(*cls._elements(cls, lambda elem : elem.value))
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}.{self.name}>'
+
+def is_sum(sum) -> bool:
+    return isinstance(sum, Sum)
+
+new_instruction = auto

@@ -1,14 +1,13 @@
 import typing as tp
 import itertools as it
 import functools as ft
-from collections import defaultdict
 
 import coreir
 
 from bit_vector import AbstractBitVector
-from .. import Product
-from bit_vector import BitVector
-from .SMT_bit_vector import SMTBitVector
+from ..adt import ISABuilder
+from bit_vector import BitVector, SIntVector
+from .SMT_bit_vector import SMTBitVector, SMTSIntVector, bind_solver
 
 import smt_switch as ss
 
@@ -24,13 +23,13 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
 def gen_mapping(
         solver : ss.smt,
         peak_component_generator : tp.Callable[[tp.Type[AbstractBitVector]], tp.Callable],
-        isa : tp.Type[Product],
+        isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
         ):
-    solver.Push()
-    SMT_BV = ft.partial(SMTBitVector, solver)
+    SMT_BV = bind_solver(SMTBitVector, solver)
+
     PY_BV = BitVector
 
     py_alu, peak_inputs, peak_outputs =  peak_component_generator(PY_BV)
@@ -38,7 +37,7 @@ def gen_mapping(
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
-    core_smt_vars = {k : SMT_BV(None, v) for k,v in core_inputs.items()}
+    core_smt_vars = {k : SMT_BV[v](None) for k,v in core_inputs.items()}
     core_smt_expr = coreir_model(**core_smt_vars)
 
     #The following is some really gross magic to generate all possible assignments
@@ -69,24 +68,28 @@ def gen_mapping(
     if found >= max_mappings:
         return
     for binding in bindings:
-        binding_dict = {k : core_smt_vars[v] if v is not None else SMT_BV(0, peak_inputs[k]) for v,k in binding}
-        name_binding = {k : v if v is not None else 0 for v,k in binding},
+        binding_dict = {k : core_smt_vars[v] if v is not None else SMT_BV[peak_inputs[k]](0) for v,k in binding}
+        name_binding = {k : v if v is not None else 0 for v,k in binding}
         for inst in isa.enumerate():
             rvals = smt_alu(inst, **binding_dict)
             for idx, bv in enumerate(rvals):
+                solver.Push()
                 if isinstance(bv, SMTBitVector) and bv.value.sort == core_smt_expr.value.sort:
                     solver.Assert(bv.value != core_smt_expr.value)
                     if not solver.CheckSat():
                         mapping = {
                                 'instruction' : inst,
-                                'rval idx' : idx,
-                                'core to smt' : core_smt_vars,
-                                'smt formula' : core_smt_expr,
-                                'binding' : name_binding,                                }
-                        solver.Pop()
-                        solver.Push()
+                                'output' : 'FLAG' if idx else 'RESULT',
+#                                'core to smt' : core_smt_vars,
+#                                'core smt formula' : core_smt_expr.value,
+#                                'peak smt formula' : bv.value,
+                                'coreir to peak' : {v if v != 0  else 'Constant 0' : k for k,v in name_binding.items()},
+                        }
+#                        solver.Pop()
+#                        solver.Push()
                         yield mapping
                         found  += 1
                         if found >= max_mappings:
                             return
+                solver.Pop()
 
