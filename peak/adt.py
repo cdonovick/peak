@@ -1,7 +1,7 @@
 import itertools as it
 import typing as tp
 from abc import ABCMeta, abstractmethod
-from dataclasses import is_dataclass, fields, dataclass
+from dataclasses import is_dataclass, fields, dataclass, astuple
 from enum import auto
 from enum import Enum as pyEnum
 import weakref
@@ -44,13 +44,17 @@ class Product(ISABuilder):
         for args in it.product(*cls._elements(fields(cls), extract)):
             yield cls(*args)
 
+    @property
+    def value(self):
+        return astuple(self)
+
 def is_product(product) -> bool:
     return isinstance(product, Product)
 
 def product(cls):
     if not issubclass(cls, Product):
         raise TypeError()
-    cls = dataclass(cls)
+    cls = dataclass(eq=True, frozen=True)(cls)
     return cls
 
 class Enum(ISABuilder, pyEnum):
@@ -128,6 +132,15 @@ class Sum(ISABuilder, metaclass=SumMeta):
             raise TypeError()
         self._value = value
 
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and self.value == other.value
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return hash(self.value)
+
     @property
     def value(self):
         return self._value
@@ -137,8 +150,8 @@ class Sum(ISABuilder, metaclass=SumMeta):
 
     @classmethod
     def enumerate(cls) -> tp.Iterable:
-        yield from it.chain(*cls._elements(cls.fields, lambda elem : elem))
-
+        for val in it.chain(*cls._elements(cls.fields, lambda elem : elem)):
+            yield cls(val)
 
 
 def is_sum(sum) -> bool:
