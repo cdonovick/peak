@@ -76,9 +76,9 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
     elif alu == ALU.XOr:
         res, res_p = a ^ b, 0
     elif alu == ALU.SHR:
-        res, res_p = a >> b[:4], 0
+        res, res_p = a >> Data(b[:4]), 0
     elif alu == ALU.SHL:
-        res, res_p = a << b[:4], 0
+        res, res_p = a << Data(b[:4]), 0
     elif alu == ALU.Neg:
         if signed:
             res, res_p = ~a+Bit(1), 0

@@ -1,11 +1,12 @@
-from .. import Bits
+from bit_vector import BitVector, Bit
 
 # Types for LUT operations
-Bit = Bits(1)
-LUT = Bits(8)
+LUT = BitVector[8]
+_IDX_t = BitVector[3]
 
 # Implement a 3-bit LUT
 def lut( lut:LUT, bit0:Bit, bit1:Bit, bit2:Bit) -> Bit:
-    i = (int(bit2)<<2) | (int(bit1)<<1) | int(bit0)
-    return Bit(lut & (1 << i))
+    i = _IDX_t([bit0, bit1, bit2])
+    i = i.zext(5)
+    return ((lut >> i) & 1)[1]
 

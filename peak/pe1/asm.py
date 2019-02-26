@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT
@@ -9,7 +8,7 @@ from .isa import *
 #
 # Format a configuration of the PE - sets all fields
 #
-def inst(alu, signed=0, lut=0, cond=Cond.Z,
+def inst(alu, signed=Signed.unsigned, lut=0, cond=Cond.Z,
     ra_mode=Mode.BYPASS, ra_const=0,
     rb_mode=Mode.BYPASS, rb_const=0,
     rd_mode=Mode.BYPASS, rd_const=0,
@@ -17,7 +16,7 @@ def inst(alu, signed=0, lut=0, cond=Cond.Z,
     rf_mode=Mode.BYPASS, rf_const=0
     ):
 
-    return Inst(alu, Signed(signed), LUT(lut), cond,
+    return Inst(alu, signed, LUT(lut), cond,
         RegA_Mode(ra_mode), RegA_Const(ra_const),
         RegB_Mode(rb_mode), RegB_Const(rb_const),
         RegD_Mode(rd_mode), RegD_Const(rd_const),

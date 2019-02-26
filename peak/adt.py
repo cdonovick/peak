@@ -5,7 +5,7 @@ from enum import auto
 from enum import Enum as pyEnum
 
 __all__ =  ['Product', 'is_product', 'product']
-__all__ += ['Sum', 'is_sum', 'new_inst']
+__all__ += ['Sum', 'is_sum', 'new_instruction']
 
 
 def _issubclass(sub : tp.Any, parent : type) -> bool:
