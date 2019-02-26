@@ -1,4 +1,4 @@
-from peak import Enum, Product, product
+from peak import Enum, Product
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT
@@ -49,7 +49,6 @@ class Signed(Enum):
 #
 # Each configuration is given by the following fields
 #
-@product
 class Inst(Product):
     alu:ALU          # ALU operation
     signed:Signed    # unsigned or signed 

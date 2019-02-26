@@ -6,8 +6,9 @@ from enum import auto
 from enum import Enum as pyEnum
 import weakref
 
-__all__ =  ['Product', 'is_product', 'product']
-__all__ += ['Sum', 'is_sum', 'new_instruction']
+__all__ =  ['Product', 'is_product',]
+__all__ += ['Sum', 'is_sum',]
+__all__ += ['Enum', 'is_enum', 'new_instruction']
 
 
 def _issubclass(sub : tp.Any, parent : type) -> bool:
@@ -29,7 +30,15 @@ class ISABuilder:
 
         return elements
 
-class Product(ISABuilder):
+
+class ProductMeta(type):
+    def __new__(mcs, name, bases, namespace, **kwargs):
+        cls = super().__new__(mcs, name, bases, namespace, **kwargs)
+        cls = dataclass(eq=True, frozen=True)(cls)
+        return cls
+
+
+class Product(ISABuilder, metaclass=ProductMeta):
     @classmethod
     def enumerate(cls) -> tp.Iterable:
         if not is_dataclass(cls):
@@ -50,20 +59,6 @@ class Product(ISABuilder):
 
 def is_product(product) -> bool:
     return isinstance(product, Product)
-
-def product(cls):
-    if not issubclass(cls, Product):
-        raise TypeError()
-    cls = dataclass(eq=True, frozen=True)(cls)
-    return cls
-
-class Enum(ISABuilder, pyEnum):
-    @classmethod
-    def enumerate(cls) -> tp.Iterable:
-        yield from it.chain(*cls._elements(cls, lambda elem : elem.value))
-
-    def __repr__(self):
-        return f'<{self.__class__.__name__}.{self.name}>'
 
 class SumMeta(type):
     _class_cache = weakref.WeakValueDictionary()
@@ -156,5 +151,16 @@ class Sum(ISABuilder, metaclass=SumMeta):
 
 def is_sum(sum) -> bool:
     return isinstance(sum, Sum)
+
+class Enum(ISABuilder, pyEnum):
+    @classmethod
+    def enumerate(cls) -> tp.Iterable:
+        yield from it.chain(*cls._elements(cls, lambda elem : elem.value))
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}.{self.name}>'
+
+def is_enum(enum) -> bool:
+    return isinstance(enum, Enum)
 
 new_instruction = auto

@@ -1,6 +1,6 @@
 from bit_vector import BitVector, Bit
 
-from peak import Enum, Product, Sum, product
+from peak import Enum, Product, Sum
 from .mode import Mode
 from .lut import LUT_t
 from .cond import Cond
@@ -22,7 +22,6 @@ Bit0_Mode = Mode
 Bit1_Mode = Mode
 Bit2_Mode = Mode
 
-@product
 class LUT(Product):
     bit0_mode:Bit0_Mode
     bit0_const:Bit0_Const
@@ -32,7 +31,6 @@ class LUT(Product):
     bit2_const:Bit2_Const
     table:LUT_t
 
-@product
 class _ALU(Product):
     data_modes  : [Data_Mode]
     data_consts : [Data_Const]
@@ -63,7 +61,6 @@ class XOr(_ALU):
 
 ALU = Sum[Add, Sub, And, Or, XOr]
 
-@product
 class Inst(Product):
     alu:ALU
     lut:LUT

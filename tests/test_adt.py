@@ -1,10 +1,9 @@
-from peak.adt import Product, Sum, Enum, product
+from peak.adt import Product, Sum, Enum
 
 class En(Enum):
     a = 0
     b = 1
 
-@product
 class Pr(Product):
     x:En
     y:En
