@@ -2,8 +2,11 @@ import peak.pe1.asm as asm
 from peak.pe1 import PE, Bit, Data
 
 def test_and():
+    # instantiate an PE - calls PE.__init__
     pe = PE()
-    inst = asm.and_()
+    # format an 'and' instruction
+    inst = asm.and_() 
+    # execute PE instruction with the arguments as inputs -  call PE.__call__
     res, res_p, irq = pe(inst, Data(1), Data(3))
     assert res==1
     assert res_p==0
@@ -25,21 +28,21 @@ def test_xor():
     assert res_p==0
     assert irq==0
 
-#def test_inv():
-#    pe = PE()
-#    inst = asm.sub()
-#    res, res_p, irq = pe(inst, Data(-1),Data(1))
-#    assert res==0xfffe
-#    assert res_p==0
-#    assert irq==0
-#
-#def test_neg():
-#    pe = PE()
-#    inst = asm.sub()
-#    res, res_p, irq = pe(inst, Data(0),Data(1))
-#    assert res==0xffff
-#    assert res_p==0
-#    assert irq==0
+def test_inv():
+    pe = PE()
+    inst = asm.sub()
+    res, res_p, irq = pe(inst, Data(0xffff),Data(1))
+    assert res==0xfffe
+    assert res_p==0
+    assert irq==0
+
+def test_neg():
+    pe = PE()
+    inst = asm.neg()
+    res, res_p, irq = pe(inst, Data(0),Data(1))
+    assert res==0xffff
+    assert res_p==0
+    assert irq==0
 
 def test_add():
     pe = PE()
@@ -56,6 +59,52 @@ def test_sub():
     assert res==-2
     assert res_p==0
     assert irq==0
+
+def test_mult0():
+    pe = PE()
+
+    inst = asm.umult0()
+    res, res_p, irq = pe(inst, Data(2),Data(3))
+    assert res==6
+    assert res_p==0
+    assert irq==0
+
+    inst = asm.smult0()
+    res, res_p, irq = pe(inst, Data(-2),Data(3))
+    assert res==-6
+    assert res_p==0
+    assert irq==0
+
+def test_mult1():
+    pe = PE()
+
+    inst = asm.umult1()
+    res, res_p, irq = pe(inst, Data(0x200),Data(3))
+    assert res==6
+    assert res_p==0
+    assert irq==0
+
+    inst = asm.smult1()
+    res, res_p, irq = pe(inst, Data(-512),Data(3))
+    assert res==-6
+    assert res_p==0
+    assert irq==0
+
+def test_mult2():
+    pe = PE()
+
+    inst = asm.umult2()
+    res, res_p, irq = pe(inst, Data(0x200),Data(0x300))
+    assert res==6
+    assert res_p==0
+    assert irq==0
+
+    inst = asm.smult2()
+    res, res_p, irq = pe(inst, Data(-2*256),Data(3*256))
+    assert res==-6
+    assert res_p==0
+    assert irq==0
+
 
 def test_lsl():
     pe = PE()
