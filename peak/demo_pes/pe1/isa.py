@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, product, Enum
+from peak.adt import Product, Sum, new_instruction, Enum
 
 DATAWIDTH = 16
 
@@ -8,6 +8,5 @@ class ALU_INST(Enum):
     Xor  = new_instruction()
     Shft = new_instruction()
 
-@product
 class INST(Product):
     ALU      : ALU_INST

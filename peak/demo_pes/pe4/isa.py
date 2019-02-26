@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, product, Enum
+from peak.adt import Product, Sum, new_instruction, Enum
 
 DATAWIDTH = 16
 
@@ -20,7 +20,6 @@ class BIT_CONSTANT(Enum):
     Zero = 0
     One  = 1
 
-@product
 class INST(Product):
     ALU      : ALU_INST
     FLAG     : FLAG_INST

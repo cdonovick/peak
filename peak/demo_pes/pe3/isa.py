@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, product, Enum
+from peak.adt import Product, Sum, new_instruction, Enum
 
 DATAWIDTH = 16
 
@@ -16,7 +16,6 @@ class INVERTER_INST(Enum):
     Ident  = new_instruction()
     Invert = new_instruction()
 
-@product
 class INST(Product):
     ALU      : ALU_INST
     FLAG     : FLAG_INST
