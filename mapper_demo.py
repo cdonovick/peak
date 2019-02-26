@@ -17,9 +17,10 @@ if __name__ == '__main__':
 
 
 solver = ss.smt('CVC4')
+#solver = ss.smt('Boolector')
 solver.SetLogic('QF_BV')
-solver.SetOption('bv-sat-solver', 'cryptominisat')
 solver.SetOption('incremental', 'true')
+solver.SetOption('bv-sat-solver', 'cryptominisat')
 solver.SetOption('bitblast', 'eager')
 
 __COREIR_MODELS = {
@@ -49,6 +50,7 @@ for gen in lib.generators.values():
 
 for mod in mods:
     if mod.name in __COREIR_MODELS:
+        solver.Push()
         found = False
         mappings = list(gen_mapping(
                 solver,
@@ -65,5 +67,5 @@ for mod in mods:
         else:
             print(f'No Mapping found for {mod.name}')
         print('\n------------------------------------------------\n')
-        solver.Reset()
+        solver.Pop()
 

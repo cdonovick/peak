@@ -73,8 +73,8 @@ def gen_mapping(
         for inst in isa.enumerate():
             rvals = smt_alu(inst, **binding_dict)
             for idx, bv in enumerate(rvals):
-                solver.Push()
                 if isinstance(bv, SMTBitVector) and bv.value.sort == core_smt_expr.value.sort:
+                    solver.Push()
                     solver.Assert(bv.value != core_smt_expr.value)
                     if not solver.CheckSat():
                         mapping = {
@@ -85,11 +85,10 @@ def gen_mapping(
 #                                'peak smt formula' : bv.value,
                                 'coreir to peak' : {v if v != 0  else 'Constant 0' : k for k,v in name_binding.items()},
                         }
-#                        solver.Pop()
-#                        solver.Push()
                         yield mapping
                         found  += 1
                         if found >= max_mappings:
+                            solver.Pop()
                             return
-                solver.Pop()
+                    solver.Pop()
 
