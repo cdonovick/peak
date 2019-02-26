@@ -1,92 +1,102 @@
-from bit_vector import BitVector, SIntVector, UIntVector, overflow
+from bit_vector import BitVector, SIntVector, overflow
 from .. import Peak
 from .mode import Mode, RegisterMode
-from .lut import LUT, lut, Bit
+from .lut import Bit, LUT, lut
 from .cond import Cond, cond
 from .isa import *
 
 
-def gen_alu(BV_t=BitVector, Sign_t=SIntVector, Unsigned_t=UIntVector):
-    def Bit(n):
-        return BV_t(n, 1)
+# simulate the PE ALU
+#
+#   inputs
+#
+#   alu is the ALU operations
+#   signed is whether the inputs are unsigned or signed
+#   a, b - 16-bit operands
+#   d - 1-bit operatnd
+#
+#
+#   returns res, res_p, Z, N, C, V
+#
+#   res - 16-bit result
+#   res_p - 1-bit result
+#   Z (result is 0)
+#   N (result is negative)
+#   C (carry generated)
+#   V (overflow generated)
+#
+def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
-    def alu(alu:ALU, signed:Signed, a:BV_t, b:BV_t, d:Bit):
+    if signed:
+        a = SIntVector(a)
+        b = SIntVector(b)
+        mula, mulb = a.sext(16), b.sext(16)
+    else:
+        mula, mulb = a.zext(16), b.zext(16)
 
-        def mul(a, b):
-            a, b = a.ext(16), b.ext(16)
-            return a*b
-        def mult0(a, b):
-            res = mul(a, b)
-            return res[:16], 0, 0 # wrong C, V
-        def mult1(a, b, d):
-            res = mul(a, b)
-            return res[8:24], 0, 0 # wrong C, V
-        def mult2(a, b, c, d):
-            res = mul(a, b)
-            return res[16:32], 0, 0 # wrong C, V
+    mul = mula * mulb
 
+    C = 0
+    V = 0
+    if   alu == ALU.Add:
+        res, C = a.adc(b, Bit(0))
+        V = overflow(a, b, res)
+        res_p = C
+    elif alu == ALU.Sub:
+        b_not = ~b
+        res, C = a.adc(b_not, Bit(1)) 
+        V = overflow(a, b_not, res)
+        res_p = C
+    elif alu == ALU.Mult0:
+        res, C, V = mul[:16], 0, 0 # wrong C, V
+        res_p = C
+    elif alu == ALU.Mult1:
+        res, C, V = mul[8:24], 0, 0 # wrong C, V
+        res_p = C
+    elif alu == ALU.Mult2:
+        res, C, V = mul[16:32], 0, 0 # wrong C, V
+        res_p = C
+    elif alu == ALU.GTE_Max:
+        # C, V = a-b?
+        pred = a >= b
+        res, res_p = pred.ite(a,b), a >= b
+    elif alu == ALU.LTE_Min:
+        # C, V = a-b?
+        pred = a <= b
+        res, res_p = pred.ite(a,b), a >= b
+    elif alu == ALU.Abs:
+        pred = a >= 0
+        res, res_p = pred.ite(a,-a), Bit(a[-1])
+    elif alu == ALU.Sel:
+        res, res_p = d.ite(a,b), 0
+    elif alu == ALU.And:
+        res, res_p = a & b, 0
+    elif alu == ALU.Or:
+        res, res_p = a | b, 0
+    elif alu == ALU.XOr:
+        res, res_p = a ^ b, 0
+    elif alu == ALU.SHR:
+        res, res_p = a >> b[:4], 0
+    elif alu == ALU.SHL:
+        res, res_p = a << b[:4], 0
+    elif alu == ALU.Neg:
         if signed:
-            a = Sign_t(a)
-            b = Sign_t(b)
-
-        C = 0
-        V = 0
-        if   alu == ALU.Add:
-            res, C = a.adc(b, Bit(0))
-            #V = overflow(a, b, res)
-            res_p = C
-        elif alu == ALU.Sub:
-            b_not = ~b
-            res, C = a.adc(b_not, Bit(1))
-            #V = overflow(a, b_not, res)
-            res_p = C
-        elif alu == ALU.Mult0:
-            res, C, V = mult0(a, b)
-            res_p = C
-        elif alu == ALU.Mult1:
-            res, C, V = mult0(a, b)
-            res_p = C
-        elif alu == ALU.Mult2:
-            res, C, V = mult0(a, b)
-            res_p = C
-        elif alu == ALU.GTE_Max:
-            # C, V = a-b?
-            res, res_p = a if a >= b else b, a >= b
-        elif alu == ALU.LTE_Min:
-            # C, V = a-b?
-            res, res_p = a if a <= b else b, a <= b
-        elif alu == ALU.Abs:
-            res, res_p = a if a >= 0 else -a, Bit(a[-1])
-        elif alu == ALU.Sel:
-            res, res_p = a if d else b, 0
-        elif alu == ALU.And:
-            res, res_p = a & b, 0
-        elif alu == ALU.Or:
-            res, res_p = a | b, 0
-        elif alu == ALU.XOr:
-            res, res_p = a ^ b, 0
-        elif alu == ALU.SHR:
-            res, res_p = a >> b, 0
-        elif alu == ALU.SHL:
-            res, res_p = a << b, 0
-        elif alu == ALU.Neg:
-            if signed:
-                res, res_p = ~a+Bit(1), 0
-            else:
-                res, res_p = ~a, 0
+            res, res_p = ~a+Bit(1), 0
         else:
-            raise NotImplementedError(alu)
+            res, res_p = ~a, 0
+    else:
+        raise NotImplementedError(alu)
 
-        Z = res == 0
-        N = Bit(res[-1])
+    Z = res == 0
+    N = Bit(res[-1])
 
-        return res, res_p, Z, N, C, V
-
-    return alu
+    return res, res_p, Z, N, C, V
 
 class PE(Peak):
 
     def __init__(self):
+        # Declare PE state
+
         # Data registers
         self.rega = RegisterMode(Data)
         self.regb = RegisterMode(Data)
@@ -94,12 +104,14 @@ class PE(Peak):
         # Bit Registers
         self.regd = RegisterMode(Bit)
         self.rege = RegisterMode(Bit)
-        self.regf = RegisterMode(Bit)
+        self.regf = RegisterMode(Bit) 
 
     def __call__(self, inst: Inst, \
         data0: Data, data1: Data = Data(0), \
         bit0: Bit = Bit(0), bit1: Bit = Bit(0), bit2: Bit = Bit(0), \
         clk_en: Bit = Bit(1)):
+
+        # Simulate one clock cycle
 
         ra = self.rega(inst.rega, inst.data0, data0, clk_en)
         rb = self.regb(inst.regb, inst.data1, data1, clk_en)
@@ -108,13 +120,19 @@ class PE(Peak):
         re = self.rege(inst.rege, inst.bit1, bit1, clk_en)
         rf = self.regf(inst.regf, inst.bit2, bit2, clk_en)
 
-        alu = gen_alu()
-
+        # calculate alu results
         alu_res, alu_res_p, Z, N, C, V = alu(inst.alu, inst.signed, ra, rb, rd)
-        lut_res = lut(inst.lut, rd, re, rf)
-        res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
-        irq = Bit(0)
 
+        # calculate lut results
+        lut_res = lut(inst.lut, rd, re, rf)
+
+        # calculate 1-bit result
+        res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
+
+        # calculate interrupt request 
+        irq = Bit(0) # NYI
+
+        # return 16-bit result, 1-bit result, irq
         return alu_res, res_p, irq
 
 

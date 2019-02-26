@@ -1,11 +1,13 @@
-from .. import Peak, Register
+from .. import Peak, Register, Enum
 from .lut import Bit
 
-class Mode:
-    CONST = 0
-    VALID = 1
-    BYPASS = 2
-    DELAY = 3
+# Field for specifying register modes
+#
+class Mode(Enum):
+    CONST = 0   # Register returns constant in constant field
+    VALID = 1   # Register written with clock enable, previous value returned
+    BYPASS = 2  # Register is bypassed and input value is returned
+    DELAY = 3   # Register written with input value, previous value returned
 
 class RegisterMode(Peak):
     def __init__(self, init = 0):
@@ -20,7 +22,7 @@ class RegisterMode(Peak):
         elif mode == Mode.BYPASS:
             return value
         elif mode == Mode.DELAY:
-            return self.register(value, mode == Mode.DELAY)
+            return self.register(value, True)
         elif mode == Mode.VALID:
             return self.register(value, clk_en)
         else:

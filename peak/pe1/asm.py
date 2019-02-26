@@ -6,6 +6,9 @@ from .isa import *
 
 # https://github.com/StanfordAHA/CGRAGenerator/wiki/PE-Spec
 
+#
+# Format a configuration of the PE - sets all fields
+#
 def inst(alu, signed=0, lut=0, cond=Cond.Z,
     ra_mode=Mode.BYPASS, ra_const=0,
     rb_mode=Mode.BYPASS, rb_const=0,
@@ -21,11 +24,36 @@ def inst(alu, signed=0, lut=0, cond=Cond.Z,
         RegE_Mode(re_mode), RegE_Const(re_const),
         RegF_Mode(rf_mode), RegF_Const(rf_const) )
 
+# helper functions to format configurations
+
 def add():
     return inst(ALU.Add)
 
 def sub ():
     return inst(ALU.Sub)
+
+def neg ():
+    return inst(ALU.Sub)
+
+def umult0 ():
+    return inst(ALU.Mult0)
+
+def umult1 ():
+    return inst(ALU.Mult1)
+
+def umult2 ():
+    return inst(ALU.Mult2)
+
+def smult0 ():
+    return inst(ALU.Mult0, signed=1)
+
+def smult1 ():
+    return inst(ALU.Mult1, signed=1)
+
+def smult2 ():
+    return inst(ALU.Mult2, signed=1)
+
+
 
 def and_():
     return inst(ALU.And)
