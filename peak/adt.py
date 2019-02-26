@@ -1,8 +1,10 @@
 import itertools as it
 import typing as tp
+from abc import ABCMeta, abstractmethod
 from dataclasses import is_dataclass, fields, dataclass
 from enum import auto
 from enum import Enum as pyEnum
+import weakref
 
 __all__ =  ['Product', 'is_product', 'product']
 __all__ += ['Sum', 'is_sum', 'new_instruction']
@@ -59,17 +61,85 @@ class Enum(ISABuilder, pyEnum):
     def __repr__(self):
         return f'<{self.__class__.__name__}.{self.name}>'
 
-class Sum(Enum):
-    def __new__(cls, t):
-        if not _issubclass(t, ISABuilder):
+class SumMeta(type):
+    _class_cache = weakref.WeakValueDictionary()
+    _class_info  = weakref.WeakKeyDictionary()
+    def __call__(cls, *args, **kwargs):
+        if not cls.is_bound:
             raise TypeError()
+        return super().__call__(*args, **kwargs)
+
+    def __new__(mcs, name, bases, namespace, **kwargs):
+        bound_types = None
+        for base in bases:
+            if getattr(base, 'is_bound', False):
+                if bound_types is None:
+                    bound_types = base.bound_types
+                elif bound_types != base.bound_types:
+                    raise TypeError("Can't inherit from multiple different bound_types")
+
+
+        t = super().__new__(mcs, name, bases, namespace, **kwargs)
+        SumMeta._class_info[t] = bound_types
+
+        return t
+
+    def __getitem__(cls, idx : tp.Union[tp.Type[ISABuilder], tp.Sequence[tp.Type[ISABuilder]]]) -> 'SumMeta':
+        if isinstance(idx, tp.Sequence):
+            idx = tuple(idx)
+            for t in idx:
+                if not _issubclass(t, ISABuilder):
+                    raise TypeError()
+        elif isinstance(idx, ISABuilder):
+            idx = idx,
+        else:
+            raise TypeError()
+
+        try:
+            return SumMeta._class_cache[cls, idx]
+        except KeyError:
+            pass
+
+        if cls.is_bound:
+            raise TypeError()
+
+        bases = [cls]
+        bases.extend(b[idx] for b in cls.__bases__ if isinstance(b, SumMeta))
+        bases = tuple(bases)
+        class_name = '{}[{}]'.format(cls.__name__, idx)
+        t = type(cls)(class_name, bases, {})
+        t.__module__ = cls.__module__
+        SumMeta._class_cache[cls, idx] = t
+        SumMeta._class_info[t] = idx
+        return t
+
+
+    @property
+    def fields(cls):
+        return SumMeta._class_info[cls]
+
+    @property
+    def is_bound(cls) -> bool:
+        return SumMeta._class_info[cls] is not None
+
+class Sum(ISABuilder, metaclass=SumMeta):
+    def __init__(self, value):
+        if type(value) not in type(self).fields:
+            raise TypeError()
+        self._value = value
+
+    @property
+    def value(self):
+        return self._value
+
+    def match(self):
+        return type(self.value), self.value
 
     @classmethod
     def enumerate(cls) -> tp.Iterable:
-        yield from it.chain(*cls._elements(cls, lambda elem : elem.value))
+        yield from it.chain(*cls._elements(cls.fields, lambda elem : elem))
 
-    def __repr__(self):
-        return f'<{self.__class__.__name__}.{self.name}>'
+
 
 def is_sum(sum) -> bool:
     return isinstance(sum, Sum)
