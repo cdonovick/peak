@@ -1,5 +1,5 @@
 from bit_vector import BitVector, SIntVector, overflow
-from .. import Peak
+from peak import Peak
 from .mode import Mode, RegisterMode
 from .lut import Bit, LUT, lut
 from .cond import Cond, cond
