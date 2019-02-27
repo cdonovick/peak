@@ -8,8 +8,8 @@ class Peak:
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
-    The output types will be stored in fn.___peak_outputs___
-    The input types will be stored in fn.___peak_inputs___
+    The output types will be stored in fn._peak_outputs__
+    The input types will be stored in fn._peak_inputs_
     Will verify that all the inputs have type annotations
     Will also verify that the outputs of running fn will have the correct number of bits
     """
