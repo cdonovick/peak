@@ -15,10 +15,13 @@ def name_outputs(**outputs):
     def decorator(call_fn):
         def call_wrapper(*args,**kwargs):
             results = call_fn(*args,**kwargs)
-            if not isinstance(results,tuple):
+            single_output = not isinstance(results,tuple)
+            if single_output:
                 results = (results,)
             for i, (oname,otype) in enumerate(outputs.items()):
                 assert results[i].num_bits == otype(0).num_bits, f"{results[i].num_bits} != {otype(0).num_bits}"
+            if single_output:
+                results = results[0]
             return results
 
         #Set all the outputs
