@@ -1,4 +1,4 @@
-from peak import new, Enum, Sum, Product
+from peak.adt import new, Enum, Sum, Product
 from peak.bitfield import bitfield
 from hwtypes import BitVector, Bit
 
