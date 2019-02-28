@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-from peak import Bit, Bits, Enum, Sum, Product
+from peak.adt import new, Enum, Sum, Product
 from peak.bitfield import bitfield
+
+from hwtypes import BitVector, Bit
 
 #word 16
 #registers 16
@@ -20,16 +21,16 @@ from peak.bitfield import bitfield
 #1010aaaaiiiiiiii "ld"
 #1011aaaaiiiiiiii "st"
 #
-#1100cccciiiiiiii "jmpc" 
+#1100cccciiiiiiii "jmpc"
 #1101cccciiiiiiii "callc"
 #1110cccc00000000 "retc"
 
-Word = Bits(16)
+Word = new(BitVector, 16)
 
-Reg4 = Bits(4)
-RegA = bitfield(8)(Bits(4))
-RegB = bitfield(4)(Bits(4))
-Imm = bitfield(0)(Bits(8))
+Reg4 = new(BitVector, 4)
+RegA = bitfield(8)(new(BitVector, 4))
+RegB = bitfield(4)(new(BitVector, 4))
+Imm = bitfield(0)(new(BitVector, 8))
 
 @bitfield(8)
 class Cond(Enum):
@@ -52,7 +53,6 @@ class Cond(Enum):
     Never = 14
     Always = 15
 
-@dataclass
 class ALU(Product):
     ra:RegA
     rb:RegB
@@ -70,8 +70,7 @@ class XOr(ALU):
     pass
 
 @bitfield(12)
-class Logic(Sum):
-    fields = (Mov, And, Or, XOr)
+class Logic(Sum[Mov, And, Or, XOr]): pass
 
 
 class Add(ALU):
@@ -87,11 +86,9 @@ class Sbc(ALU):
     pass
 
 @bitfield(12)
-class Arith(Sum):
-    fields = (Add, Sub, Adc, Sbc)
+class Arith(Sum[Add, Sub, Adc, Sbc]): pass
 
 
-@dataclass
 class _Memory(Product):
     ra:RegA
     imm:Imm
@@ -109,11 +106,9 @@ class ST(_Memory):
     pass
 
 @bitfield(12)
-class Memory(Sum):
-    fields = (LDLO, LDHI, LD, ST)
+class Memory(Sum[LDLO, LDHI, LD, ST]): pass
 
 
-@dataclass
 class _Control(Product):
     imm:Imm
     cond:Cond
@@ -128,11 +123,9 @@ class Return(_Control):
     pass
 
 @bitfield(12)
-class Control(Sum):
-    fields = (Jump, Call, Return)
+class Control(Sum[Jump, Call, Return]): pass
 
 
 @bitfield(14)
-class Inst(Sum):
-    fields = (Logic, Arith, Memory, Control)
+class Inst(Sum[Logic, Arith, Memory, Control]): pass
 

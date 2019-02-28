@@ -1,13 +1,6 @@
-from peak import Enum, Sum, Product
+from peak import new, Enum, Sum, Product
 from peak.bitfield import bitfield
 from hwtypes import BitVector, Bit
-
-def new(klass, size=None):
-    class T(klass): pass
-    if size is not None:
-        return T[size]
-    else:
-        return T
 
 
 Byte = new(BitVector, 8)

@@ -8,10 +8,17 @@ from enum import EnumMeta as pyEnumMeta
 import weakref
 import dataclasses as dc
 
-__all__ =  ['Product', 'is_product', 'Tuple']
+__all__ =  ['new', 'Product', 'is_product', 'Tuple', ]
 __all__ += ['Sum', 'is_sum',]
 __all__ += ['Enum', 'is_enum', 'new_instruction']
 
+
+def new(klass, bind=None):
+    class T(klass): pass
+    if bind is not None:
+        return T[bind]
+    else:
+        return T
 
 def _issubclass(sub : tp.Any, parent : type) -> bool:
     try:

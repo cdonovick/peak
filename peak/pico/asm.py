@@ -2,7 +2,7 @@ from .isa import *
 
 def logic(op, ra, rb):
     return Inst(Logic(op(RegA(ra), RegB(rb))))
-    
+
 def mov(ra,rb):
     return logic(Mov, ra, rb)
 def and_(ra, rb):
@@ -14,7 +14,7 @@ def xor(ra, rb):
 
 def arith(op, ra, rb):
     return Inst(Arith(op(RegA(ra), RegB(rb))))
-    
+
 def add(ra, rb):
     return arith(Add, ra, rb)
 def sub(ra, rb):
