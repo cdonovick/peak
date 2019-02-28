@@ -1,5 +1,5 @@
 from hwtypes import BitVector, SIntVector, overflow
-from peak import Peak
+from .. import Peak, name_outputs
 from .mode import Mode, RegisterMode
 from .lut import Bit, LUT, lut
 from .cond import Cond, cond
@@ -106,6 +106,7 @@ class PE(Peak):
         self.rege = RegisterMode(Bit)
         self.regf = RegisterMode(Bit) 
 
+    @name_outputs(alu_res=Data,res_p=Bit,irq=Bit)
     def __call__(self, inst: Inst, \
         data0: Data, data1: Data = Data(0), \
         bit0: Bit = Bit(0), bit1: Bit = Bit(0), bit2: Bit = Bit(0), \
