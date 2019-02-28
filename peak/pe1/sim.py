@@ -36,25 +36,25 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
     mul = mula * mulb
 
-    C = 0
-    V = 0
+    C = Bit(0)
+    V = Bit(0)
     if   alu == ALU.Add:
         res, C = a.adc(b, Bit(0))
         V = overflow(a, b, res)
         res_p = C
     elif alu == ALU.Sub:
         b_not = ~b
-        res, C = a.adc(b_not, Bit(1)) 
+        res, C = a.adc(b_not, Bit(1))
         V = overflow(a, b_not, res)
         res_p = C
     elif alu == ALU.Mult0:
-        res, C, V = mul[:16], 0, 0 # wrong C, V
+        res, C, V = mul[:16], Bit(0), Bit(0) # wrong C, V
         res_p = C
     elif alu == ALU.Mult1:
-        res, C, V = mul[8:24], 0, 0 # wrong C, V
+        res, C, V = mul[8:24], Bit(0), Bit(0) # wrong C, V
         res_p = C
     elif alu == ALU.Mult2:
-        res, C, V = mul[16:32], 0, 0 # wrong C, V
+        res, C, V = mul[16:32], Bit(0), Bit(0) # wrong C, V
         res_p = C
     elif alu == ALU.GTE_Max:
         # C, V = a-b?
@@ -68,26 +68,26 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
         pred = a >= 0
         res, res_p = pred.ite(a,-a), Bit(a[-1])
     elif alu == ALU.Sel:
-        res, res_p = d.ite(a,b), 0
+        res, res_p = d.ite(a,b), Bit(0)
     elif alu == ALU.And:
-        res, res_p = a & b, 0
+        res, res_p = a & b, Bit(0)
     elif alu == ALU.Or:
-        res, res_p = a | b, 0
+        res, res_p = a | b, Bit(0)
     elif alu == ALU.XOr:
-        res, res_p = a ^ b, 0
+        res, res_p = a ^ b, Bit(0)
     elif alu == ALU.SHR:
-        res, res_p = a >> Data(b[:4]), 0
+        res, res_p = a >> Data(b[:4]), Bit(0)
     elif alu == ALU.SHL:
-        res, res_p = a << Data(b[:4]), 0
+        res, res_p = a << Data(b[:4]), Bit(0)
     elif alu == ALU.Neg:
         if signed:
-            res, res_p = ~a+Bit(1), 0
+            res, res_p = ~a+Bit(1), Bit(0)
         else:
-            res, res_p = ~a, 0
+            res, res_p = ~a, Bit(0)
     else:
         raise NotImplementedError(alu)
 
-    Z = res == 0
+    Z = res == Bit(0)
     N = Bit(res[-1])
 
     return res, res_p, Z, N, C, V
@@ -104,7 +104,7 @@ class PE(Peak):
         # Bit Registers
         self.regd = RegisterMode(Bit)
         self.rege = RegisterMode(Bit)
-        self.regf = RegisterMode(Bit) 
+        self.regf = RegisterMode(Bit)
 
     @name_outputs(alu_res=Data,res_p=Bit,irq=Bit)
     def __call__(self, inst: Inst, \
@@ -130,7 +130,7 @@ class PE(Peak):
         # calculate 1-bit result
         res_p = cond(inst.cond, alu_res, lut_res, Z, N, C, V)
 
-        # calculate interrupt request 
+        # calculate interrupt request
         irq = Bit(0) # NYI
 
         # return 16-bit result, 1-bit result, irq

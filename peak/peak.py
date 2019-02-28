@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from bit_vector import BitVector
+from hwtypes import AbstractBitVector, AbstractBit
 import functools
 
 class Peak:
@@ -21,9 +21,9 @@ def name_outputs(**outputs):
             single_output = not isinstance(results,tuple)
             if single_output:
                 results = (results,)
-            for i, (oname,otype) in enumerate(outputs.items()):
-                if results[i].num_bits != otype(0).num_bits:
-                    raise TypeError(f"{results[i].num_bits} != {otype(0).num_bits}")
+            for i, (oname, otype) in enumerate(outputs.items()):
+                if not isinstance(results[i], otype):
+                    raise TypeError(f"result type {type(results[i])} did not match expected type {otype}")
             if single_output:
                 results = results[0]
             return results
@@ -31,7 +31,7 @@ def name_outputs(**outputs):
         #Set all the outputs
         call_wrapper._peak_outputs_ = OrderedDict()
         for oname,otype in outputs.items():
-            if not issubclass(otype,BitVector):
+            if not issubclass(otype, (AbstractBitVector, AbstractBit)):
                 raise TypeError(f"{oname} is not a Bitvector class")
             call_wrapper._peak_outputs_[oname] = otype
 
