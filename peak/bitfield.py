@@ -1,7 +1,5 @@
-from .bits import BV
-from .enum import Enum
-from .sum import Sum
-from .product import Product
+from .adt import Enum, Sum, Product
+from hwtypes import AbstractBitVector
 
 def bitfield(i):
     def wrap(klass):
@@ -11,7 +9,7 @@ def bitfield(i):
 
 def encode(inst, *args):
     #print(inst, type(inst))
-    if isinstance(inst,BV):
+    if isinstance(inst, AbstractBitVector):
         word = int(inst) << inst.bitfield
     elif isinstance(inst,Enum):
         word = inst.value << inst.bitfield
@@ -21,8 +19,8 @@ def encode(inst, *args):
             word |= encode(getattr(inst, key))
     elif isinstance(inst,Sum):
         t = type(inst)
-        i = list(t.fields).index(type(inst.a))
-        word = (i << t.bitfield) | encode(inst.a)
+        i = list(t.fields).index(type(inst.value))
+        word = (i << t.bitfield) | encode(inst.value)
     else:
         raise ValueError(inst)
     return word

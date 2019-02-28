@@ -1,36 +1,40 @@
-from dataclasses import dataclass
-from peak import Bit, Bits, Enum, Sum, Product
+from peak import Enum, Sum, Product
 from peak.bitfield import bitfield
+from hwtypes import BitVector, Bit
 
-Byte = Bits(8)
-Half = Bits(16)
-Word = Bits(32)
+def new(klass, size=None):
+    class T(klass): pass
+    if size is not None:
+        return T[size]
+    else:
+        return T
 
-Imm = bitfield(0)(Bits(8))
-Rotate = bitfield(8)(Bits(4))
 
-@dataclass
+Byte = new(BitVector, 8)
+Half = new(BitVector, 16)
+Word = new(BitVector, 32)
+
+Imm = bitfield(0)(new(BitVector, 8))
+Rotate = bitfield(8)(new(BitVector, 4))
+
 class ImmOperand(Product):
     imm:Imm
     rotate:Rotate
 
-RegC = bitfield(0)(Bits(4))
-Shift = bitfield(4)(Bits(8))
+RegC = bitfield(0)(new(BitVector, 4))
+Shift = bitfield(4)(new(BitVector, 8))
 
-@dataclass
 class RegOperand(Product):
     rc:RegC
     shift:Shift
 
 @bitfield(25)
-class Operand(Sum):
-    fields = (RegOperand, ImmOperand)
+class Operand(Sum[RegOperand, ImmOperand]): pass
 
-RegA = bitfield(16)(Bits(4))
-RegB = bitfield(12)(Bits(4))
-S = bitfield(20)(Bits(1))
+RegA = bitfield(16)(new(BitVector, 4))
+RegB = bitfield(12)(new(BitVector, 4))
+S = bitfield(20)(new(BitVector, 1))
 
-@dataclass
 class _Data(Product):
     ra:RegA
     rb:RegB
@@ -86,15 +90,13 @@ class MVN(_Data):
     pass
 
 @bitfield(21)
-class Data(Sum):
-    fields = (AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC, \
-              TST, TEQ, CMP, CMN, ORR, MOV, BIC, MVN)
+class Data(Sum[AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC,
+    TST, TEQ, CMP, CMN, ORR, MOV, BIC, MVN]): pass
 
-@dataclass
 class _LDST(Product):
     ra:RegA
     rb:RegB
-    rc:Operand 
+    rc:Operand
 
 class LDR(_LDST):
     pass
@@ -103,18 +105,16 @@ class STR(_LDST):
     pass
 
 @bitfield(20)
-class LDST(Sum):
-    fields = (STR, LDR)
+class LDST(Sum[STR, LDR]): pass
 
 
-Offset = bitfield(0)(Bits(24))
-L = bitfield(24)(Bits(1))
-BI = bitfield(25)(Bits(1))
+Offset = bitfield(0)(new(BitVector, 24))
+L = bitfield(24)(new(BitVector, 1))
+BI = bitfield(25)(new(BitVector, 1))
 
-@dataclass
 class B(Product):
     offset:Offset
-    l:L 
+    l:L
     i:BI = BI(1)
 
 @bitfield(28)
@@ -138,10 +138,8 @@ class Cond(Enum):
     Always = 14
 
 @bitfield(26)
-class BaseInst(Sum):
-    fields = (Data, LDST, B)
+class BaseInst(Sum[Data, LDST, B]): pass
 
-@dataclass
 class Inst(Product):
     inst:BaseInst
     cond:Cond

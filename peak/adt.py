@@ -55,13 +55,11 @@ class ProductMeta(type):
         cls = dc.dataclass(eq=True, frozen=True)(cls)
         _fields = []
         for field in dc.fields(cls):
-            if field.default is not dc.MISSING:
-                raise ValueError('fields should not define defaults')
+            t = _field_type(field)
+            if field.default is not dc.MISSING and not isinstance(field.default, t):
+                raise TypeError()
             elif field.default_factory is not dc.MISSING:
                 raise ValueError('fields should not define default factory')
-
-
-            t = _field_type(field)
             if not _issubclass(t, _FIELD_TYPES) and not isinstance(t, _FIELD_TYPES):
                 raise TypeError('Unsupported Field type: {}'.format(t))
             _fields.append(t)
@@ -103,10 +101,10 @@ class BoundMeta(type):
     def __new__(mcs, name, bases, namespace, **kwargs):
         bound_types = None
         for base in bases:
-            if getattr(base, 'is_bound', False):
+            if isinstance(base, BoundMeta) and base.is_bound:
                 if bound_types is None:
-                    bound_types = base.bound_types
-                elif bound_types != base.bound_types:
+                    bound_types = base.fields
+                elif bound_types != base.fields:
                     raise TypeError("Can't inherit from multiple different bound_types")
 
 
