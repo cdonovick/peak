@@ -1,4 +1,5 @@
-from peak.adt import Product, Sum, Enum
+import pytest
+from peak.adt import Product, Sum, Enum, Tuple
 
 class En(Enum):
     a = 0
@@ -9,6 +10,8 @@ class Pr(Product):
     y:En
 
 Su = Sum[En, Pr]
+
+Tu = Tuple[En, En]
 
 def test_enum():
     assert set(En.enumerate()) == {
@@ -37,6 +40,11 @@ def test_product():
     assert isinstance(Pr(En.a, En.a), Product)
     assert isinstance(Pr(En.a, En.a), Pr)
 
+    assert Pr(En.a, En.b).y == En.b
+    with pytest.raises(TypeError):
+        Pr(En.a, 1)
+
+
 def test_sum():
     assert set(Su.enumerate()) == {
             Su(En.a),
@@ -53,3 +61,24 @@ def test_sum():
     assert isinstance(Su(En.a), Su)
     assert isinstance(Su(En.a), Sum)
 
+    with pytest.raises(TypeError):
+        Su(1)
+
+def test_tuple():
+    assert set(Tu.enumerate()) == {
+            Tu(En.a, En.a),
+            Tu(En.a, En.b),
+            Tu(En.b, En.a),
+            Tu(En.b, En.b),
+    }
+
+    assert Tu(En.a, En.a).value == (En.a, En.a)
+
+    assert issubclass(Tu, Tuple)
+    assert isinstance(Tu(En.a, En.a), Tuple)
+    assert isinstance(Tu(En.a, En.a), Tu)
+
+    assert Tu(En.a, En.b)[1] == En.b
+
+    with pytest.raises(TypeError):
+        Tu(En.a, 1)

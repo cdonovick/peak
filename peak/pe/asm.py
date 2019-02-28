@@ -1,4 +1,4 @@
-from peak import Enum, Product
+from peak import Enum, Product, Tuple
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT_t
@@ -16,9 +16,9 @@ def lut(bit0_mode=Mode.BYPASS, bit1_mode=Mode.BYPASS, bit2_mode=Mode.BYPASS, \
 
 def alu( Op, data_modes=None, data_consts=None ):
     if not data_modes:
-        data_modes = [Data_Mode(Mode.BYPASS) for i in range(NUM_INPUTS)]
+        data_modes = Tuple(*(Data_Mode(Mode.BYPASS) for i in range(NUM_INPUTS)))
     if not data_consts:
-        data_consts = [Data_Const(0) for i in range(NUM_INPUTS)]
+        data_consts = Tuple(*(Data_Const(0) for i in range(NUM_INPUTS)))
     return ALU(Op(data_modes, data_consts))
 
 def inst(alu, lut, cond=Cond.Z):

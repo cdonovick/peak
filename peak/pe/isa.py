@@ -1,6 +1,6 @@
 from bit_vector import BitVector, Bit
 
-from peak import Enum, Product, Sum
+from peak import Enum, Product, Sum, Tuple
 from .mode import Mode
 from .lut import LUT_t
 from .cond import Cond
@@ -32,8 +32,8 @@ class LUT(Product):
     table:LUT_t
 
 class _ALU(Product):
-    data_modes  : [Data_Mode]
-    data_consts : [Data_Const]
+    data_modes  : Tuple[(Data_Mode for _ in range(NUM_INPUTS))]
+    data_consts : Tuple[(Data_Const for _ in range(NUM_INPUTS))]
 
 class Add(_ALU):
   # returns res, res_p, C, V
