@@ -13,7 +13,7 @@ setup(
         "peak",
     ],
     install_requires=[
-        "bit_vector==0.39a0"
+        "hwtypes >= 1.0.1"
     ],
     python_requires='>=3.6'
 )

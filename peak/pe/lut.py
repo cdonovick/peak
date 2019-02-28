@@ -1,4 +1,4 @@
-from bit_vector import BitVector, Bit
+from hwtypes import BitVector, Bit
 
 LUT_t = BitVector[8]
 _IDX_t = BitVector[3]

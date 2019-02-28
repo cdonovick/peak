@@ -1,4 +1,4 @@
-from bit_vector import BitVector, Bit
+from hwtypes import BitVector, Bit
 
 from peak import Enum, Product, Sum, Tuple
 from .mode import Mode

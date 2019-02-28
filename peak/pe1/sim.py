@@ -1,4 +1,4 @@
-from bit_vector import BitVector, SIntVector, overflow
+from hwtypes import BitVector, SIntVector, overflow
 from peak import Peak
 from .mode import Mode, RegisterMode
 from .lut import Bit, LUT, lut

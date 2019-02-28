@@ -1,4 +1,4 @@
-from bit_vector import BitVector, Bit
+from hwtypes import BitVector, Bit
 
 # Types for LUT operations
 LUT = BitVector[8]

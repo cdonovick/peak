@@ -1,4 +1,4 @@
-from bit_vector import BitVector, overflow
+from hwtypes import BitVector, overflow
 from .isa import *
 from .. import Peak, Register, RAM, ROM
 

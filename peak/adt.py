@@ -1,6 +1,6 @@
 import itertools as it
 import typing as tp
-from bit_vector import AbstractBitVector, AbstractBit
+from hwtypes import AbstractBitVector, AbstractBit
 from abc import ABCMeta, abstractmethod
 from enum import auto as new_instruction
 from enum import Enum as pyEnum

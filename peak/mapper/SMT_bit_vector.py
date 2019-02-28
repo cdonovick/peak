@@ -2,7 +2,7 @@ import typing as tp
 import itertools as it
 import functools as ft
 import smt_switch as ss
-import bit_vector as bv
+import hwtypes as bv
 from abc import abstractmethod
 import re
 import warnings

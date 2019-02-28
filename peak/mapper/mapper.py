@@ -4,9 +4,9 @@ import functools as ft
 
 import coreir
 
-from bit_vector import AbstractBitVector
+from hwtypes import AbstractBitVector
 from ..adt import ISABuilder
-from bit_vector import BitVector, SIntVector
+from hwtypes import BitVector, SIntVector
 from .SMT_bit_vector import SMTBitVector, SMTSIntVector, bind_solver
 
 import smt_switch as ss

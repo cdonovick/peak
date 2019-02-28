@@ -2,7 +2,7 @@ from peak import Enum, Product
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT
-from bit_vector import BitVector, Bit
+from hwtypes import BitVector, Bit
 
 # https://github.com/StanfordAHA/CGRAGenerator/wiki/PE-Spec
 

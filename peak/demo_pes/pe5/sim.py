@@ -3,7 +3,7 @@ import operator
 from .isa import *
 import functools as ft
 
-from bit_vector import AbstractBitVector
+from hwtypes import AbstractBitVector
 
 def gen_alu(BV_t : tp.Type['AbstractBitVector']):
     Bit = BV_t[1]
