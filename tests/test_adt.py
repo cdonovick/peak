@@ -1,5 +1,5 @@
 import pytest
-from peak.adt import Product, Sum, Enum, Tuple
+from peak.adt import Product, Sum, Enum, Tuple, new
 
 class En(Enum):
     a = 0
@@ -82,3 +82,22 @@ def test_tuple():
 
     with pytest.raises(TypeError):
         Tu(En.a, 1)
+
+def test_new():
+    t = new(Tuple)
+    s = new(Tuple)
+    assert issubclass(t, Tuple)
+    assert issubclass(t[En], t)
+    assert issubclass(t[En], Tuple[En])
+    assert t is not Tuple
+    assert s is not t
+
+    t = new(Sum, (En, Pr))
+    assert t is not Su
+    assert Sum[En, Pr] is Su
+    assert t.__name__ == 'T[{}, {}]'.format(En, Pr)
+    assert t.__module__ == 'peak.adt'
+
+    t = new(Sum, (En, Pr), name='magic', module=__name__)
+    assert t.__name__ == 'magic[{}, {}]'.format(En, Pr)
+    assert t.__module__ == __name__

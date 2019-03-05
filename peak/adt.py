@@ -13,9 +13,17 @@ __all__ += ['Sum', 'is_sum',]
 __all__ += ['Enum', 'is_enum', 'new_instruction']
 
 
-def new(klass, bind=None):
+#special sentinal value
+class _MISSING: pass
+
+def new(klass, bind=_MISSING, *, name=_MISSING, module=_MISSING):
     class T(klass): pass
-    if bind is not None:
+    if name is not _MISSING:
+        T.__name__ = name
+    if module is not _MISSING:
+        T.__module__ = module
+
+    if bind is not _MISSING:
         return T[bind]
     else:
         return T
@@ -34,6 +42,8 @@ def _field_type(field : dc.Field) -> type:
     else:
         return t
 
+_CONSTANT_TYPES = (bool, AbstractBit, int, AbstractBitVector)
+
 class ISABuilder:
     @staticmethod
     def _elements(it : tp.Sequence, type_getter : tp.Callable) -> list:
@@ -43,11 +53,11 @@ class ISABuilder:
             if _issubclass(t, ISABuilder):
                 elements.append(tuple(t.enumerate()))
             else:
+                assert _issubclass(t, _CONSTANT_TYPES) or isinstance(t, _CONSTANT_TYPES)
                 elements.append((elem,))
 
         return elements
 
-_CONSTANT_TYPES = (bool, AbstractBit, int, AbstractBitVector)
 _FIELD_TYPES = ISABuilder, *_CONSTANT_TYPES
 
 class ProductMeta(type):
@@ -121,13 +131,13 @@ class BoundMeta(type):
         return t
 
     def __getitem__(cls, idx : tp.Union[tp.Type[ISABuilder], tp.Sequence[tp.Type[ISABuilder]]]) -> 'BoundMeta':
-        if isinstance(idx, tp.Iterable):
+        if _issubclass(idx, ISABuilder):
+            idx = idx,
+        elif isinstance(idx, tp.Iterable):
             idx = tuple(idx)
             for t in idx:
                 if not _issubclass(t, _FIELD_TYPES):
                     raise TypeError(t)
-        elif isinstance(idx, ISABuilder):
-            idx = idx,
         else:
             raise TypeError(idx)
 
@@ -142,7 +152,7 @@ class BoundMeta(type):
         bases = [cls]
         bases.extend(b[idx] for b in cls.__bases__ if isinstance(b, BoundMeta))
         bases = tuple(bases)
-        class_name = '{}[{}]'.format(cls.__name__, idx)
+        class_name = '{}[{}]'.format(cls.__name__, ', '.join(map(repr, idx)))
         t = type(cls)(class_name, bases, {})
         t.__module__ = cls.__module__
         BoundMeta._class_cache[cls, idx] = t
