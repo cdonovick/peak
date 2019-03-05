@@ -1,33 +1,27 @@
-from bit_vector import BitVector, SIntVector, UIntVector, overflow
 from .. import Peak, name_outputs
+import typing as  tp
 from .isa import *
+from hwtypes import AbstractBitVector
 
-def gen_alu(BV_t=BitVector):
+def gen_alu(BV_t : tp.Type['AbstractBitVector']):
+    Bit = BV_t[1]
+    Data = BV_t[Datawidth]
     
-    def alu(alu:ALU, a:BV_t, b:BV_t):
-
-        if alu == ALUOP.Add:
-            res = a + b
-        elif alu == ALUOP.Sub:
-            res = a-b
-        elif alu == ALUOP.And:
-            res = a & b
-        elif alu == ALUOP.Or:
-            res = a | b
-        elif alu == ALUOP.XOr:
-            res = a ^ b
-        else:
-            raise NotImplementedError(alu)
-        return res
-
-    return alu
-
-class ALU(Peak):
-    def __init__(self):
-        pass
-
     @name_outputs(alu_res=Data)
-    def __call__(self, inst:Inst, data0: Data, data1: Data):
-        alu = gen_alu()
-        alu_res = alu(inst.alu, data0, data1)
-        return alu_res
+    def PE(inst : Inst, a : Data, b : Data):
+        def alu(op : ALUOP, a : Data, b : Data):
+            if op == ALUOP.Add:
+                res = a + b
+            elif op == ALUOP.Sub:
+                res = a-b
+            elif op == ALUOP.And:
+                res = a & b
+            elif op == ALUOP.Or:
+                res = a | b
+            elif op == ALUOP.XOr:
+                res = a ^ b
+            else:
+                raise NotImplementedError(op)
+            return res
+        return alu(inst.alu_op,a,b)
+    return PE

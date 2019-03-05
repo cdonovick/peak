@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from hwtypes import AbstractBitVector, AbstractBit
 import functools
+import inspect
 
 class Peak:
     pass
@@ -38,9 +39,12 @@ def name_outputs(**outputs):
         #set all the inputs
         call_wrapper._peak_inputs_ = OrderedDict()
         num_inputs = call_fn.__code__.co_argcount
-        input_names = call_fn.__code__.co_varnames[1:num_inputs]
+        arg_offset = 1 if inspect.ismethod(call_fn) else 0
+        input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
         in_types = call_fn.__annotations__
         if set(input_names) != set(in_types.keys()):
+            print(set(input_names))
+            print(set(in_types))
             raise TypeError("Missing type annotations on inputs")
         for name in input_names:
             call_wrapper._peak_inputs_[name] = in_types[name]

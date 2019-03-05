@@ -1,15 +1,15 @@
-from dataclasses import dataclass
-from .. import Bits, Enum, Product
+from peak.adt import Product, Sum, new_instruction, Enum
+from hwtypes import BitVector
 
-Data = Bits(16)
+Datawidth = 16
+Data = BitVector[Datawidth]
 
 class ALUOP(Enum):
-    Add = 0
-    Sub = 2
-    Or = 4
-    And = 5
-    XOr = 7
+    Add = new_instruction()
+    Sub = new_instruction()
+    Or =  new_instruction()
+    And = new_instruction()
+    XOr = new_instruction()
 
-@dataclass
 class Inst(Product):
-    alu:ALUOP=ALUOP.Add
+    alu_op : ALUOP = ALUOP.Add
