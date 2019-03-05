@@ -16,6 +16,7 @@ def name_outputs(**outputs):
     """
 
     def decorator(call_fn):
+        
         @functools.wraps(call_fn)
         def call_wrapper(*args,**kwargs):
             results = call_fn(*args,**kwargs)
@@ -37,9 +38,9 @@ def name_outputs(**outputs):
             call_wrapper._peak_outputs_[oname] = otype
 
         #set all the inputs
+        arg_offset = 1 if call_fn.__name__=="__call__" else 0
         call_wrapper._peak_inputs_ = OrderedDict()
         num_inputs = call_fn.__code__.co_argcount
-        arg_offset = 1 if inspect.ismethod(call_fn) else 0
         input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
         in_types = call_fn.__annotations__
         if set(input_names) != set(in_types.keys()):
