@@ -1,7 +1,6 @@
 from collections import OrderedDict
 from hwtypes import AbstractBitVector, AbstractBit
 import functools
-import inspect
 
 class Peak:
     pass
