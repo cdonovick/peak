@@ -7,9 +7,9 @@ import coreir
 from hwtypes import AbstractBitVector
 from ..adt import ISABuilder
 from hwtypes import BitVector, SIntVector
-from .SMT_bit_vector import SMTBitVector, SMTSIntVector, bind_solver
+from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 
-import smt_switch as ss
+import pysmt.shortcuts as smt
 
 
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
@@ -21,18 +21,13 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
 
 
 def gen_mapping(
-        solver : ss.smt,
         peak_component_generator : tp.Callable[[tp.Type[AbstractBitVector]], tp.Callable],
         isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
         ):
-    SMT_BV = bind_solver(SMTBitVector, solver)
 
-    PY_BV = BitVector
-
-    py_alu, peak_inputs, peak_outputs =  peak_component_generator(PY_BV)
     smt_alu, _, _ = peak_component_generator(SMT_BV)
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
