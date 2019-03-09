@@ -1,9 +1,14 @@
 import typing as tp
 import itertools as it
 import functools as ft
-import smt_switch as ss
-import hwtypes as bv
+import hwtypes as ht
+
 from abc import abstractmethod
+
+import pysmt
+import pysmt.shortcuts as smt
+from pysmt.typing import  BVType, BOOL
+
 import re
 import warnings
 import weakref
@@ -12,8 +17,11 @@ __ALL__ = ['SMTBitVector', 'SMTNumVector', 'SMTSIntVector', 'SMTUIntVector']
 
 _var_counter = it.count()
 _name_table = weakref.WeakValueDictionary()
+_free_names = []
 
 def _gen_name():
+    if _free_names:
+        return _free_names.pop()
     name = f'V_{next(_var_counter)}'
     while name in _name_table:
         name = f'V_{next(_var_counter)}'
@@ -21,89 +29,205 @@ def _gen_name():
 
 _name_re = re.compile(r'V_\d+')
 
-def auto_cast(fn):
+class _SMYBOLIC:
+    def __repr__(self):
+        return 'SYMBOLIC'
+
+class _AUTOMATIC:
+    def __repr__(self):
+        return 'AUTOMATIC'
+
+SMYBOLIC = _SMYBOLIC()
+AUTOMATIC = _AUTOMATIC()
+
+def bit_cast(fn):
     @ft.wraps(fn)
-    def wrapped(self, *args):
-        T = type(self)
-        def cast(x):
-            if isinstance(x, T):
-                return x
-            else:
-                return T(x)
-        args = map(cast, args)
-        return cast(fn(self, *args))
+    def wrapped(self, other):
+        if isinstance(other, SMTBit):
+            return fn(self, other)
+        else:
+            return fn(self, SMTBit(other))
     return wrapped
 
-def auto_cast_bool(fn):
-    @ft.wraps(fn)
-    def wrapped(self, *args):
-        solver = self.solver
-        T = type(self)
-        def cast(x):
-            if isinstance(x, T):
-                return x
-            else:
-                return T(x)
-        args = map(cast, args)
-        r = fn(self, *args)
-        bit = solver.BitVec(1)
-        r = solver.Ite(r, solver.TheoryConst(bit, 1), solver.TheoryConst(bit, 0))
-        return T.unsized_t[1](r)
-    return wrapped
+class SMTBit(ht.AbstractBit):
+    @staticmethod
+    def get_family() -> ht.TypeFamily:
+        return _Family_
 
-class SMTBitVector(bv.AbstractBitVector):
-    @abstractmethod
-    def __init__(self, solver:ss.smt, value:tp.Union[None, bool, int, bv.BitVector, ss.terms.TermBase] = None,  *, name:tp.Optional[str] = None):
-        self._solver = solver
-
-        if name is not None:
-            if name in _name_table:
+    def __init__(self, value=SMYBOLIC, *, name=AUTOMATIC):
+        if name is not AUTOMATIC and value is not SMYBOLIC:
+            raise TypeError('Can only name symbolic variables')
+        elif name is not AUTOMATIC:
+            if not isinstance(name, str):
+                raise TypeError('Name must be string')
+            elif name in _name_table:
                 raise ValueError(f'Name {name} already in use')
             elif _name_re.fullmatch(name):
                 warnings.warn('Name looks like an auto generated name, this might break things')
-
-        if value is None:
-            self._sort = sort = solver.BitVec(self.size)
-            if name is None:
-                name = _gen_name()
-            self._value = solver.DeclareConst(name, sort)
-            self._const_value = None
-
-        elif isinstance(value, SMTBitVector):
-            self._value = value.value
-            if value.size != self.size:
-                raise TypeError("inconsistent bitwidth")
-            self._sort = value._sort
-            if name is None:
-                name = value._name
-            else:
-                warnings.warn('Changing the name of a SMTBitVector does not cause a new underlying smt variable to be created')
-            self._const_value = value._const_value
-
-        elif isinstance(value, ss.terms.TermBase):
-            #Value is a smt expression
-            if isinstance(value.sort, ss.sorts.Bool) and self.size != 1:
-                raise TypeError("inconsistent bitwidth")
-            elif isinstance(value.sort, ss.sorts.BitVec) and value.sort.width != self.size:
-                raise TypeError("inconsistent bitwidth")
-
-            self._sort = value.sort
-            self._value  = value
-            self._const_value = None
-        else:
-            if isinstance(value, bool):
-                value = int(value)
-            elif isinstance(value, bv.BitVector):
-                value = value.as_uint()
-            elif not isinstance(value, int):
-                raise TypeError(f'Unexpected type {type(value)}')
-            self._sort = sort = solver.BitVec(self.size)
-            self._const_value = value
-            self._value = solver.TheoryConst(sort, value)
-
-        self._name = name
-        if name is not None:
             _name_table[name] = self
+        elif name is AUTOMATIC and value is SMYBOLIC:
+            name = _gen_name()
+            _name_table[name] = self
+
+        if value is SMYBOLIC:
+            self._value = smt.Symbol(name, BOOL)
+        elif isinstance(value, pysmt.fnode.FNode):
+            if value.get_type().is_bool_type():
+                self._value = value
+            else:
+                raise TypeError(f'Expected bool type not {value.get_type()}')
+        elif isinstance(value, SMTBit):
+            if name is not AUTOMATIC and name != value.name:
+                warnings.warn('Changing the name of a SMTBit does not cause a new underlying smt variable to be created')
+            self._value = value._value
+        elif isinstance(value, bool):
+            self._value = smt.Bool(value)
+        elif isinstance(value, int):
+            if value not in {0, 1}:
+                raise ValueError('Bit must have value 0 or 1 not {}'.format(value))
+            self._value = smt.Bool(bool(value))
+        elif hasattr(value, '__bool__'):
+            self._value = smt.Bool(bool(value))
+        else:
+            raise TypeError("Can't coerce {} to Bit".format(type(other)))
+        self._name = name
+
+    @property
+    def value(self):
+        return self._value
+
+    @bit_cast
+    def __eq__(self, other : 'SMTBit') -> 'SMTBit':
+        return type(self)(smt.Iff(self.value, other.value))
+
+    @bit_cast
+    def __ne__(self, other : 'SMTBit') -> 'SMTBit':
+        return type(self)(smt.Not(smt.Iff(self.value, other.value)))
+
+    def __invert__(self) -> 'SMTBit':
+        return type(self)(smt.Not(self.value))
+
+    @bit_cast
+    def __and__(self, other : 'SMTBit') -> 'SMTBit':
+        return type(self)(smt.And(self.value, other.value))
+
+    @bit_cast
+    def __or__(self, other : 'SMTBit') -> 'SMTBit':
+        return type(self)(smt.Or(self.value, other.value))
+
+    @bit_cast
+    def __xor__(self, other : 'SMTBit') -> 'SMTBit':
+        return type(self)(smt.Xor(self.value, other.value))
+
+    def ite(self, t_branch, f_branch):
+        tb_t = type(t_branch)
+        fb_t = type(f_branch)
+        BV_t = self.get_family().BitVector
+        if isinstance(t_branch, BV_t) and isinstance(f_branch, BV_t):
+            if tb_t is not fb_t:
+                raise TypeError('Both branches must have the same type')
+            T = tb_t
+        elif isinstance(t_branch, BV_t):
+            f_branch = tb_t(f_branch)
+            T = tb_t
+        elif isinstance(f_branch, BV_t):
+            t_branch = fb_t(t_branch)
+            T = fb_t
+        else:
+            t_branch = BV_t(t_branch)
+            f_branch = BV_t(f_branch)
+            ext = t_branch.size - f_branch.size
+            if ext > 0:
+                f_branch = f_branch.zext(ext)
+            elif ext < 0:
+                t_branch = t_branch.zext(-ext)
+
+            T = type(t_branch)
+
+
+        return T(smt.Ite(self.value, t_branch.value, f_branch.value))
+
+def _coerce(T : tp.Type['SMTBitVector'], val : tp.Any) -> 'SMTBitVector':
+    if not isinstance(val, SMTBitVector):
+        return T(val)
+    elif val.size != T.size:
+        raise TypeError('Inconsistent size')
+    else:
+        return val
+
+def bv_cast(fn : tp.Callable[['SMTBitVector', 'SMTBitVector'], tp.Any]) -> tp.Callable[['SMTBitVector', tp.Any], tp.Any]:
+    @ft.wraps(fn)
+    def wrapped(self : 'SMTBitVector', other : tp.Any) -> tp.Any:
+        other = _coerce(type(self), other)
+        return fn(self, other)
+    return wrapped
+
+def int_cast(fn : tp.Callable[['SMTBitVector', int], tp.Any]) -> tp.Callable[['SMTBitVector', tp.Any], tp.Any]:
+    @ft.wraps(fn)
+    def wrapped(self :  'SMTBitVector', other :  tp.Any) -> tp.Any:
+        other = int(other)
+        return fn(self, other)
+    return wrapped
+
+class SMTBitVector(ht.AbstractBitVector):
+    @staticmethod
+    def get_family() -> ht.TypeFamily:
+        return _Family_
+
+    def __init__(self, value=SMYBOLIC, *, name=AUTOMATIC):
+        if name is not AUTOMATIC and value is not SMYBOLIC:
+            raise TypeError('Can only name symbolic variables')
+        elif name is not AUTOMATIC:
+            if not isinstance(name, str):
+                raise TypeError('Name must be string')
+            elif name in _name_table:
+                raise ValueError(f'Name {name} already in use')
+            elif _name_re.fullmatch(name):
+                warnings.warn('Name looks like an auto generated name, this might break things')
+            _name_table[name] = self
+        elif name is AUTOMATIC and value is SMYBOLIC:
+            name = _gen_name()
+            _name_table[name] = self
+        self._name = name
+
+        T = BVType(self.size)
+
+        if value is SMYBOLIC:
+            self._value = smt.Symbol(name, T)
+        elif isinstance(value, pysmt.fnode.FNode):
+            t = value.get_type()
+            if t is T:
+                self._value = value
+            else:
+                raise TypeError(f'Expected {T} not {t}')
+        elif isinstance(value, SMTBitVector):
+            if name is not AUTOMATIC and name != value.name:
+                warnings.warn('Changing the name of a SMTBitVector does not cause a new underlying smt variable to be created')
+
+            ext = self.size - value.size
+
+            if ext < 0:
+                warnings.warn('Truncating value from {} to {}'.format(type(value), type(self)))
+                self._value = value[:self.size].value
+            elif ext > 0:
+                self._value = value.value.zext(ext)
+            else:
+                self._value = value.value
+
+        elif isinstance(value, SMTBit):
+            self._value = smt.Ite(value.value, smt.BVOne(self.size), smt.BVZero(self.size))
+
+        elif isinstance(value, tp.Sequence):
+            raise NotImplementedError()
+        elif isinstance(value, int):
+            self._value =  smt.BV(value, self.size)
+
+        elif hasattr(value, '__int__'):
+            value = int(value)
+            self._value = smt.BV(value, self.size)
+        else:
+            raise TypeError("Can't coerce {} to SMTBitVector".format(type(other)))
+        assert self._value.get_type() is T
 
     def make_constant(self, value, size:tp.Optional[int]=None):
         if size is None:
@@ -118,12 +242,8 @@ class SMTBitVector(bv.AbstractBitVector):
     def num_bits(self):
         return self.size
 
-    @property
-    def solver(self):
-        return self._solver
-
     def __repr__(self):
-        if self._name is not None:
+        if self._name is not AUTOMATIC:
             return self._name
         else:
             return repr(self._value)
@@ -150,8 +270,8 @@ class SMTBitVector(bv.AbstractBitVector):
             elif step != 1:
                 raise IndexError('SMT extract does not support step != 1')
 
-            v = self.value[stop-1 : start]
-        else:
+            v = self.value[start:stop-1]
+        elif isinstance(index, int):
             if index < 0:
                 index = size+index
 
@@ -159,15 +279,31 @@ class SMTBitVector(bv.AbstractBitVector):
                 raise IndexError()
 
             v = self.value[index]
+            return self.get_family().Bit(v == 1)
+        else:
+            raise TypeError()
 
-        return type(self).unsized_t[v.sort.width](v)
+        return type(self).unsized_t[v.get_type().width](v)
 
     def __setitem__(self, index, value):
-        #not sure what a set item should mean
-        raise NotImplementedError()
+        if isinstance(index, slice):
+            raise NotImplementedError()
+        else:
+            if not (isinstance(value, bool) or isinstance(value, SMTBit) or (isinstance(value, int) and value in {0, 1})):
+                raise ValueError("Second argument __setitem__ on a single BitVector index should be a bit, boolean or 0 or 1, not {value}".format(value=value))
+
+            if index < 0:
+                index = self.size+index
+
+            if not (0 <= index < self.size):
+                raise IndexError()
+
+            mask = type(self)(1 << index)
+            self._value = SMTBit(value).ite(self | mask,  self & ~mask)._value
+
 
     def __len__(self):
-        return self.num_bits
+        return self.size
 
     @classmethod
     def concat(cls, x, y):
@@ -183,168 +319,151 @@ class SMTBitVector(bv.AbstractBitVector):
             x = SMTBitVector(solver, x)
         else:
             raise ValueError('x or y must be an SMTBitVector')
-        return cls.unsized_t[x.size + y.size](solver.Concat(x.value, y.value))
+        return cls.unsized_t[x.size + y.size](smt.BVConcat(x.value, y.value))
 
-    @auto_cast
     def bvnot(self):
-        return self.solver.BVNot(self.value)
+        return type(self)(smt.BVNot(self.value))
 
-    @auto_cast
+    @bv_cast
     def bvand(self, other):
-        return self.solver.BVAnd(self.value, other.value)
+        return type(self)(smt.BVAnd(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvnand(self, other):
-        return self.solver.BVNot(self.bvand(other))
+        return type(self)(smt.BVNot(smt.BVAnd(self.value, other.value)))
 
-    @auto_cast
+    @bv_cast
     def bvor(self, other):
-        return self.solver.BVOr(self.value, other.value)
+        return type(self)(smt.BVOr(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvnor(self, other):
-        return self.solver.BVNot(self.bvor(other))
+        return type(self)(smt.BVNot(smt.BVOr(self.value, other.value)))
 
-    @auto_cast
+    @bv_cast
     def bvxor(self, other):
-        return self.solver.BVXor(self.value, other.value)
+        return type(self)(smt.BVXor(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvxnor(self, other):
-        return self.solver.BVNot(self.bvxor(other))
+        return type(self)(smt.BVNot(smt.BVXor(self.value, other.value)))
 
-    @auto_cast
+    @bv_cast
     def bvshl(self, other):
-        return self.solver.BVShl(self.value, other.value)
+        return type(self)(smt.BVLShl(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvlshr(self, other):
-        return self.solver.BVLshr(self.value, other.value)
+        return type(self)(smt.BVLShr(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvashr(self, other):
-        return self.solver.BVAshr(self.value, other.value)
+        return type(self)(smt.BVAShr(self.value, other.value))
 
+    @int_cast
     def bvrol(self, other):
-        raise NotImplementedError()
+        return type(self)(smt.get_env().formula_manager.BVRol(self.value, other))
 
+    @int_cast
     def bvror(self, other):
-        raise NotImplementedError()
+        return type(self)(smt.get_env().formula_manager.BVRor(self.value, other))
 
-    @auto_cast_bool
+    @bv_cast
     def bvcomp(self, other):
-        return self.solver.Equals(self.value, other.value)
+        return type(self)(smt.BVComp(self.value, other.value))
 
-    bveq = bvcomp
+    @bv_cast
+    def bveq(self,  other):
+        return self.get_family().Bit(smt.Equal(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvne(self, other):
-        return self.solver.Not(self.solver.Equals(self.value, other.value))
+        return self.get_family().Bit(smt.NotEquals(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvult(self, other):
-        return self.solver.BVUlt(self.value, other.value)
+        return self.get_family().Bit(smt.BVULT(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvule(self, other):
-        return self.solver.BVUle(self.value, other.value)
+        return self.get_family().Bit(smt.BVULE(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvugt(self, other):
-        return self.solver.BVUgt(self.value, other.value)
+        return self.get_family().Bit(smt.BVUGT(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvuge(self, other):
-        return self.solver.BVUge(self.value, other.value)
+        return self.get_family().Bit(smt.BVUGE(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvslt(self, other):
-        return self.solver.BVSlt(self.value, other.value)
+        return self.get_family().Bit(smt.BVSLT(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvsle(self, other):
-        return self.solver.BVSle(self.value, other.value)
+        return self.get_family().Bit(smt.BVSLE(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvsgt(self, other):
-        return self.solver.BVSgt(self.value, other.value)
+        return self.get_family().Bit(smt.BVSGT(self.value, other.value))
 
-    @auto_cast_bool
+    @bv_cast
     def bvsge(self, other):
-        return self.solver.BVSge(self.value, other.value)
+        return self.get_family().Bit(smt.BVSGE(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvneg(self):
-        return self.solver.BVNeg(self.value)
+        return type(self)(smt.BVNeg(self.value))
 
-    def adc(self, b, c):
+    def adc(self, other : 'SMTBitVector', carry : SMTBit) -> tp.Tuple['BitVector', SMTBit]:
+        """
+        add with carry
+
+        returns a two element tuple of the form (result, carry)
+
+        """
         T = type(self)
-        if not isinstance(b, T):
-            b = T(b)
-
-        if not isinstance(c, T.unsized_t[1]):
-            c = T.unsized_t[1](c)
-
-        if c.num_bits != 1:
-            warnings.warn('carry is not single bit something weird might happen')
+        other = _coerce(T, other)
+        carry = _coerce(T.unsized_t[1], carry)
 
         a = self.zext(1)
-        b = b.zext(1)
-        c = c.zext(1+self.size-c.size)
+        b = other.zext(1)
+        c = carry.zext(T.size)
+
         res = a + b + c
         return res[0:-1], res[-1]
 
-    def ite(self, t, e):
-        T = type(self).unsized_t
-        if not isinstance(t, T) and not isinstance(e, T):
-            t = int(t)
-            e = int(e)
-            size = max(t.bit_length(), e.bit_length())
-            TS = type(self).unsized_t[size]
-            t = T(e)
-            e = T(e)
-        elif not isinstance(t, T):
-            TS = type(e)
-            t =  T(t)
-        elif not isinstance(e, T):
-            TS = type(t)
-            e = T(e)
-        else:
-            if t.size != e.size:
-                raise TypeError()
-            TS = type(t)
-        return TS(self.solver.Ite(self.value != self.make_constant(0).value, t.value, e.value))
+    def ite(self, t_branch, f_branch):
+        return self.bvne(0).ite(t_branch, f_branch)
 
-    @auto_cast
+    @bv_cast
     def bvadd(self, other):
-        return self.solver.BVAdd(self.value, other.value)
+        return type(self)(smt.BVAdd(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvsub(self, other):
-        return self.solver.BVSub(self.value, other.value)
+        return type(self)(smt.BVSub(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvmul(self, other):
-        return self.solver.BVMul(self.value, other.value)
+        return type(self)(smt.BVMul(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvudiv(self, other):
-        return self.solver.BVUdiv(self.value, other.value)
+        return type(self)(smt.BVUDiv(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvurem(self, other):
-        return self.solver.BVUrem(self.value, other.value)
+        return type(self)(smt.BVURem(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvsdiv(self, other):
-        # currently not in smt switch
-        raise NotImplementedError()
-        return self.solver.BVSdiv(self.value, other.value)
+        return type(self)(smt.BVSDiv(self.value, other.value))
 
-    @auto_cast
+    @bv_cast
     def bvsrem(self, other):
-        raise NotImplementedError()
-        return self.solver.BVSrem(self.value, other.value)
+        return type(self)(smt.BVSRem(self.value, other.value))
 
     __invert__ = bvnot
     __and__ = bvand
@@ -368,87 +487,38 @@ class SMTBitVector(bv.AbstractBitVector):
     __le__ = bvule
     __lt__ = bvult
 
-    def is_x(self):
-        raise NotImplementedError()
 
-    def as_uint(self):
-        raise NotImplementedError()
 
-    def as_sint(self):
-        raise NotImplementedError()
-
-    as_int = as_sint
-
-    #def __int__(self):
-    #    raise NotImplementedError()
-
-    #def __bool__(self):
-    #    raise NotImplementedError()
-
-    def binary_string(self):
-        raise NotImplementedError()
-
-    def as_binary_string(self):
-        raise NotImplementedError()
-
-    def bits(self):
-        raise NotImplementedError()
-
-    def as_bool_list(self):
-        raise NotImplementedError()
-
+    @int_cast
     def repeat(self, other):
-        raise NotImplementedError()
+        return type(self)(smt.get_env().formula_manager.BVRepeat(self.value, other))
 
-    def sext(self, other):
-        """
-        **NOTE:** Does not cast, returns a raw BitVector instead.
-
-        The user is responsible for handling the conversion. This behavior was
-        chosen due to issues with subclassing BitVector (e.g. Bits(n) type
-        generator which specializes num_bits). Basically, it's not guaranteed
-        that a subtype will respect the __init__ interface, so we return a raw
-        BitVector instead and require the user to correctly convert back to the
-        subtype.
-
-        Subtypes can improve ergonomics by implementing their own extension
-        operators which handle the implicit conversion from raw BitVector.
-
-        TODO: Do this implicit conversion for built-in types like UIntVector.
-        """
-        T = type(self).unsized_t
-        ext = int(other)
+    @int_cast
+    def sext(self, ext):
         if ext < 0:
             raise ValueError()
-        elif ext == 0:
-            return self
+        return type(self).unsized_t[self.size + ext](smt.BVSExt(self.value, ext))
+
+    def ext(self, ext):
+        return self.zext(ext)
+
+    @int_cast
+    def zext(self, ext):
+        if ext < 0:
+            raise ValueError()
+        return type(self).unsized_t[self.size + ext](smt.BVZExt(self.value, ext))
+
+    def __int__(self):
+        if self.value.is_constant():
+            return self.value.constant_value()
         else:
-            x = self[self.num_bits - 1]
-            XT = type(x).unsized_t
-            for i in range(1, ext):
-                x = XT.concat(x, x)
-        return T.concat(x, self)
+            raise ValueError("Can't convert symbolic bitvector to int")
 
-    def ext(self, other):
-        """
-        **NOTE:** Does not cast, returns a raw BitVector instead.  See
-        docstring for `sext` for more info.
-        """
-        return self.zext(other)
-
-    def zext(self, other):
-        """
-        **NOTE:** Does not cast, returns a raw BitVector instead.  See
-        docstring for `sext` for more info.
-        """
-        T = type(self).unsized_t
-        ext = int(other)
-        if ext < 0:
-            raise ValueError()
-        elif ext == 0:
-            return self
-
-        return T.concat(T[ext](0), self)
+    def __bool__(self):
+        if self.value.is_constant():
+            return bool(self.value.constant_value())
+        else:
+            raise ValueError("Can't convert symbolic bitvector to bool")
 
 
 class SMTNumVector(SMTBitVector):
@@ -480,12 +550,4 @@ class SMTSIntVector(SMTNumVector):
     def __le__(self, other):
         return self.bvsle(other)
 
-def bind_solver(T : tp.Type[SMTBitVector], solver) -> tp.Type[SMTBitVector]:
-    class BoundVector(T):
-        def __init__(self, *args, **kwargs):
-            super().__init__(solver, *args, **kwargs)
-    return BoundVector
-
-def overflow(a, b, res):
-   raise NotImplementedError()
-
+_Family_ = ht.TypeFamily(SMTBit, SMTBitVector, SMTUIntVector, SMTSIntVector)

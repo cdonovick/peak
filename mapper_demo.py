@@ -4,24 +4,17 @@ from peak.mapper import gen_mapping
 import coreir
 import sys
 
-if __name__ == '__main__':
-    if len(sys.argv) == 2:
-        _demo_pe = __import__(f'peak.demo_pes.pe{sys.argv[1]}', fromlist=('sim', 'isa'))
-    else:
-        print('Incorrect usage')
-        print(f'{sys.argv[0]} <DEMO PE NUMBER>')
-        sys.exit(1)
-    sim = _demo_pe.sim
-    isa = _demo_pe.isa
-    del _demo_pe
 
+if len(sys.argv) == 2:
+    _demo_pe = __import__(f'peak.demo_pes.pe{sys.argv[1]}', fromlist=('sim', 'isa'))
+else:
+    print('Incorrect usage')
+    print(f'{sys.argv[0]} <DEMO PE NUMBER>')
+    sys.exit(1)
+sim = _demo_pe.sim
+isa = _demo_pe.isa
+del _demo_pe
 
-solver = ss.smt('CVC4')
-#solver = ss.smt('Boolector')
-solver.SetLogic('QF_BV')
-solver.SetOption('incremental', 'true')
-solver.SetOption('bv-sat-solver', 'cryptominisat')
-solver.SetOption('bitblast', 'eager')
 
 __COREIR_MODELS = {
         'add' : lambda in0, in1: in0.bvadd(in1),
@@ -48,9 +41,11 @@ for gen in lib.generators.values():
     if gen.params.keys() == {'width'}:
         mods.append(gen(width=sim.DATAWIDTH))
 
+del lib
+del context
+
 for mod in mods:
     if mod.name in __COREIR_MODELS:
-        solver.Push()
         found = False
         mappings = list(gen_mapping(
                 solver,
@@ -67,5 +62,4 @@ for mod in mods:
         else:
             print(f'No Mapping found for {mod.name}')
         print('\n------------------------------------------------\n')
-        solver.Pop()
 
