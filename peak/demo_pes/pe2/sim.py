@@ -3,11 +3,11 @@ import operator
 from .isa import *
 import functools as ft
 
-from hwtypes import AbstractBitVector
+from hwtypes import TypeFamily
 
-def gen_alu(BV_t : tp.Type['AbstractBitVector']):
-    Bit = BV_t[1]
-    Data = BV_t[DATAWIDTH]
+def gen_alu(family : TypeFamily):
+    Bit = family.Bit
+    Data = family.BitVector[DATAWIDTH]
 
     def PE(inst : INST, data0 : Data, data1 : Data):
         def alu(inst : ALU_INST, data0 : Data, data1 : Data, bit0 : Bit):
@@ -39,6 +39,8 @@ def gen_alu(BV_t : tp.Type['AbstractBitVector']):
         bit0 = Bit(0)
         res, carry, zero = alu(inst.ALU, data0, data1, bit0)
         flag_out = flag_mux(inst.FLAG, carry, zero)
+        assert isinstance(flag_out, Bit)
+        assert isinstance(res, Data)
         return res, flag_out
 
     in_width_map = {
