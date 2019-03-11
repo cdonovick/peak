@@ -1,5 +1,5 @@
-from bit_vector import BitVector, SIntVector
-from .. import Peak
+from hwtypes import BitVector, SIntVector
+from peak import Peak
 from .mode import RegisterMode
 from .cond import cond
 from .lut import lut

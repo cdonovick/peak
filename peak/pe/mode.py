@@ -1,7 +1,7 @@
-from .. import Peak, Register
+from peak import Peak, Register, Enum
 from .lut import Bit
 
-class Mode:
+class Mode(Enum):
     CONST = 0
     VALID = 1
     BYPASS = 2

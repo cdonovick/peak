@@ -1,4 +1,4 @@
-from bit_vector import BitVector, overflow
+from hwtypes import BitVector, overflow
 from .isa import *
 from .. import Peak, Register, RAM, ROM
 
@@ -143,13 +143,13 @@ class Pico(Peak):
 
     def peak_flag(self, flag):
         if   flag == 'Z':
-            return int(self.Z())
+            return self.Z()
         elif flag == 'N':
-            return int(self.N())
+            return self.N()
         elif flag == 'C':
-            return int(self.C())
+            return self.C()
         elif flag == 'V':
-            return int(self.C())
+            return self.C()
         raise NotImplemented(flag)
 
     def poke_flag(self, flag, value):
