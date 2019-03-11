@@ -89,7 +89,7 @@ class SMTBit(ht.AbstractBit):
         elif hasattr(value, '__bool__'):
             self._value = smt.Bool(bool(value))
         else:
-            raise TypeError("Can't coerce {} to Bit".format(type(other)))
+            raise TypeError("Can't coerce {} to Bit".format(type(value)))
         self._name = name
 
     @property
@@ -226,7 +226,7 @@ class SMTBitVector(ht.AbstractBitVector):
             value = int(value)
             self._value = smt.BV(value, self.size)
         else:
-            raise TypeError("Can't coerce {} to SMTBitVector".format(type(other)))
+            raise TypeError("Can't coerce {} to SMTBitVector".format(type(value)))
         assert self._value.get_type() is T
 
     def make_constant(self, value, size:tp.Optional[int]=None):
@@ -374,7 +374,7 @@ class SMTBitVector(ht.AbstractBitVector):
 
     @bv_cast
     def bveq(self,  other):
-        return self.get_family().Bit(smt.Equal(self.value, other.value))
+        return self.get_family().Bit(smt.Equals(self.value, other.value))
 
     @bv_cast
     def bvne(self, other):
@@ -412,7 +412,6 @@ class SMTBitVector(ht.AbstractBitVector):
     def bvsge(self, other):
         return self.get_family().Bit(smt.BVSGE(self.value, other.value))
 
-    @bv_cast
     def bvneg(self):
         return type(self)(smt.BVNeg(self.value))
 

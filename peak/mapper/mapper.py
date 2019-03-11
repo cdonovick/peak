@@ -10,6 +10,7 @@ from hwtypes import BitVector, SIntVector
 from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 
 import pysmt.shortcuts as smt
+from pysmt.logics import QF_BV
 
 
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
@@ -26,13 +27,15 @@ def gen_mapping(
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
+        *,
+        solver_name : str = 'btor',
         ):
 
-    smt_alu, _, _ = peak_component_generator(SMT_BV)
+    smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector)
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
-    core_smt_vars = {k : SMT_BV[v](None) for k,v in core_inputs.items()}
+    core_smt_vars = {k : SMTBitVector[v]() for k,v in core_inputs.items()}
     core_smt_expr = coreir_model(**core_smt_vars)
 
     #The following is some really gross magic to generate all possible assignments
@@ -63,27 +66,25 @@ def gen_mapping(
     if found >= max_mappings:
         return
     for binding in bindings:
-        binding_dict = {k : core_smt_vars[v] if v is not None else SMT_BV[peak_inputs[k]](0) for v,k in binding}
+        binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
         name_binding = {k : v if v is not None else 0 for v,k in binding}
         for inst in isa.enumerate():
             rvals = smt_alu(inst, **binding_dict)
             for idx, bv in enumerate(rvals):
-                if isinstance(bv, SMTBitVector) and bv.value.sort == core_smt_expr.value.sort:
-                    solver.Push()
-                    solver.Assert(bv.value != core_smt_expr.value)
-                    if not solver.CheckSat():
-                        mapping = {
-                                'instruction' : inst,
-                                'output' : 'FLAG' if idx else 'RESULT',
-#                                'core to smt' : core_smt_vars,
-#                                'core smt formula' : core_smt_expr.value,
-#                                'peak smt formula' : bv.value,
-                                'coreir to peak' : {v if v != 0  else 'Constant 0' : k for k,v in name_binding.items()},
-                        }
-                        yield mapping
-                        found  += 1
-                        if found >= max_mappings:
-                            solver.Pop()
-                            return
-                    solver.Pop()
+                if isinstance(bv, SMTBitVector) and bv.value.get_type() == core_smt_expr.value.get_type():
+                    with smt.Solver(solver_name, logic=QF_BV) as solver:
+                        solver.add_assertion(smt.NotEquals(bv.value, core_smt_expr.value))
+                        if not solver.solve():
+                            mapping = {
+                                    'instruction' : inst,
+                                    'output' : 'FLAG' if idx else 'RESULT',
+    #                                'core to smt' : core_smt_vars,
+    #                                'core smt formula' : core_smt_expr.value,
+    #                                'peak smt formula' : bv.value,
+                                    'coreir to peak' : {v if v != 0  else 'Constant 0' : k for k,v in name_binding.items()},
+                            }
+                            yield mapping
+                            found  += 1
+                            if found >= max_mappings:
+                                return
 

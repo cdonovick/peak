@@ -1,5 +1,5 @@
 import functools as ft
-from peak.mapper import SMTBitVector, ss
+from peak.mapper import SMTBitVector
 from peak.mapper import gen_mapping
 import coreir
 import sys
@@ -48,7 +48,6 @@ for mod in mods:
     if mod.name in __COREIR_MODELS:
         found = False
         mappings = list(gen_mapping(
-                solver,
                 sim.gen_alu,
                 isa.INST,
                 mod,

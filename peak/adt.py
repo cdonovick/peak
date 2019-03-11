@@ -159,7 +159,6 @@ class BoundMeta(type):
         BoundMeta._class_info[t] = idx
         return t
 
-
     @property
     def fields(cls):
         return BoundMeta._class_info[cls]
