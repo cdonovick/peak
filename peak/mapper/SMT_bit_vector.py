@@ -92,6 +92,11 @@ class SMTBit(ht.AbstractBit):
             raise TypeError("Can't coerce {} to Bit".format(type(value)))
         self._name = name
 
+    def __repr__(self):
+        if self._name is not AUTOMATIC:
+            return self._name
+        else:
+            return repr(self._value)
     @property
     def value(self):
         return self._value
@@ -271,6 +276,7 @@ class SMTBitVector(ht.AbstractBitVector):
                 raise IndexError('SMT extract does not support step != 1')
 
             v = self.value[start:stop-1]
+            return type(self).unsized_t[v.get_type().width](v)
         elif isinstance(index, int):
             if index < 0:
                 index = size+index
@@ -279,11 +285,10 @@ class SMTBitVector(ht.AbstractBitVector):
                 raise IndexError()
 
             v = self.value[index]
-            return self.get_family().Bit(v == 1)
+            return self.get_family().Bit(smt.Equals(v, smt.BV(1, 1)))
         else:
             raise TypeError()
 
-        return type(self).unsized_t[v.get_type().width](v)
 
     def __setitem__(self, index, value):
         if isinstance(index, slice):
@@ -370,7 +375,7 @@ class SMTBitVector(ht.AbstractBitVector):
 
     @bv_cast
     def bvcomp(self, other):
-        return type(self)(smt.BVComp(self.value, other.value))
+        return type(self).unsized_t[1](smt.BVComp(self.value, other.value))
 
     @bv_cast
     def bveq(self,  other):

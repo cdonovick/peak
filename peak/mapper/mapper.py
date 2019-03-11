@@ -28,10 +28,10 @@ def gen_mapping(
         coreir_model : tp.Callable,
         max_mappings : int,
         *,
-        solver_name : str = 'btor',
+        solver_name : str = 'z3',
         ):
 
-    smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector)
+    smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
@@ -71,9 +71,11 @@ def gen_mapping(
         for inst in isa.enumerate():
             rvals = smt_alu(inst, **binding_dict)
             for idx, bv in enumerate(rvals):
-                if isinstance(bv, SMTBitVector) and bv.value.get_type() == core_smt_expr.value.get_type():
+
+                if isinstance(bv, (SMTBit,SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
                     with smt.Solver(solver_name, logic=QF_BV) as solver:
-                        solver.add_assertion(smt.NotEquals(bv.value, core_smt_expr.value))
+                        expr = bv != core_smt_expr
+                        solver.add_assertion(expr.value)
                         if not solver.solve():
                             mapping = {
                                     'instruction' : inst,
@@ -87,4 +89,3 @@ def gen_mapping(
                             found  += 1
                             if found >= max_mappings:
                                 return
-
