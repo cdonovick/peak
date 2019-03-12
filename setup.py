@@ -13,7 +13,8 @@ setup(
         "peak",
     ],
     install_requires=[
-        "hwtypes >= 1.0.1"
+        "hwtypes >= 1.0.1",
+        "pysmt",
     ],
     python_requires='>=3.6'
 )
