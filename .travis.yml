@@ -4,11 +4,11 @@ before_install:
 # Here we just install Miniconda, which you shouldn't have to change.    
 - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
 - chmod +x miniconda.sh
-- ./miniconda.sh -b
+- ./miniconda.sh -u -b -p
 - export PATH=./miniconda/bin:$PATH
-- conda update --yes conda 
+- conda update -q conda 
 install:
-- conda create --yes -n test python=3.7.2
+- conda create -q -n test python=3.7.2
 - source activate test
 - conda install pip
 - pip install pytest-cov
