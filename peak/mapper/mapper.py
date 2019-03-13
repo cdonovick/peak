@@ -21,6 +21,16 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
     return nd
 
 
+def _convert_io_types(peak_io):
+    width_map = {}
+    for name,btype in peak_io.items():
+        if issubclass(btype,ISABuilder):
+            continue
+        #Hack to get bitwidth of a hwtype
+        width = 1 if not hasattr(btype,"size") else btype.size
+        width_map[name] = width
+    return width_map
+
 def gen_mapping(
         peak_component_generator : tp.Callable[[tp.Type[AbstractBitVector]], tp.Callable],
         isa : tp.Type[ISABuilder],
@@ -31,7 +41,15 @@ def gen_mapping(
         solver_name : str = 'z3',
         ):
 
-    smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
+    smt_alu = peak_component_generator(SMTBitVector.get_family())
+    #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
+    if isinstance(smt_alu,tuple):
+        smt_alu, peak_inputs, peak_outputs = smt_alu
+    else:
+        if not hasattr(smt_alu, "_peak_inputs_"):
+            raise ValueError("Need to wrap __call__ with @name_outputs")
+        peak_inputs = _convert_io_types(smt_alu._peak_inputs_)
+        peak_outputs = _convert_io_types(smt_alu._peak_outputs_)
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
