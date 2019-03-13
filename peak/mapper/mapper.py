@@ -96,9 +96,7 @@ def gen_mapping(
                         expr = bv != core_smt_expr
                         solver.add_assertion(expr.value)
                         if not solver.solve():
-                            mapping = {}
-                            mapping["instruction"] = inst
-                            #Create output map
+                            #Create output and input map
                             output_map = {"out":list(smt_alu._peak_outputs_.items())[idx][0]}
                             input_map = {}
                             for k,v in name_binding.items():
