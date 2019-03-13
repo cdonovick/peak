@@ -102,7 +102,7 @@ def gen_mapping(
                             for k,v in name_binding.items():
                                 if v == 0:
                                     v = "Constant 0"
-                                if v != "in_":
+                                elif v == "in_":
                                     v = "in"
 
                             mapping = dict(
