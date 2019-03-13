@@ -2,13 +2,15 @@ import typing as  tp
 import operator
 from .isa import *
 import functools as ft
+from peak import name_outputs
 
 from hwtypes import TypeFamily
 
 def gen_alu(family : TypeFamily):
     Bit = family.Bit
     Data = family.BitVector[DATAWIDTH]
-
+    
+    @name_outputs(res=Data,flag_out=Bit)
     def PE(inst : INST, data0 : Data, data1 : Data):
         def alu(inst : ALU_INST, data0 : Data, data1 : Data, bit0 : Bit):
             if inst == ALU_INST.Add:
@@ -43,4 +45,4 @@ def gen_alu(family : TypeFamily):
             0 : DATAWIDTH,
             1 : 1,
     }
-    return PE, in_width_map, out_width_map
+    return PE #, in_width_map, out_width_map
