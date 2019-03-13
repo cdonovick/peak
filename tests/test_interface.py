@@ -3,8 +3,8 @@ from peak.pe1 import PE, Inst, Bit, Data
 
 def test_inputs():
     #Expected inputs
-    expected_names = ["inst", "data0", "data1", "bit0", "bit1", "bit2", "clk_en"]
-    expected_types = [Inst,Data,Data,Bit,Bit,Bit,Bit]
+    expected_names = ["data0", "data1", "bit0", "bit1", "bit2", "clk_en"]
+    expected_types = [Data,Data,Bit,Bit,Bit,Bit]
 
     assert hasattr(PE.__call__,"_peak_inputs_")
     inputs = PE.__call__._peak_inputs_
@@ -23,3 +23,8 @@ def test_outputs():
         assert oname == expected_names[i]
         assert otype == expected_types[i]
 
+def test_isa():
+    assert hasattr(PE.__call__,"_peak_isa_")
+    isa = PE.__call__._peak_isa_
+    assert "inst" in isa
+    assert isa["inst"] == Inst
