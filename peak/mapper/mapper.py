@@ -21,6 +21,16 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
     return nd
 
 
+def _convert_io_types(peak_io):
+    width_map = {}
+    for name,btype in peak_io.items():
+        if issubclass(btype,ISABuilder):
+            continue
+        #Hack to get bitwidth of a hwtype
+        width = 1 if not hasattr(btype,"size") else btype.size
+        width_map[name] = width
+    return width_map
+
 def gen_mapping(
         peak_component_generator : tp.Callable[[tp.Type[AbstractBitVector]], tp.Callable],
         isa : tp.Type[ISABuilder],
@@ -31,7 +41,15 @@ def gen_mapping(
         solver_name : str = 'z3',
         ):
 
-    smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
+    smt_alu = peak_component_generator(SMTBitVector.get_family())
+    #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
+    if isinstance(smt_alu,tuple):
+        smt_alu, peak_inputs, peak_outputs = smt_alu
+    else:
+        if not hasattr(smt_alu, "_peak_inputs_"):
+            raise ValueError("Need to wrap __call__ with @name_outputs")
+        peak_inputs = _convert_io_types(smt_alu._peak_inputs_)
+        peak_outputs = _convert_io_types(smt_alu._peak_outputs_)
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
@@ -61,7 +79,6 @@ def gen_mapping(
     bindings = []
     for l in it.product(*possible_matching.values()):
         bindings.append(list(it.chain(*l)))
-
     found = 0
     if found >= max_mappings:
         return
@@ -70,9 +87,11 @@ def gen_mapping(
         name_binding = {k : v if v is not None else 0 for v,k in binding}
         for inst in isa.enumerate():
             rvals = smt_alu(inst, **binding_dict)
-            for idx, bv in enumerate(rvals):
+            if not isinstance(rvals, tuple):
+                rvals = rvals,
 
-                if isinstance(bv, (SMTBit,SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
+            for idx, bv in enumerate(rvals):
+                if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
                     with smt.Solver(solver_name, logic=QF_BV) as solver:
                         expr = bv != core_smt_expr
                         solver.add_assertion(expr.value)
