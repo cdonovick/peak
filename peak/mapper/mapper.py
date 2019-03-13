@@ -96,14 +96,20 @@ def gen_mapping(
                         expr = bv != core_smt_expr
                         solver.add_assertion(expr.value)
                         if not solver.solve():
-                            mapping = {
-                                    'instruction' : inst,
-                                    'output' : 'FLAG' if idx else 'RESULT',
-    #                                'core to smt' : core_smt_vars,
-    #                                'core smt formula' : core_smt_expr.value,
-    #                                'peak smt formula' : bv.value,
-                                    'coreir to peak' : {v if v != 0  else 'Constant 0' : k for k,v in name_binding.items()},
-                            }
+                            #Create output and input map
+                            output_map = {"out":list(smt_alu._peak_outputs_.items())[idx][0]}
+                            input_map = {}
+                            for k,v in name_binding.items():
+                                if v == 0:
+                                    v = "Constant 0"
+                                elif v == "in_":
+                                    v = "in"
+
+                            mapping = dict(
+                                instruction=inst,
+                                output_map=output_map,
+                                input_map=input_map
+                            )
                             yield mapping
                             found  += 1
                             if found >= max_mappings:
