@@ -61,7 +61,6 @@ def gen_mapping(
     bindings = []
     for l in it.product(*possible_matching.values()):
         bindings.append(list(it.chain(*l)))
-
     found = 0
     if found >= max_mappings:
         return
@@ -70,9 +69,11 @@ def gen_mapping(
         name_binding = {k : v if v is not None else 0 for v,k in binding}
         for inst in isa.enumerate():
             rvals = smt_alu(inst, **binding_dict)
-            for idx, bv in enumerate(rvals):
+            if not isinstance(rvals, tuple):
+                rvals = rvals,
 
-                if isinstance(bv, (SMTBit,SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
+            for idx, bv in enumerate(rvals):
+                if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
                     with smt.Solver(solver_name, logic=QF_BV) as solver:
                         expr = bv != core_smt_expr
                         solver.add_assertion(expr.value)
