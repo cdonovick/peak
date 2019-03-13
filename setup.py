@@ -16,5 +16,5 @@ setup(
         "hwtypes >= 1.0.1",
         "pysmt",
     ],
-    python_requires='>=3.6'
+    python_requires='>=3.7.2'
 )
