@@ -43,9 +43,7 @@ def name_outputs(**outputs):
         input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
         in_types = call_fn.__annotations__
         if set(input_names) != set(in_types.keys()):
-            print(set(input_names))
-            print(set(in_types))
-            raise TypeError("Missing type annotations on inputs")
+            raise TypeError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_types)}")
         for name in input_names:
             call_wrapper._peak_inputs_[name] = in_types[name]
 

@@ -1,7 +1,7 @@
 from peak.alu import *
 from hwtypes import BitVector
 
-PE = gen_alu(BitVector)
+PE = gen_alu(BitVector.get_family())
 
 def test_add():
     inst = Inst(ALUOP.Add)

@@ -31,7 +31,20 @@ def gen_mapping(
         solver_name : str = 'z3',
         ):
 
-    smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
+    smt_alu = peak_component_generator(SMTBitVector.get_family())
+    #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
+    if isinstance(smt_alu,tuple):
+        smt_alu, peak_inputs, peak_outputs = smt_alu
+    else:
+        if not hasattr(smt_alu, "_peak_inputs_"):
+            raise ValueError("Need to wrap __call__ with @name_outputs")
+        
+        #Filter out the instruction
+        peak_inputs = {}
+        for k,v in smt_alu._peak_inputs_.items():
+            if not issubclass(v,ISABuilder):
+                peak_inputs[k] = v.size
+        peak_outputs = {k:v.size for (k,v) in smt_alu._peak_outputs_.items() }
 
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}

@@ -1,11 +1,11 @@
 from .. import Peak, name_outputs
 import typing as  tp
 from .isa import *
-from hwtypes import AbstractBitVector
+from hwtypes import TypeFamily
 
-def gen_alu(BV_t : tp.Type['AbstractBitVector']):
-    Bit = BV_t[1]
-    Data = BV_t[Datawidth]
+def gen_alu(family : TypeFamily):
+    Bit = family.Bit
+    Data = family.BitVector[Datawidth]
     
     @name_outputs(alu_res=Data)
     def PE(inst : Inst, a : Data, b : Data):
