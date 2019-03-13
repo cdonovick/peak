@@ -1,17 +1,8 @@
 language: python
 python:
-- '3.5'
 - '3.6'
 install:
 - pip install pytest-cov
 - pip install -e .
 script:
 - py.test --cov=peak tests/
-deploy:
-  provider: pypi
-  user: leonardt
-  password:
-    secure: f8XsegKLUb+sLuQujNOalix9Ef7WKgGdBUPdrgkiAhttUuCXh9oY50qc6LOybhaVDQsHPa69Sfrvj25QERvJFToXEnuUrKR9aK6EHZDcwE/FQSZWg/GFYGAXHb5VgiGhIXrIATmLXaCnLZDk9e5USQSGeQ/pB3mYjzEV2rvnmPgKHWvfQ5Q5rfovHNCodG9K0mS9SHF3h+DY6iT4YyX+OlFafxhXnlfqPdR1gc/kQy99gJSbXtWktv57yEt9+3p2HVAYS0bnLRA+c5ZI/xNEZtoeykPXth27NPGqT7XPMWs4JyX1TSAcC6VUxPsirdPlWCQDDgsEea25008ShlFC1XssEtdMaQDVhlXDqVY19+7B8WGDnwZMVTuuoNtMilCvZnBnBILf8/EAqM+X1vh94oKdPAnGrIZu84xgZPskWLjqdaDl5d4zpISIeVdHkPxfUdzV6DKr2ikjL4u0D3axzQrHZouKcyv1oPL8ZJalxpoRY8Q/bnsAVN8eEfN8HlLKf6XNuu5fpSbtm98IqvS/Cz6srw8IHfPkxfvjKAsNAzxuFM1Cb+nHL8fuUkCd2tr4BtYzFipP7j9GUOcRLgWL0GCHxLY0UQK65GW+TYRkgclibEW50aEGgsN0L6rd3itcyzrvj6l8KS/MBHNBUQFGw3fAp/wUz5j1S4KGyc56ads=
-  on:
-    branch: master
-    tags: true
