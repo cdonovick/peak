@@ -20,7 +20,7 @@ def test_ldhi():
     assert pico.peak_reg(0) == 10 << 8
 
 def test_ld():
-    mem = [asm.ldlo(0,1),asm.ldhi(1,2),asm.or_(0,1)]
+    mem = [asm.ldlo(0,1), asm.ldhi(1,2), asm.or_(0,1)]
     pico = Pico(mem)
     pico()
     pico()

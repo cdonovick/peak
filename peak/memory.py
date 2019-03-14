@@ -1,12 +1,12 @@
 from .peak import Peak
-from .register import Register
+from .register import gen_register
 
 class ROM(Peak):
     def __init__(self, type, n, mem, init=0):
         self.mem = []
         for i in range(n):
             data = mem[i] if i < len(mem) else init
-            self.mem.append( Register(type, data) )
+            self.mem.append( gen_register(type)(data) )
         
     def __call__(self, addr):
         return self.mem[int(addr)]()
