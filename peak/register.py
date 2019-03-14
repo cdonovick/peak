@@ -1,25 +1,24 @@
 from .peak import Peak
-from hwtypes import TypeFamily
+from hwtypes import BitVector
+import magma as m
 
 
-def gen_register(family: TypeFamily, datawidth=None):
-    T = family
-    if datawidth is not None:
-        T = T[datawidth]
+def gen_register(T, mode="sim"):
+    family = BitVector.get_family()
 
     class Register(Peak):
         def __init__(self, init):
-            self.init: T = init
-            self.reset()
+            self.value: T = init
 
-        def reset(self):
-            self.value = self.init
-
-        def __call__(self, value=None, en=1):
+        def __call__(self, value: T=None, en: family.Bit=1) -> T:
             retvalue = self.value
             if value is not None and en:
                 assert value is not None
                 self.value = value
             return retvalue
 
-    return Register
+    if mode == "sim":
+        return Register
+    elif mode == "rtl":
+        return m.circuit.sequential(Register)
+    raise NotImplementedError(mode)
