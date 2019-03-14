@@ -3,7 +3,7 @@ from hwtypes import BitVector
 import magma as m
 
 
-def gen_register(T, mode="sim"):
+def gen_register(T, init=0, mode="sim"):
     if mode == "sim":
         family = BitVector.get_family()
     elif mode == "rtl":
@@ -12,7 +12,7 @@ def gen_register(T, mode="sim"):
         raise NotImplementedError(mode)
 
     class Register(Peak):
-        def __init__(self, init):
+        def __init__(self):
             self.value: T = T(init)
 
         def __call__(self, value: T=None, en: family.Bit=1) -> T:
