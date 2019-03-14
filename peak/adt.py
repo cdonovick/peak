@@ -275,6 +275,13 @@ class Enum(ISABuilder, pyEnum):
     def __repr__(self):
         return f'<{self.__class__.__name__}.{self.name}>'
 
+    @classmethod
+    def bit_length(cls):
+        n = 1
+        for value in cls:
+            n = max(n, value.value.bit_length())
+        return n
+
 def is_enum(enum) -> bool:
     return isinstance(enum, Enum)
 

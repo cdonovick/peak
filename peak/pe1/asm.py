@@ -25,8 +25,8 @@ def inst(alu, signed=Signed.unsigned, lut=0, cond=Cond.Z,
 
 # helper functions to format configurations
 
-def add():
-    return inst(ALU.Add)
+def add(ra_mode=Mode.BYPASS, rb_mode=Mode.BYPASS):
+    return inst(ALU.Add, ra_mode=ra_mode, rb_mode=rb_mode)
 
 def sub ():
     return inst(ALU.Sub)
@@ -54,14 +54,14 @@ def smult2 ():
 
 
 
-def and_():
-    return inst(ALU.And)
+def and_(ra_mode=Mode.BYPASS, rb_mode=Mode.BYPASS):
+    return inst(ALU.And, ra_mode=ra_mode, rb_mode=rb_mode)
 
-def or_():
-    return inst(ALU.Or)
+def or_(ra_mode=Mode.BYPASS, rb_mode=Mode.BYPASS):
+    return inst(ALU.Or, ra_mode=ra_mode, rb_mode=rb_mode)
 
-def xor():
-    return inst(ALU.XOr)
+def xor(ra_mode=Mode.BYPASS, rb_mode=Mode.BYPASS):
+    return inst(ALU.XOr, ra_mode=ra_mode, rb_mode=rb_mode)
 
 def lsl():
     return inst(ALU.SHL)
