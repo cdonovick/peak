@@ -1,13 +1,32 @@
 language: python
-
-install:
-# Here we just install Miniconda, which you shouldn't have to change.    
+cache:
+  apt: true
+before_install:
+- mkdir deps
+- mkdir deps/bin
+- mkdir deps/lib
+- mkdir deps/include
+# install coreir
+- export PATH=$TRAVIS_BUILD_DIR/deps/bin:$PATH
+- export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/deps/lib:$LD_LIBRARY_PATH
+- curl -s -L https://github.com/rdaly525/coreir/releases/latest | grep "href.*coreir.tar.gz" | cut -d \" -f 2 | xargs -I {} wget https://github.com"{}"
+- mkdir coreir_release;
+- tar -xf coreir.tar.gz -C coreir_release --strip-components 1;
+- cd coreir_release;
+- make install prefix=$TRAVIS_BUILD_DIR/deps;
+- cd ..
+# install conda 
 - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
 - chmod +x miniconda.sh
-- ./miniconda.sh -b $HOME/miniconda
-- export PATH="$HOME/miniconda/bin:$PATH"
+- ./miniconda.sh -b -p $TRAVIS_BUILD_DIR/miniconda
+- export PATH=$TRAVIS_BUILD_DIR/miniconda/bin:$PATH
+- hash -r
+- conda config --set always_yes yes --set changeps1 no
 - conda update -q conda 
+- conda create -q -n test-env python=3.7
+- source activate test-env
 - conda install pip
+install:
 - pip install pytest-cov
 - pip install -e .
 script:
