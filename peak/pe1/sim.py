@@ -1,6 +1,6 @@
 from hwtypes import BitVector, SIntVector, overflow
 from .. import Peak, name_outputs
-from .mode import Mode, RegisterMode
+from .mode import Mode, gen_register_mode
 from .lut import Bit, LUT, lut
 from .cond import Cond, cond
 from .isa import *
@@ -98,13 +98,13 @@ class PE(Peak):
         # Declare PE state
 
         # Data registers
-        self.rega = RegisterMode(Data)
-        self.regb = RegisterMode(Data)
+        self.rega = gen_register_mode(Data)()
+        self.regb = gen_register_mode(Data)()
 
         # Bit Registers
-        self.regd = RegisterMode(Bit)
-        self.rege = RegisterMode(Bit)
-        self.regf = RegisterMode(Bit)
+        self.regd = gen_register_mode(Bit)()
+        self.rege = gen_register_mode(Bit)()
+        self.regf = gen_register_mode(Bit)()
 
     @name_outputs(alu_res=Data,res_p=Bit,irq=Bit)
     def __call__(self, inst: Inst, \
