@@ -6,7 +6,7 @@ import magma as m
 def gen_register(T, mode="sim"):
     if mode == "sim":
         family = BitVector.get_family()
-    elif mode == "sim":
+    elif mode == "rtl":
         family = m.get_family()
     else:
         raise NotImplementedError(mode)
