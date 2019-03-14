@@ -4,7 +4,12 @@ import magma as m
 
 
 def gen_register(T, mode="sim"):
-    family = BitVector.get_family()
+    if mode == "sim":
+        family = BitVector.get_family()
+    elif mode == "sim":
+        family = m.get_family()
+    else:
+        raise NotImplementedError(mode)
 
     class Register(Peak):
         def __init__(self, init):
@@ -21,4 +26,3 @@ def gen_register(T, mode="sim"):
         return Register
     elif mode == "rtl":
         return m.circuit.sequential(Register)
-    raise NotImplementedError(mode)
