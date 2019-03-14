@@ -6,7 +6,7 @@ class ROM(Peak):
         self.mem = []
         for i in range(n):
             data = mem[i] if i < len(mem) else init
-            self.mem.append( gen_register(type)(data) )
+            self.mem.append( gen_register(type, init=data)() )
         
     def __call__(self, addr):
         return self.mem[int(addr)]()

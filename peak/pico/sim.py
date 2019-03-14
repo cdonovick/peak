@@ -70,11 +70,11 @@ class Pico(Peak):
         self.mem = ROM(Inst, 256, mem, Word(0))
 
         self.reg = RAM(Word, 16, [Word(0) for i in range(16)])
-        self.PC = gen_register(Word)(Word(0))
-        self.Z = gen_register(Bit)(ZERO)
-        self.N = gen_register(Bit)(ZERO)
-        self.C = gen_register(Bit)(ZERO)
-        self.V = gen_register(Bit)(ZERO)
+        self.PC = gen_register(Word, Word(0))()
+        self.Z = gen_register(Bit, ZERO)()
+        self.N = gen_register(Bit, ZERO)()
+        self.C = gen_register(Bit, ZERO)()
+        self.V = gen_register(Bit, ZERO)()
 
     def __call__(self):
         pc = self.PC()
