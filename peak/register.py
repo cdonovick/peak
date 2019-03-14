@@ -2,7 +2,7 @@ from .peak import Peak
 
 class Register(Peak):
     def __init__(self, type, init = 0):
-        self.init = init
+        self.init = type(init)
         self.reset()
     
     def reset(self): 
