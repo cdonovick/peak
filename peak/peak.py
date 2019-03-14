@@ -14,9 +14,7 @@ def name_outputs(**outputs):
     Will verify that all the inputs have type annotations
     Will also verify that the outputs of running fn will have the correct number of bits
     """
-
     def decorator(call_fn):
-        
         @functools.wraps(call_fn)
         def call_wrapper(*args,**kwargs):
             results = call_fn(*args,**kwargs)
@@ -25,7 +23,7 @@ def name_outputs(**outputs):
                 results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
                 if not isinstance(results[i], otype):
-                    raise TypeError(f"result type {type(results[i])} did not match expected type {otype}")
+                    raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
             if single_output:
                 results = results[0]
             return results
@@ -56,7 +54,7 @@ def name_outputs(**outputs):
             raise TypeError("Need to pass peak ISA instruction to __call__")
         if len(isa) > 1:
             raise NotImplementedError("Can only pass in single instruction")
-        call_wrapper._peak_isa_ = {isa[0][0]:isa[0][1]}
+        call_wrapper._peak_isa_ = isa[0]
         return call_wrapper
     return decorator
 

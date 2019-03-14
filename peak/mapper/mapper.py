@@ -1,7 +1,7 @@
 import typing as tp
 import itertools as it
 import functools as ft
-
+from ..peak import Peak
 import coreir
 
 from hwtypes import AbstractBitVector
@@ -12,14 +12,12 @@ from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
-
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
     nd = {}
     for k,v in d.items():
         nd.setdefault(v, []).append(k)
 
     return nd
-
 
 def _convert_io_types(peak_io):
     width_map = {}
@@ -32,7 +30,7 @@ def _convert_io_types(peak_io):
     return width_map
 
 def gen_mapping(
-        peak_component_generator : tp.Callable[[tp.Type[AbstractBitVector]], tp.Callable],
+        peak_component_generator : Peak,
         isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
@@ -41,11 +39,14 @@ def gen_mapping(
         solver_name : str = 'z3',
         ):
 
-    smt_alu = peak_component_generator(SMTBitVector.get_family())
+    peak_class = peak_component_generator(SMTBitVector.get_family())
+    peak_inst = peak_class()
     #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
     if isinstance(smt_alu,tuple):
         smt_alu, peak_inputs, peak_outputs = smt_alu
     else:
+        if issubclass(smt_alu,Peak):
+            smt_alu = smt_alu.__call__
         if not hasattr(smt_alu, "_peak_inputs_"):
             raise ValueError("Need to wrap __call__ with @name_outputs")
         peak_inputs = _convert_io_types(smt_alu._peak_inputs_)
