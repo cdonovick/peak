@@ -40,19 +40,10 @@ def gen_mapping(
         ):
 
     peak_inst = peak_class(SMTBitVector.get_family())
-    #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
-    #if isinstance(smt_alu,tuple):
-    #    smt_alu, peak_inputs, peak_outputs = smt_alu
-    #else:
-    #if issubclass(smt_alu,Peak):
-    #    smt_alu = smt_alu.__call__
-    #if not hasattr(smt_alu, "_peak_inputs_"):
-    #    raise ValueError("Need to wrap __call__ with @name_outputs")
+    
     peak_inputs = _convert_io_types(peak_class.__call__._peak_inputs_)
     peak_outputs = _convert_io_types(peak_class.__call__._peak_outputs_)
-    #print(peak_inputs)
-    #print(peak_outputs)
-    #assert 0
+    
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
     core_smt_vars = {k : SMTBitVector[v]() for k,v in core_inputs.items()}
@@ -84,11 +75,17 @@ def gen_mapping(
     found = 0
     if found >= max_mappings:
         return
-    for binding in bindings:
+    for bi,binding in enumerate(bindings):
         binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
         name_binding = {k : v if v is not None else 0 for v,k in binding}
-        for inst in isa.enumerate():
-            rvals = peak_inst(inst, **binding_dict)
+        #print(f"binding {bi+1}/{len(bindings)}")
+        for ii,inst in enumerate(isa.enumerate()):
+            #TODO this is to handle calls to BFloat
+            try:
+                rvals = peak_inst(inst, **binding_dict)
+            except:
+                continue
+
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 
@@ -103,9 +100,10 @@ def gen_mapping(
                             input_map = {}
                             for k,v in name_binding.items():
                                 if v == 0:
-                                    v = "Constant 0"
+                                    v = "0"
                                 elif v == "in_":
                                     v = "in"
+                                input_map[v] = k
 
                             mapping = dict(
                                 instruction=inst,
