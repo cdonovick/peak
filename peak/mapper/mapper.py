@@ -30,7 +30,7 @@ def _convert_io_types(peak_io):
     return width_map
 
 def gen_mapping(
-        peak_component_generator : Peak,
+        peak_class : Peak,
         isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
@@ -39,19 +39,20 @@ def gen_mapping(
         solver_name : str = 'z3',
         ):
 
-    peak_class = peak_component_generator(SMTBitVector.get_family())
-    peak_inst = peak_class()
+    peak_inst = peak_class(SMTBitVector.get_family())
     #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
-    if isinstance(smt_alu,tuple):
-        smt_alu, peak_inputs, peak_outputs = smt_alu
-    else:
-        if issubclass(smt_alu,Peak):
-            smt_alu = smt_alu.__call__
-        if not hasattr(smt_alu, "_peak_inputs_"):
-            raise ValueError("Need to wrap __call__ with @name_outputs")
-        peak_inputs = _convert_io_types(smt_alu._peak_inputs_)
-        peak_outputs = _convert_io_types(smt_alu._peak_outputs_)
-
+    #if isinstance(smt_alu,tuple):
+    #    smt_alu, peak_inputs, peak_outputs = smt_alu
+    #else:
+    #if issubclass(smt_alu,Peak):
+    #    smt_alu = smt_alu.__call__
+    #if not hasattr(smt_alu, "_peak_inputs_"):
+    #    raise ValueError("Need to wrap __call__ with @name_outputs")
+    peak_inputs = _convert_io_types(peak_class.__call__._peak_inputs_)
+    peak_outputs = _convert_io_types(peak_class.__call__._peak_outputs_)
+    #print(peak_inputs)
+    #print(peak_outputs)
+    #assert 0
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
     core_smt_vars = {k : SMTBitVector[v]() for k,v in core_inputs.items()}
@@ -87,7 +88,7 @@ def gen_mapping(
         binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
         name_binding = {k : v if v is not None else 0 for v,k in binding}
         for inst in isa.enumerate():
-            rvals = smt_alu(inst, **binding_dict)
+            rvals = peak_inst(inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 
@@ -98,7 +99,7 @@ def gen_mapping(
                         solver.add_assertion(expr.value)
                         if not solver.solve():
                             #Create output and input map
-                            output_map = {"out":list(smt_alu._peak_outputs_.items())[idx][0]}
+                            output_map = {"out":list(peak_class.__call__._peak_outputs_.items())[idx][0]}
                             input_map = {}
                             for k,v in name_binding.items():
                                 if v == 0:

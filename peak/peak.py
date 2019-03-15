@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from hwtypes import AbstractBitVector, AbstractBit
+from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
 import functools
 from .adt import ISABuilder
 
@@ -22,8 +22,9 @@ def name_outputs(**outputs):
             if single_output:
                 results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
-                if not isinstance(results[i], otype):
-                    raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
+                if isinstance(otype,BitVector) or isinstance(otype,Bit):
+                    if not isinstance(results[i], otype):
+                        raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
             if single_output:
                 results = results[0]
             return results
