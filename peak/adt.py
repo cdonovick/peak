@@ -69,7 +69,7 @@ class ProductMeta(type):
 
     def __new__(mcs, name, bases, namespace, **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
-        cls = dc.dataclass(eq=True, frozen=True)(cls)
+        cls = dc.dataclass(eq=True, frozen=False)(cls)
         _fields = []
         for field in dc.fields(cls):
             t = _field_type(field)
