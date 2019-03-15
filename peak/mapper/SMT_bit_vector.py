@@ -215,7 +215,7 @@ class SMTBitVector(ht.AbstractBitVector):
                 warnings.warn('Truncating value from {} to {}'.format(type(value), type(self)))
                 self._value = value[:self.size].value
             elif ext > 0:
-                self._value = value.value.zext(ext)
+                self._value = value.zext(ext).value
             else:
                 self._value = value.value
 
