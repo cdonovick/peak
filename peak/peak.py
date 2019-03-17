@@ -1,16 +1,20 @@
 from collections import OrderedDict
-from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
+from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit
 import functools
 from .adt import ISABuilder
 
 class Peak:
-    pass
-
+    def __init__(self,family: TypeFamily, datawidth=16):
+        self.Bit = family.Bit
+        self.Data = family.BitVector[datawidth]
+        self.Signed = family.Signed
+        self.BitVector = family.BitVector
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
     The output types will be stored in fn._peak_outputs__
     The input types will be stored in fn._peak_inputs_
+    The ISA will be stored in fn._peak_isa_
     Will verify that all the inputs have type annotations
     Will also verify that the outputs of running fn will have the correct number of bits
     """
@@ -22,6 +26,7 @@ def name_outputs(**outputs):
             if single_output:
                 results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
+                #Only checking if it is a BitVector
                 if isinstance(otype,BitVector) or isinstance(otype,Bit):
                     if not isinstance(results[i], otype):
                         raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
