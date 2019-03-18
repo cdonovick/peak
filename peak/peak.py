@@ -4,11 +4,12 @@ import functools
 from .adt import ISABuilder
 
 class Peak:
-    def __init__(self,family: TypeFamily, datawidth=16):
-        self.Bit = family.Bit
-        self.Data = family.BitVector[datawidth]
-        self.Signed = family.Signed
-        self.BitVector = family.BitVector
+    pass
+    #def __init__(self,family: TypeFamily, datawidth=16):
+    #    self.Bit = family.Bit
+    #    self.Data = family.BitVector[datawidth]
+    #    self.Signed = family.Signed
+    #    self.BitVector = family.BitVector
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
