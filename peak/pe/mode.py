@@ -12,14 +12,10 @@ class Mode(Enum):
     DELAY = 3   # Register written with input value, previous value returned
 
 
-def gen_register_mode(family: TypeFamily, datawidth=None, init=0):
-    T = family
-    if datawidth is not None:
-        T = T[datawidth]
-
+def gen_register_mode(family: TypeFamily, T, init=0):
     class RegisterMode(Peak):
         def __init__(self):
-            self.register: T = gen_register(T, init)()
+            self.register: T = gen_register(family, T, init)()
 
         def reset(self):
             self.register.reset()
