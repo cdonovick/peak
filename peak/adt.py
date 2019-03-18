@@ -41,7 +41,6 @@ def _field_type(field : dc.Field) -> type:
         return eval(t)
     else:
         return t
-def _id(x) : return x
 
 _CONSTANT_TYPES = (bool, AbstractBit, int, AbstractBitVector)
 
@@ -52,13 +51,10 @@ class ISABuilder:
         for elem in it:
             t = type_getter(elem)
             if _issubclass(t, ISABuilder):
-                yield tuple(t.enumerate())
-            elif _issubclass(t, _CONSTANT_TYPES):
-                yield t(0),
-            elif isinstance(t, _CONSTANT_TYPES):
-                yield elem,
+                elements.append(tuple(t.enumerate()))
             else:
-                raise TypeError()
+                assert _issubclass(t, _CONSTANT_TYPES) or isinstance(t, _CONSTANT_TYPES)
+                elements.append((elem,))
 
         return elements
 
@@ -67,7 +63,7 @@ _FIELD_TYPES = ISABuilder, *_CONSTANT_TYPES
 class ProductMeta(type):
     def __call__(cls, *value):
         for v,t in zip(value, cls.fields):
-            if not isinstance(v, t) and not _issubclass(v, t):
+            if not isinstance(v, t):
                 raise TypeError('Value {} is not of type {}'.format(v, t))
         return super().__call__(*value)
 
@@ -96,7 +92,7 @@ class ProductMeta(type):
 class Product(ISABuilder, metaclass=ProductMeta):
     @classmethod
     def enumerate(cls) -> tp.Iterable:
-        for args in it.product(*cls._elements(cls.fields, _id)):
+        for args in it.product(*cls._elements(dc.fields(cls), _field_type)):
             yield cls(*args)
 
     @property
@@ -140,10 +136,7 @@ class BoundMeta(type):
         elif isinstance(idx, tp.Iterable):
             idx = tuple(idx)
             for t in idx:
-                if isinstance(t, _CONSTANT_TYPES):
-                    #TODO should wrap in some sort of thing
-                    pass
-                elif not _issubclass(t, _FIELD_TYPES):
+                if not _issubclass(t, _FIELD_TYPES):
                     raise TypeError(t)
         else:
             raise TypeError(idx)
@@ -176,7 +169,7 @@ class BoundMeta(type):
 
 class Sum(ISABuilder, metaclass=BoundMeta):
     def __init__(self, value):
-        if type(value) not in type(self).fields and value not in type(self).fields:
+        if type(value) not in type(self).fields:
             raise TypeError('Value {} is not of types {}'.format(value, type(self).fields))
         self._value = value
 
@@ -198,11 +191,8 @@ class Sum(ISABuilder, metaclass=BoundMeta):
 
     @classmethod
     def enumerate(cls) -> tp.Iterable:
-        for val in it.chain(*cls._elements(cls.fields, _id)):
+        for val in it.chain(*cls._elements(cls.fields, lambda elem : elem)):
             yield cls(val)
-
-    def __repr__(self) -> str:
-        return f'{type(self)}({self.value})'
 
 def is_sum(sum) -> bool:
     return isinstance(sum, Sum)
@@ -244,7 +234,7 @@ class Tuple(ISABuilder, metaclass=BoundMeta):
 
     @classmethod
     def enumerate(cls) -> tp.Iterable:
-        for args in it.product(*cls._elements(cls.fields, _id)):
+        for args in it.product(*cls._elements(cls.fields, lambda x : x)):
             yield cls(*args)
 
 class Enum(ISABuilder, pyEnum):

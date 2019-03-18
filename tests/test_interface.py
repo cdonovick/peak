@@ -26,4 +26,5 @@ def test_outputs():
 def test_isa():
     assert hasattr(PE.__call__,"_peak_isa_")
     isa = PE.__call__._peak_isa_
-    assert isa == ("inst",Inst)
+    assert "inst" in isa
+    assert isa["inst"] == Inst
