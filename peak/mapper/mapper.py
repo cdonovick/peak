@@ -37,6 +37,7 @@ def gen_mapping(
         max_mappings : int,
         *,
         solver_name : str = 'z3',
+        constraints = []
         ):
 
     peak_inst = peak_class(SMTBitVector.get_family())
@@ -78,14 +79,22 @@ def gen_mapping(
     for bi,binding in enumerate(bindings):
         binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
         name_binding = {k : v if v is not None else 0 for v,k in binding}
+        
         #print(f"binding {bi+1}/{len(bindings)}")
         for ii,inst in enumerate(isa.enumerate()):
+
+            #skip if inst does not conform to constraints
+            is_valid = [constraint(inst) for constraint in constraints]
+            if not all(is_valid):
+                continue
+
             #TODO this is to handle calls to BFloat
             try:
                 rvals = peak_inst(inst, **binding_dict)
             except:
                 continue
 
+            rvals = smt_alu(inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 

@@ -1,9 +1,8 @@
-from peak.alu import *
+from peak.alu import ALU, Inst, ALUOP
 from hwtypes import BitVector
 
-alu = ALU(BitVector.get_family())
+alu = ALU(BitVector.get_family(),width=16)
 Data = alu.Data
-
 
 def test_add():
     inst = Inst(ALUOP.Add)
