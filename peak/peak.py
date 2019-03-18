@@ -1,24 +1,22 @@
 from collections import OrderedDict
-from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit
+from hwtypes import AbstractBitVector, AbstractBit
 import functools
 from .adt import ISABuilder
 
 class Peak:
-    def __init__(self,family: TypeFamily, datawidth=16):
-        self.Bit = family.Bit
-        self.Data = family.BitVector[datawidth]
-        self.Signed = family.Signed
-        self.BitVector = family.BitVector
+    pass
+
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
     The output types will be stored in fn._peak_outputs__
     The input types will be stored in fn._peak_inputs_
-    The ISA will be stored in fn._peak_isa_
     Will verify that all the inputs have type annotations
     Will also verify that the outputs of running fn will have the correct number of bits
     """
+
     def decorator(call_fn):
+        
         @functools.wraps(call_fn)
         def call_wrapper(*args,**kwargs):
             results = call_fn(*args,**kwargs)
@@ -26,10 +24,8 @@ def name_outputs(**outputs):
             if single_output:
                 results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
-                #Only checking if it is a BitVector
-                if isinstance(otype,BitVector) or isinstance(otype,Bit):
-                    if not isinstance(results[i], otype):
-                        raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
+                if not isinstance(results[i], otype):
+                    raise TypeError(f"result type {type(results[i])} did not match expected type {otype}")
             if single_output:
                 results = results[0]
             return results
@@ -60,7 +56,7 @@ def name_outputs(**outputs):
             raise TypeError("Need to pass peak ISA instruction to __call__")
         if len(isa) > 1:
             raise NotImplementedError("Can only pass in single instruction")
-        call_wrapper._peak_isa_ = isa[0]
+        call_wrapper._peak_isa_ = {isa[0][0]:isa[0][1]}
         return call_wrapper
     return decorator
 
