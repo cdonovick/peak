@@ -81,7 +81,9 @@ def gen_mapping(
         name_binding = {k : v if v is not None else 0 for v,k in binding}
         
         #print(f"binding {bi+1}/{len(bindings)}")
+        #len_isa = len(isa.enumerate())
         for ii,inst in enumerate(isa.enumerate()):
+            #print(f"inst {ii+1}/{len_isa}")
 
             #skip if inst does not conform to constraints
             is_valid = [constraint(inst) for constraint in constraints]
@@ -94,7 +96,6 @@ def gen_mapping(
             except:
                 continue
 
-            rvals = smt_alu(inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 

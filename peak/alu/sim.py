@@ -6,7 +6,7 @@ from hwtypes import TypeFamily, BitVector
 Data = BitVector[16]
 
 class ALU(Peak):
-    def __init__(self, family : TypeFamily, width):
+    def __init__(self, family : TypeFamily, width=16):
         super().__init__(family,width)
     
     def alu(self,op : ALUOP, a : Data, b : Data):
