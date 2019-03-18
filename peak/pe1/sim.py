@@ -97,14 +97,15 @@ class PE(Peak):
     def __init__(self):
         # Declare PE state
 
+        family = Data.get_family()
         # Data registers
-        self.rega = gen_register_mode(Data)()
-        self.regb = gen_register_mode(Data)()
+        self.rega = gen_register_mode(family, Data)()
+        self.regb = gen_register_mode(family, Data)()
 
         # Bit Registers
-        self.regd = gen_register_mode(Bit)()
-        self.rege = gen_register_mode(Bit)()
-        self.regf = gen_register_mode(Bit)()
+        self.regd = gen_register_mode(family, Bit)()
+        self.rege = gen_register_mode(family, Bit)()
+        self.regf = gen_register_mode(family, Bit)()
 
     @name_outputs(alu_res=Data,res_p=Bit,irq=Bit)
     def __call__(self, inst: Inst, \
