@@ -223,7 +223,11 @@ class SMTBitVector(ht.AbstractBitVector):
             self._value = smt.Ite(value.value, smt.BVOne(self.size), smt.BVZero(self.size))
 
         elif isinstance(value, tp.Sequence):
-            raise NotImplementedError()
+            if len(value) != self.size:
+                raise ValueError('Iterable is not the correct size')
+            cls = type(self)
+            B1 = cls.unsized_t[1]
+            self._value = ft.reduce(cls.concat, map(B1, reversed(value))).value
         elif isinstance(value, int):
             self._value =  smt.BV(value, self.size)
 
@@ -312,18 +316,6 @@ class SMTBitVector(ht.AbstractBitVector):
 
     @classmethod
     def concat(cls, x, y):
-        if isinstance(x, SMTBitVector) and isinstance(y, SMTBitVector):
-            if x.solver is not y.solver:
-                raise ValueError('x and y bound to different solvers')
-            solver = x.solver
-        elif isinstance(x, SMTBitVector):
-            solver = x.solver
-            y = SMTBitVector(solver, y)
-        elif isinstance(y, SMTBitVector):
-            solver = y.solver
-            x = SMTBitVector(solver, x)
-        else:
-            raise ValueError('x or y must be an SMTBitVector')
         return cls.unsized_t[x.size + y.size](smt.BVConcat(x.value, y.value))
 
     def bvnot(self):
