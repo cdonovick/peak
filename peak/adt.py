@@ -41,6 +41,7 @@ def _field_type(field : dc.Field) -> type:
         return eval(t)
     else:
         return t
+
 def _id(x) : return x
 
 _CONSTANT_TYPES = (bool, AbstractBit, int, AbstractBitVector)
