@@ -127,5 +127,5 @@ class Control(Sum[Jump, Call, Return]): pass
 
 
 @bitfield(14)
-class Inst(Sum[Logic, Arith, Memory, Control]): pass
+class Inst(Sum[Logic, Arith, Memory, Control, Word]): pass
 
