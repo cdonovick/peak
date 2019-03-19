@@ -160,8 +160,6 @@ def generate_assembler(isa : ISABuilder):
         return _bv(isa)
     elif isinstance(isa, AbstractBit):
         return _bv_const(isa)
-    elif isinstance(isa, int):
-        return _bv(BitVector(isa))
     else:
         raise TypeError(isa)
 
