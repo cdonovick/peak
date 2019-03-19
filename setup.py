@@ -15,6 +15,7 @@ setup(
     install_requires=[
         "hwtypes >= 1.0.1",
         "pysmt",
+        "magma-lang",
         "coreir",
     ],
     python_requires='>=3.7.2'
