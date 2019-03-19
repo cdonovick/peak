@@ -34,7 +34,7 @@ def name_outputs(**outputs):
         #Set all the outputs
         call_wrapper._peak_outputs_ = OrderedDict()
         for oname,otype in outputs.items():
-            if not issubclass(otype, (AbstractBitVector, AbstractBit, m.Type)):
+            if not issubclass(otype, (AbstractBitVector, AbstractBit, m.t.Type)):
                 raise TypeError(f"{oname} is not a Bitvector class or Magma type")
             call_wrapper._peak_outputs_[oname] = otype
 
