@@ -94,7 +94,6 @@ def gen_mapping(
             
             #TODO this is to handle calls to BFloat
             rvals = peak_inst(inst, **binding_dict)
-            assert 0
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 
