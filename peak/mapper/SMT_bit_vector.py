@@ -227,7 +227,7 @@ class SMTBitVector(ht.AbstractBitVector):
                 raise ValueError('Iterable is not the correct size')
             cls = type(self)
             B1 = cls.unsized_t[1]
-            self._value = ft.reduce(cls.concat, map(B1, reversed(value)))
+            self._value = ft.reduce(cls.concat, map(B1, reversed(value))).value
         elif isinstance(value, int):
             self._value =  smt.BV(value, self.size)
 
