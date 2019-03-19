@@ -157,7 +157,7 @@ def generate_assembler(isa : ISABuilder):
     elif isinstance(isa, AbstractBitVector):
         return _bv_const(isa)
     elif _issubclass(isa, AbstractBit):
-        return _bv(isa)
+        return _bv_field(isa)
     elif isinstance(isa, AbstractBit):
         return _bv_const(isa)
     else:
