@@ -1,5 +1,6 @@
 from .peak import Peak
 from hwtypes import BitVector
+import magma as m
 
 
 def gen_register(family, T, init=0):
@@ -13,4 +14,7 @@ def gen_register(family, T, init=0):
                 assert value is not None
                 self.value = value
             return retvalue
+
+    if family.Bit is m.Bit:
+        Register = m.circuit.sequential(Register)
     return Register
