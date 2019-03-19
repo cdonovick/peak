@@ -30,7 +30,7 @@ def _convert_io_types(peak_io):
     return width_map
 
 def gen_mapping(
-        peak_class : Peak,
+        peak_class : Peak, #This has to be the SMTBitvector version of the peak class
         isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
@@ -40,7 +40,7 @@ def gen_mapping(
         constraints = []
         ):
 
-    peak_inst = peak_class(SMTBitVector.get_family())
+    peak_inst = peak_class()
     
     peak_inputs = _convert_io_types(peak_class.__call__._peak_inputs_)
     peak_outputs = _convert_io_types(peak_class.__call__._peak_outputs_)
