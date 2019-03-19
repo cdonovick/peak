@@ -28,29 +28,15 @@ def get_width(isa : ISABuilder):
         raise TypeError(isa)
 
 
-def generate_encoder_decoder_stupid(isa : ISABuilder):
-    w = len(list(isa.enumerate()))
-    encoding = {}
-    decoding = {}
-    for idx, inst in enumerate(isa.enumerate()):
-        idx = BitVector[w](idx)
-        encoding[inst] = idx
-        decoding[idx]  = inst
-
-
-    def encode(inst):
-        return encoding[inst]
-    def decode(bv):
-        return decoding[bv]
-
-    return encode, decode, w
 
 
 def _enum(isa : Enum):
     encoding = {}
     decoding = {}
+    layout = {}
     w = get_width(isa)
     for inst in isa:
+        layout[inst] = (0, w, None)
         opcode = BitVector[w](inst.value)
         encoding[inst] = opcode
         decoding[opcode]  = inst
@@ -60,61 +46,55 @@ def _enum(isa : Enum):
     def decode(bv):
         return decoding[bv]
 
-    return encode, decode, w
+    return encode, decode, w, layout
 
 def _product(isa : Product):
-    encoding = OrderedDict()
-    decoding = OrderedDict()
-    fields_range = OrderedDict()
+    encoding = dict()
+    decoding = dict()
+    layout = dict()
 
     width = get_width(isa)
 
     base = 0
-    for idx,field in enumerate(isa.fields):
-        e, d, w = generate_encoder_decoder(field)
-        encoding[idx] = e
-        decoding[idx] = d
-        fields_range[idx] = (base, base+w)
+    for name,field in isa._fields_dict.items():
+        e, d, w, l = generate_encoder_decoder(field)
+        encoding[name] = e
+        decoding[name] = d
+        layout[name] = (base, base+w, l)
         base += w
 
     assert base == width
 
     def encode(inst):
-        t = inst.value
         opcode = BitVector[width](0)
-        base = 0
-        for idx,v in enumerate(t):
-            assert fields_range[idx][0] == base, (idx, base, fields_range[idx])
-            v = BitVector[width](encoding[idx](v))
-            opcode |= v << base
-            base += fields_range[idx][1] - fields_range[idx][0]
-        assert base == width
+        for name,v in inst._as_dict().items():
+            v = BitVector[width](encoding[name](v))
+            opcode |= v << layout[name][0]
         return opcode
 
     def decode(opcode):
         args = []
-        idx_ = -1
-        for idx,d in decoding.items():
-            assert idx > idx_
-            base, top = fields_range[idx]
+        for name,d in decoding.items():
+            base, top, _ = layout[name]
             args.append(d(opcode[base:top]))
-            idx_ = idx
         return isa(*args)
 
-    return encode, decode, width
+    return encode, decode, width, layout
 
 def _sum(isa : Sum):
     encoding = {}
     decoding = {}
+    layout = {}
     width = get_width(isa)
     tag_width = len(isa.fields).bit_length()
 
     for tag, field in enumerate(isa.fields):
         tag = BitVector[tag_width](tag)
-        e, d, w = generate_encoder_decoder(field)
+        e, d, w, l = generate_encoder_decoder(field)
         assert tag_width + w <= width
         encoding[field] = tag, e,
         decoding[tag] = d, w
+        layout[field] = (tag_width, tag_width+w, l)
 
     def encode(inst):
         opcode = BitVector[width](0)
@@ -133,14 +113,14 @@ def _sum(isa : Sum):
         d, w = decoding[tag]
         return isa(d(opcode[tag_width:tag_width + w]))
 
-    return encode, decode, width
+    return encode, decode, width, layout
 
 def _bv(isa : AbstractBitVector):
     def encode(inst):
         return inst
-    def decode(inst):
-        return inst
-    return encode, decode, get_width(isa)
+    def decode(opcode):
+        return isa(opcode)
+    return encode, decode, get_width(isa), None
 
 
 def generate_encoder_decoder(isa : ISABuilder):
