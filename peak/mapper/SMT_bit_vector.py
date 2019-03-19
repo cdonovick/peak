@@ -223,7 +223,11 @@ class SMTBitVector(ht.AbstractBitVector):
             self._value = smt.Ite(value.value, smt.BVOne(self.size), smt.BVZero(self.size))
 
         elif isinstance(value, tp.Sequence):
-            raise NotImplementedError()
+            if len(value) != self.size:
+                raise ValueError('Iterable is not the correct size')
+            cls = type(self)
+            B1 = cls.unsized_t[1]
+            self._value = ft.reduce(cls.concat, map(B1, reversed(value)))
         elif isinstance(value, int):
             self._value =  smt.BV(value, self.size)
 
