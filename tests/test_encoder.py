@@ -15,10 +15,24 @@ def test_encoder_decoder(isa):
         assert isinstance(opcode, BitVector[width])
         assert decoder(opcode) == inst
 
+        if isinstance(isa, Product):
+            for name,field in isa._fields_dict.items():
+                e,d,w,l = generate_encoder_decoder(field)
+                assert l == layout[name][2]
+                sub_opcode = opcode[layout[name][0] : layout[name][1]]
+                assert sub_opcode.size <= w
+                assert isinstance(d(sub_opcode), field)
+        elif isinstance(isa, Sum):
+            for field in isa.fields:
+                e,d,w,l = generate_encoder_decoder(field)
+                assert l == layout[field][2]
+                sub_opcode = opcode[layout[field][0] : layout[field][1]]
+                assert sub_opcode.size <= w
+                assert isinstance(d(sub_opcode), field)
+
     if isinstance(isa, Product):
         for name,field in isa._fields_dict.items():
             e,d,w,l = generate_encoder_decoder(field)
-            assert l == layout[name][2]
             for inst in field.enumerate():
                 opcode = e(inst)
                 assert isinstance(opcode, BitVector[w])
@@ -26,7 +40,6 @@ def test_encoder_decoder(isa):
     elif isinstance(isa, Sum):
         for field in isa.fields:
             e,d,w,l = generate_encoder_decoder(field)
-            assert l == layout[field][2]
             for inst in field.enumerate():
                 opcode = e(inst)
                 assert isinstance(opcode, BitVector[w])
