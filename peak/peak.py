@@ -2,6 +2,7 @@ from collections import OrderedDict
 from hwtypes import AbstractBitVector, AbstractBit
 import functools
 from .adt import ISABuilder
+import magma as m
 
 class Peak:
     pass
@@ -33,8 +34,8 @@ def name_outputs(**outputs):
         #Set all the outputs
         call_wrapper._peak_outputs_ = OrderedDict()
         for oname,otype in outputs.items():
-            if not issubclass(otype, (AbstractBitVector, AbstractBit)):
-                raise TypeError(f"{oname} is not a Bitvector class")
+            if not issubclass(otype, (AbstractBitVector, AbstractBit, m.Type)):
+                raise TypeError(f"{oname} is not a Bitvector class or Magma type")
             call_wrapper._peak_outputs_[oname] = otype
 
         #set all the inputs
