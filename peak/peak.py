@@ -44,8 +44,12 @@ def name_outputs(**outputs):
         num_inputs = call_fn.__code__.co_argcount
         input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
         in_types = call_fn.__annotations__
-        if set(input_names) != set(in_types.keys()):
-            raise TypeError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_types)}")
+        in_type_keys = set(in_types.keys())
+        # Remove return annotation if it exists
+        if "return" in in_type_keys:
+            in_type_keys.remove("return")
+        if set(input_names) != set(in_type_keys):
+            raise TypeError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_type_keys)}")
         isa = []
         for name in input_names:
             input_type= in_types[name]
