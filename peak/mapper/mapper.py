@@ -76,26 +76,25 @@ def gen_mapping(
     found = 0
     if found >= max_mappings:
         return
-    for bi,binding in enumerate(bindings):
-        binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
-        name_binding = {k : v if v is not None else 0 for v,k in binding}
+    def f_fun(inst):
+        return all(constraint(inst) for constraint in constraints)
+
+    isa_list = list(filter(f_fun, isa.enumerate()))
+    isa_len = len(isa_list)
+
+    for ii,inst in enumerate(isa_list):
+        #print(f"inst {ii+1}/{isa_len}")
+        #print(inst)
+ 
+        for bi,binding in enumerate(bindings):
+            binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
+            name_binding = {k : v if v is not None else 0 for v,k in binding}
         
-        #print(f"binding {bi+1}/{len(bindings)}")
-        #len_isa = len(isa.enumerate())
-        for ii,inst in enumerate(isa.enumerate()):
-            #print(f"inst {ii+1}/{len_isa}")
-
-            #skip if inst does not conform to constraints
-            is_valid = [constraint(inst) for constraint in constraints]
-            if not all(is_valid):
-                continue
-
+            #print(f"binding {bi+1}/{len(bindings)}")
+            
             #TODO this is to handle calls to BFloat
-            try:
-                rvals = peak_inst(inst, **binding_dict)
-            except:
-                continue
-
+            rvals = peak_inst(inst, **binding_dict)
+            assert 0
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 
@@ -103,6 +102,7 @@ def gen_mapping(
                 if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
                     with smt.Solver(solver_name, logic=QF_BV) as solver:
                         expr = bv != core_smt_expr
+                        #print(expr)
                         solver.add_assertion(expr.value)
                         if not solver.solve():
                             #Create output and input map
