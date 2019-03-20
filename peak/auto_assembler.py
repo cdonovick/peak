@@ -4,6 +4,8 @@ from collections import OrderedDict
 from functools import reduce
 from hwtypes import AbstractBitVector, BitVector, AbstractBit, Bit
 import operator
+import ast
+import magma as m
 
 def _issubclass(sub , parent : type) -> bool:
     try:
@@ -32,6 +34,8 @@ def get_width(isa : ISABuilder):
         return  max(map(get_width, isa.fields)) + len(isa.fields).bit_length()
     elif _issubclass(isa, AbstractBitVector):
         return isa.size
+    elif _issubclass(isa, AbstractBit) or isinstance(isa, AbstractBit):
+        return 1
     elif isinstance(isa, AbstractBitVector):
         return isa.size
     elif isinstance(isa, int):
@@ -154,6 +158,42 @@ def generate_assembler(isa : ISABuilder):
         return _bv_field(isa)
     elif isinstance(isa, AbstractBitVector):
         return _bv_const(isa)
+    elif _issubclass(isa, AbstractBit):
+        return _bv_field(isa)
+    elif isinstance(isa, AbstractBit):
+        return _bv_const(isa)
     else:
-        raise TypeError()
+        raise TypeError(isa)
 
+
+class ISABuilderAssembler(ast.NodeTransformer):
+    def __init__(self, _locals, _globals):
+        self._locals = _locals
+        self._globals = _globals
+
+    def visit_Attribute(self, node):
+        if isinstance(node.ctx, ast.Load):
+            try:
+                value = eval(compile(ast.Expression(node.value),
+                                     filename="<ast>", mode="eval"),
+                             self._locals, self._globals)
+                if getattr(value, "_is_magma_enum", False):
+                    return ast.Call(
+                        ast.Name("assemble", ast.Load()),
+                        [node], []
+                    )
+            except NameError:
+                pass
+        return node
+
+
+def assemble_values_in_func(assembler, peak_fn, _locals, _globals):
+    func_def = m.ast_utils.get_ast(peak_fn).body[0]
+    func_def = ISABuilderAssembler(_locals, _globals).visit(func_def)
+    # Uncomment to see result of AST rewrite
+    # import astor
+    # print(astor.to_source(func_def))
+    func_def = ast.fix_missing_locations(func_def)
+    exec(compile(ast.Module([func_def]), filename="<ast>", mode="exec"),
+         _locals, _globals)
+    return _locals[peak_fn.__name__]
