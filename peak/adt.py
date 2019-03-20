@@ -76,6 +76,7 @@ class ProductMeta(type):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         cls = dc.dataclass(eq=True, frozen=True)(cls)
         _fields = []
+        _fields_dict = {}
         for field in dc.fields(cls):
             t = _field_type(field)
             if field.default is not dc.MISSING and not isinstance(field.default, t):
@@ -85,14 +86,15 @@ class ProductMeta(type):
             if not _issubclass(t, _FIELD_TYPES) and not isinstance(t, _FIELD_TYPES):
                 raise TypeError('Unsupported Field type: {}'.format(t))
             _fields.append(t)
+            _fields_dict[field.name] = t
 
         cls._fields = tuple(_fields)
+        cls._fields_dict = _fields_dict
         return cls
 
     @property
     def fields(cls):
         return cls._fields
-
 
 class Product(ISABuilder, metaclass=ProductMeta):
     @classmethod
@@ -103,6 +105,12 @@ class Product(ISABuilder, metaclass=ProductMeta):
     @property
     def value(self):
         return dc.astuple(self)
+
+    def _as_dict(self):
+        d = {}
+        for n in self._fields_dict:
+            d[n] = getattr(self, n)
+        return d
 
 def is_product(product) -> bool:
     return isinstance(product, Product)
