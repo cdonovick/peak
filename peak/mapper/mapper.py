@@ -36,6 +36,7 @@ def gen_mapping(
         coreir_model : tp.Callable,
         max_mappings : int,
         *,
+        verbose : bool = False,
         solver_name : str = 'z3',
         constraints = []
         ):
@@ -83,14 +84,15 @@ def gen_mapping(
     isa_len = len(isa_list)
 
     for ii,inst in enumerate(isa_list):
-        #print(f"inst {ii+1}/{isa_len}")
-        #print(inst)
+        if verbose:
+            print(f"inst {ii+1}/{isa_len}")
+            print(inst)
  
         for bi,binding in enumerate(bindings):
             binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
             name_binding = {k : v if v is not None else 0 for v,k in binding}
-        
-            #print(f"binding {bi+1}/{len(bindings)}")
+            if verbose:
+                print(f"binding {bi+1}/{len(bindings)}")
             
             #TODO this is to handle calls to BFloat
             rvals = peak_inst(inst, **binding_dict)
@@ -101,7 +103,6 @@ def gen_mapping(
                 if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
                     with smt.Solver(solver_name, logic=QF_BV) as solver:
                         expr = bv != core_smt_expr
-                        #print(expr)
                         solver.add_assertion(expr.value)
                         if not solver.solve():
                             #Create output and input map
