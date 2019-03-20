@@ -1,6 +1,6 @@
 from hwtypes import BitVector, SIntVector
 from peak import Peak
-from .mode import RegisterMode
+from .mode import gen_register_mode
 from .cond import cond
 from .lut import lut
 from .isa import *
@@ -10,13 +10,14 @@ def gen_pe(num_inputs):
     class PE(Peak):
 
         def __init__(self):
+            family = Data.get_family()
             # Data registers
-            self.data = [(RegisterMode(Data)) for i in range(num_inputs)]
+            self.data = [(gen_register_mode(family, Data)()) for i in range(num_inputs)]
 
             # Bit Registers
-            self.bit0 = RegisterMode(Bit)
-            self.bit1 = RegisterMode(Bit)
-            self.bit2 = RegisterMode(Bit)
+            self.bit0 = gen_register_mode(family, Bit)()
+            self.bit1 = gen_register_mode(family, Bit)()
+            self.bit2 = gen_register_mode(family, Bit)()
 
         def __call__(self, inst: Inst, \
                         data, \

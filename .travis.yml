@@ -29,6 +29,7 @@ before_install:
 install:
 - pip install pytest-cov
 - pip install git+git://github.com/phanrahan/magma@lassen#egg=magma
+- pip install git+git://github.com/leonardt/Pyverilog.git#egg=pyverilog
 - pip install -e .
 script:
 - py.test --cov=peak tests/

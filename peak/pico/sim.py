@@ -1,6 +1,6 @@
 from hwtypes import BitVector, overflow
 from .isa import *
-from .. import Peak, Register, RAM, ROM
+from .. import Peak, gen_register, RAM, ROM
 
 LR = Reg4(15)
 ZERO = Bit(0)
@@ -67,14 +67,15 @@ def cond(code, Z, N, C, V):
 class Pico(Peak):
 
     def __init__(self, mem):
-        self.mem = ROM(Word, 256, mem, Word(0))
+        family = Bit.get_family()
+        self.mem = ROM(Inst, 256, mem, Word(0))
 
         self.reg = RAM(Word, 16, [Word(0) for i in range(16)])
-        self.PC = Register(Word, Word(0))
-        self.Z = Register(Bit,ZERO)
-        self.N = Register(Bit,ZERO)
-        self.C = Register(Bit,ZERO)
-        self.V = Register(Bit,ZERO)
+        self.PC = gen_register(family, Word, Word(0))()
+        self.Z = gen_register(family, Bit, ZERO)()
+        self.N = gen_register(family, Bit, ZERO)()
+        self.C = gen_register(family, Bit, ZERO)()
+        self.V = gen_register(family, Bit, ZERO)()
 
     def __call__(self):
         pc = self.PC()
