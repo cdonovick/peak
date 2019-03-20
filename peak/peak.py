@@ -22,10 +22,8 @@ def name_outputs(**outputs):
             if single_output:
                 results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
-                #Only checking if it is a BitVector
-                if isinstance(otype,BitVector) or isinstance(otype,Bit):
-                    if not isinstance(results[i], otype):
-                        raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
+                if not isinstance(results[i], otype):
+                    raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
             if single_output:
                 results = results[0]
             return results

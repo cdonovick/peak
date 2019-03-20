@@ -94,7 +94,6 @@ def gen_mapping(
             if verbose:
                 print(f"binding {bi+1}/{len(bindings)}")
             
-            #TODO this is to handle calls to BFloat
             rvals = peak_inst(inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,
