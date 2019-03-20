@@ -1,7 +1,7 @@
 import typing as tp
 import itertools as it
 import functools as ft
-
+from ..peak import Peak
 import coreir
 
 from hwtypes import AbstractBitVector
@@ -12,14 +12,12 @@ from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
-
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
     nd = {}
     for k,v in d.items():
         nd.setdefault(v, []).append(k)
 
     return nd
-
 
 def _convert_io_types(peak_io):
     width_map = {}
@@ -32,25 +30,22 @@ def _convert_io_types(peak_io):
     return width_map
 
 def gen_mapping(
-        peak_component_generator : tp.Callable[[tp.Type[AbstractBitVector]], tp.Callable],
+        peak_class : Peak,
         isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
         *,
+        verbose : bool = False,
         solver_name : str = 'z3',
+        constraints = []
         ):
 
-    smt_alu = peak_component_generator(SMTBitVector.get_family())
-    #smt_alu, peak_inputs, peak_outputs = peak_component_generator(SMTBitVector.get_family())
-    if isinstance(smt_alu,tuple):
-        smt_alu, peak_inputs, peak_outputs = smt_alu
-    else:
-        if not hasattr(smt_alu, "_peak_inputs_"):
-            raise ValueError("Need to wrap __call__ with @name_outputs")
-        peak_inputs = _convert_io_types(smt_alu._peak_inputs_)
-        peak_outputs = _convert_io_types(smt_alu._peak_outputs_)
-
+    peak_inst = peak_class() #This cannot take any args
+    
+    peak_inputs = _convert_io_types(peak_class.__call__._peak_inputs_)
+    peak_outputs = _convert_io_types(peak_class.__call__._peak_outputs_)
+    
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
     core_smt_vars = {k : SMTBitVector[v]() for k,v in core_inputs.items()}
@@ -82,11 +77,24 @@ def gen_mapping(
     found = 0
     if found >= max_mappings:
         return
-    for binding in bindings:
-        binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
-        name_binding = {k : v if v is not None else 0 for v,k in binding}
-        for inst in isa.enumerate():
-            rvals = smt_alu(inst, **binding_dict)
+    def f_fun(inst):
+        return all(constraint(inst) for constraint in constraints)
+
+    isa_list = list(filter(f_fun, isa.enumerate()))
+    isa_len = len(isa_list)
+
+    for ii,inst in enumerate(isa_list):
+        if verbose:
+            print(f"inst {ii+1}/{isa_len}")
+            print(inst)
+ 
+        for bi,binding in enumerate(bindings):
+            binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
+            name_binding = {k : v if v is not None else 0 for v,k in binding}
+            if verbose:
+                print(f"binding {bi+1}/{len(bindings)}")
+            
+            rvals = peak_inst(inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 
@@ -97,13 +105,14 @@ def gen_mapping(
                         solver.add_assertion(expr.value)
                         if not solver.solve():
                             #Create output and input map
-                            output_map = {"out":list(smt_alu._peak_outputs_.items())[idx][0]}
+                            output_map = {"out":list(peak_class.__call__._peak_outputs_.items())[idx][0]}
                             input_map = {}
                             for k,v in name_binding.items():
                                 if v == 0:
-                                    v = "Constant 0"
+                                    v = "0"
                                 elif v == "in_":
                                     v = "in"
+                                input_map[v] = k
 
                             mapping = dict(
                                 instruction=inst,
