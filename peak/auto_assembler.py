@@ -34,6 +34,8 @@ def get_width(isa : ISABuilder):
         return  max(map(get_width, isa.fields)) + len(isa.fields).bit_length()
     elif _issubclass(isa, AbstractBitVector):
         return isa.size
+    elif _issubclass(isa, AbstractBit) or isinstance(isa, AbstractBit):
+        return 1
     elif isinstance(isa, AbstractBitVector):
         return isa.size
     elif isinstance(isa, int):
@@ -156,8 +158,12 @@ def generate_assembler(isa : ISABuilder):
         return _bv_field(isa)
     elif isinstance(isa, AbstractBitVector):
         return _bv_const(isa)
+    elif _issubclass(isa, AbstractBit):
+        return _bv_field(isa)
+    elif isinstance(isa, AbstractBit):
+        return _bv_const(isa)
     else:
-        raise TypeError()
+        raise TypeError(isa)
 
 
 class ISABuilderAssembler(ast.NodeTransformer):
