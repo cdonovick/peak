@@ -1,4 +1,5 @@
 from .adt import Enum, ISABuilder, Product, Sum, Tuple
+from .mapper.SMT_bit_vector import SMTBit, SMTBitVector
 import typing as tp
 from collections import OrderedDict
 from functools import reduce
@@ -12,6 +13,22 @@ def _issubclass(sub , parent : type) -> bool:
         return issubclass(sub, parent)
     except TypeError:
         return False
+
+
+def _as_bv(value, width):
+    if isinstance(value, int):
+        return BitVector[width](value)
+    if isinstance(value, (Bit, BitVector)):
+        return BitVector[width](value)
+    if isinstance(value, (SMTBit)):
+        value = eval(repr(value))
+        assert isinstance(value, bool)
+        value = Bit(value)
+        return BitVector[width](value)
+    if isinstance(value, SMTBitVector):
+        return BitVector[width](int(value))
+    raise NotImplementedError()
+
 
 def get_width(isa : ISABuilder):
     if _issubclass(isa, Enum):
@@ -50,7 +67,7 @@ def _enum(isa : Enum):
     width = get_width(isa)
     for inst in isa:
         layout[inst] = (0, width, None)
-        opcode = BitVector[width](inst.value)
+        opcode = _as_bv(inst.value, width)
         encoding[inst] = opcode
         decoding[opcode]  = inst
 
@@ -81,7 +98,7 @@ def _product(isa : Product):
     def assembler(inst):
         opcode = BitVector[width](0)
         for name,v in inst._as_dict().items():
-            v = BitVector[width](encoding[name](v))
+            v = _as_bv(encoding[name](v), width)
             opcode |= v << layout[name][0]
         return opcode
 
@@ -102,7 +119,7 @@ def _sum(isa : Sum):
     tag_width = len(isa.fields).bit_length()
 
     for tag, field in enumerate(isa.fields):
-        tag = BitVector[tag_width](tag)
+        tag = _as_bv(tag, tag_width)
         e, d, w, l = generate_assembler(field)
         assert tag_width + w <= width
         encoding[field] = tag, e,
