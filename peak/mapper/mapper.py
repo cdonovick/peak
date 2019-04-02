@@ -31,8 +31,8 @@ def _convert_io_types(peak_io):
 
 def gen_mapping(
         peak_class : Peak,
-        bv_isa : tp.Type[BitVector],
-        smt_isa : tp.Type[SMTBitVector],
+        bv_isa : tp.Type[ISABuilder], #This is currently a hack that will be removed.
+        smt_isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
