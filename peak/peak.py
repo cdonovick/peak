@@ -62,4 +62,7 @@ def name_outputs(**outputs):
         return call_wrapper
     return decorator
 
+class PeakNotImplementedError(NotImplementedError):
+    pass
+
 

@@ -1,4 +1,4 @@
-from .. import Peak, name_outputs
+from .. import Peak, name_outputs, PeakNotImplementedError
 import typing as  tp
 from .isa import *
 from hwtypes import TypeFamily
@@ -17,7 +17,7 @@ def gen_alu(family : TypeFamily, width=16):
         elif op == ALUOP.XOr:
             res = a ^ b
         else:
-            raise NotImplementedError(op)
+            raise PeakNotImplementedError(op)
         return res
 
     class ALU(Peak):
