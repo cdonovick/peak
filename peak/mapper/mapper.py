@@ -31,7 +31,8 @@ def _convert_io_types(peak_io):
 
 def gen_mapping(
         peak_class : Peak,
-        isa : tp.Type[ISABuilder],
+        bv_isa : tp.Type[ISABuilder], #This is currently a hack that will be removed.
+        smt_isa : tp.Type[ISABuilder],
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
@@ -79,14 +80,15 @@ def gen_mapping(
         return
     def f_fun(inst):
         return all(constraint(inst) for constraint in constraints)
+    bv_isa_list = list(filter(f_fun, bv_isa.enumerate()))
+    bv_isa_len = len(bv_isa_list)
+    smt_isa_list = list(filter(f_fun, smt_isa.enumerate()))
+    smt_isa_len = len(smt_isa_list)
 
-    isa_list = list(filter(f_fun, isa.enumerate()))
-    isa_len = len(isa_list)
-
-    for ii,inst in enumerate(isa_list):
+    for ii,smt_inst in enumerate(smt_isa_list):
         if verbose:
             print(f"inst {ii+1}/{isa_len}")
-            print(inst)
+            print(smt_inst)
  
         for bi,binding in enumerate(bindings):
             binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
@@ -94,7 +96,7 @@ def gen_mapping(
             if verbose:
                 print(f"binding {bi+1}/{len(bindings)}")
             
-            rvals = peak_inst(inst, **binding_dict)
+            rvals = peak_inst(smt_inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,
 
@@ -115,7 +117,7 @@ def gen_mapping(
                                 input_map[v] = k
 
                             mapping = dict(
-                                instruction=inst,
+                                instruction=bv_isa_list[ii],
                                 output_map=output_map,
                                 input_map=input_map
                             )
