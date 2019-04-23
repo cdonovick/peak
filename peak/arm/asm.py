@@ -61,7 +61,7 @@ def eor(ra, rb, rc=None, shift=0, imm=0, s=0, cond=Cond.Always):
 def b(offset, link=0, cond=Cond.Always):
     offset = Offset(offset)
     link = L(link)
-    return Inst(BaseInst(B(offset,link)),cond)
+    return Inst(BaseInst(B(offset,link, BI(1))),cond)
 
 
 def ldst(Op, ra, rb, rc, shift, imm, cond):

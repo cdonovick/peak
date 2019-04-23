@@ -1,4 +1,4 @@
-from peak.adt import new, Enum, Sum, Product
+from hwtypes.adt import new, Enum, Sum, Product
 from peak.bitfield import bitfield
 
 from hwtypes import BitVector, Bit
@@ -54,8 +54,8 @@ class Cond(Enum):
     Always = 15
 
 class ALU(Product):
-    ra:RegA
-    rb:RegB
+    ra=RegA
+    rb=RegB
 
 class Mov(ALU):
     pass
@@ -90,8 +90,8 @@ class Arith(Sum[Add, Sub, Adc, Sbc]): pass
 
 
 class _Memory(Product):
-    ra:RegA
-    imm:Imm
+    ra  = RegA
+    imm = Imm
 
 class LDLO(_Memory):
     pass
@@ -110,8 +110,8 @@ class Memory(Sum[LDLO, LDHI, LD, ST]): pass
 
 
 class _Control(Product):
-    imm:Imm
-    cond:Cond
+    imm  = Imm
+    cond = Cond
 
 class Jump(_Control):
     pass

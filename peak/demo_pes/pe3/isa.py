@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, Enum
+from hwtypes.adt import Product, Sum, new_instruction, Enum
 
 DATAWIDTH = 16
 
@@ -17,6 +17,6 @@ class INVERTER_INST(Enum):
     Invert = new_instruction()
 
 class INST(Product):
-    ALU      : ALU_INST
-    FLAG     : FLAG_INST
-    INVERTER : INVERTER_INST
+    ALU      = ALU_INST
+    FLAG     = FLAG_INST
+    INVERTER = INVERTER_INST
