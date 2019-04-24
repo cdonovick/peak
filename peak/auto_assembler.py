@@ -18,8 +18,6 @@ def get_width(isa):
     if _issubclass(isa, Enum):
         return _enum(isa)[2]
     elif _issubclass(isa, (Tuple, Product)):
-        print(isa)
-        print(isa.fields)
         return sum(map(get_width, isa.fields))
     elif _issubclass(isa, Sum):
         return  max(map(get_width, isa.fields)) + len(isa.fields).bit_length()
