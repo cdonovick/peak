@@ -168,7 +168,7 @@ def test_determinism():
 
         class Inst(Product):
             alu_op = ALUOP
-        
+
         assembler, disassembler, width, layout =  generate_assembler(Inst)
         add_instr = Inst(ALUOP.Add)
         instr_bv = assembler(add_instr)
