@@ -4,7 +4,7 @@ from peak.demo_pes.pe5.isa import INST as pe5_isa
 from peak.arm.isa import Inst as arm_isa
 from peak.pico.isa import Inst as pico_isa
 from hwtypes import BitVector
-from hwtypes.adt import Product, Sum, Enum
+from hwtypes.adt import Product, Sum, Enum, new_instruction
 import inspect
 import magma as m
 import ast
@@ -156,3 +156,23 @@ def test_ast_rewrite():
 
     # Call the front end to make sure it works
     cond = assemble_values_in_func(assembler, cond, locals(), globals())
+
+def test_determinism():
+    def foo():
+        class ALUOP(Enum):
+            Add = new_instruction()
+            Sub = new_instruction()
+            Or =  new_instruction()
+            And = new_instruction()
+            XOr = new_instruction()
+
+        class Inst(Product):
+            alu_op = ALUOP
+        
+        assembler, disassembler, width, layout =  generate_assembler(Inst)
+        add_instr = Inst(ALUOP.Add)
+        instr_bv = assembler(add_instr)
+        return int(instr_bv)
+    val = foo()
+    for i in range(100):
+        assert val == foo()
