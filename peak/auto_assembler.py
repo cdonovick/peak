@@ -37,7 +37,7 @@ def _enum(isa : Enum):
     decoding = {}
     layout = {}
 
-    free  = set()
+    free  = []
     used  = set()
     i_map = {}
     for inst in isa.enumerate():
@@ -46,7 +46,7 @@ def _enum(isa : Enum):
             i_map[inst] = inst.value
         else:
             assert isinstance(inst.value, EnumMeta.Auto)
-            free.add(inst)
+            free.append(inst)
     c = 0
     while free:
         inst = free.pop()
