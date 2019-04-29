@@ -157,8 +157,24 @@ def test_ast_rewrite():
     # Call the front end to make sure it works
     cond = assemble_values_in_func(assembler, cond, locals(), globals())
 
-def test_determinism():
-    def foo():
+def test_enum_determinism():
+    def assemble():
+        class ALUOP(Enum):
+            Add = new_instruction()
+            Sub = new_instruction()
+            Or =  new_instruction()
+            And = new_instruction()
+            XOr = new_instruction()
+
+        assembler, disassembler, width, layout =  generate_assembler(ALUOP)
+        instr_bv = assembler(ALUOP.Or)
+        return int(instr_bv)
+    val = assemble()
+    for _ in range(100):
+        assert val == assemble()
+
+def test_product_determinism():
+    def assemble():
         class ALUOP(Enum):
             Add = new_instruction()
             Sub = new_instruction()
@@ -167,12 +183,35 @@ def test_determinism():
             XOr = new_instruction()
 
         class Inst(Product):
-            alu_op = ALUOP
+            alu_op1 = ALUOP
+            alu_op2 = ALUOP
 
         assembler, disassembler, width, layout =  generate_assembler(Inst)
-        add_instr = Inst(ALUOP.Add)
+        instr_bv = assembler(Inst(ALUOP.Add, ALUOP.Sub))
+        return int(instr_bv)
+    val = assemble()
+    for _ in range(100):
+        assert val == assemble()
+
+def test_sum_determinism():
+    def assemble():
+        class OP1(Enum):
+            Add = new_instruction()
+            Sub = new_instruction()
+
+        class OP2(Enum):
+            Or =  new_instruction()
+            And = new_instruction()
+            XOr = new_instruction()
+
+
+        class Inst(Sum[OP1, OP2]): pass
+
+        assembler, disassembler, width, layout =  generate_assembler(Inst)
+        add_instr = Inst(OP1.Add)
         instr_bv = assembler(add_instr)
         return int(instr_bv)
-    val = foo()
-    for i in range(100):
-        assert val == foo()
+
+    val = assemble()
+    for _ in range(100):
+        assert val == assemble()
