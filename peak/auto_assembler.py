@@ -37,7 +37,7 @@ def _enum(isa : Enum):
     decoding = {}
     layout = {}
 
-    free  = set()
+    free  = []
     used  = set()
     i_map = {}
     for inst in isa.enumerate():
@@ -46,7 +46,7 @@ def _enum(isa : Enum):
             i_map[inst] = inst.value
         else:
             assert isinstance(inst.value, EnumMeta.Auto)
-            free.add(inst)
+            free.append(inst)
     c = 0
     while free:
         inst = free.pop()
@@ -109,7 +109,7 @@ def _sum(isa : Sum):
     width = get_width(isa)
     tag_width = len(isa.fields).bit_length()
 
-    for tag, field in enumerate(isa.fields):
+    for tag, field in enumerate(sorted(isa.fields, key=lambda field: (field.__name__, field.__module__))):
         tag = BitVector[tag_width](tag)
         e, d, w, l = generate_assembler(field)
         assert tag_width + w <= width
