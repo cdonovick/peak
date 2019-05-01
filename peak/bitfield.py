@@ -1,4 +1,4 @@
-from .adt import Enum, Sum, Product
+from hwtypes.adt import Enum, Sum, Product
 from hwtypes import AbstractBitVector
 
 def bitfield(i):
@@ -15,7 +15,7 @@ def encode(inst, *args):
         word = inst.value << inst.bitfield
     elif isinstance(inst,Product):
         word = 0
-        for key in inst.__annotations__.keys():
+        for key in type(inst).field_dict.keys():
             word |= encode(getattr(inst, key))
     elif isinstance(inst,Sum):
         t = type(inst)

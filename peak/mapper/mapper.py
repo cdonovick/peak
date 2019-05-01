@@ -5,8 +5,9 @@ from ..peak import Peak
 import coreir
 
 from hwtypes import AbstractBitVector
-from ..adt import ISABuilder
 from hwtypes import BitVector, SIntVector
+from hwtypes import is_adt_type
+from hwtypes.adt_meta import BoundMeta
 from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 
 import pysmt.shortcuts as smt
@@ -22,7 +23,7 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
 def _convert_io_types(peak_io):
     width_map = {}
     for name,btype in peak_io.items():
-        if issubclass(btype,ISABuilder):
+        if is_adt_type(btype):
             continue
         #Hack to get bitwidth of a hwtype
         width = 1 if not hasattr(btype,"size") else btype.size
@@ -31,8 +32,8 @@ def _convert_io_types(peak_io):
 
 def gen_mapping(
         peak_class : Peak,
-        bv_isa : tp.Type[ISABuilder], #This is currently a hack that will be removed.
-        smt_isa : tp.Type[ISABuilder],
+        bv_isa : BoundMeta, #This is currently a hack that will be removed.
+        smt_isa : BoundMeta,
         coreir_module : coreir.ModuleDef,
         coreir_model : tp.Callable,
         max_mappings : int,
@@ -43,10 +44,10 @@ def gen_mapping(
         ):
 
     peak_inst = peak_class() #This cannot take any args
-    
+
     peak_inputs = _convert_io_types(peak_class.__call__._peak_inputs_)
     peak_outputs = _convert_io_types(peak_class.__call__._peak_outputs_)
-    
+
     core_inputs = {k if k != 'in' else 'in_' : v.size for k,v in coreir_module.type.items() if v.is_input()}
     core_outputs = {k : v.size for k,v in  coreir_module.type.items() if v.is_output()}
     core_smt_vars = {k : SMTBitVector[v]() for k,v in core_inputs.items()}
@@ -89,13 +90,13 @@ def gen_mapping(
         if verbose:
             print(f"inst {ii+1}/{isa_len}")
             print(smt_inst)
- 
+
         for bi,binding in enumerate(bindings):
             binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
             name_binding = {k : v if v is not None else 0 for v,k in binding}
             if verbose:
                 print(f"binding {bi+1}/{len(bindings)}")
-            
+
             rvals = peak_inst(smt_inst, **binding_dict)
             if not isinstance(rvals, tuple):
                 rvals = rvals,

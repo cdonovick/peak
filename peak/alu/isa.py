@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, Enum
+from hwtypes.adt import Product, Sum, new_instruction, Enum
 from hwtypes import BitVector
 
 Datawidth = 16
@@ -12,4 +12,4 @@ class ALUOP(Enum):
     XOr = new_instruction()
 
 class Inst(Product):
-    alu_op : ALUOP = ALUOP.Add
+    alu_op = ALUOP

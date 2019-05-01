@@ -1,4 +1,4 @@
-from peak.adt import new, Enum, Sum, Product
+from hwtypes.adt import new, Enum, Sum, Product
 from peak.bitfield import bitfield
 from hwtypes import BitVector, Bit
 
@@ -11,15 +11,15 @@ Imm = bitfield(0)(new(BitVector, 8))
 Rotate = bitfield(8)(new(BitVector, 4))
 
 class ImmOperand(Product):
-    imm:Imm
-    rotate:Rotate
+    imm = Imm
+    rotate = Rotate
 
 RegC = bitfield(0)(new(BitVector, 4))
 Shift = bitfield(4)(new(BitVector, 8))
 
 class RegOperand(Product):
-    rc:RegC
-    shift:Shift
+    rc = RegC
+    shift = Shift
 
 @bitfield(25)
 class Operand(Sum[RegOperand, ImmOperand]): pass
@@ -29,10 +29,10 @@ RegB = bitfield(12)(new(BitVector, 4))
 S = bitfield(20)(new(BitVector, 1))
 
 class _Data(Product):
-    ra:RegA
-    rb:RegB
-    rc:Operand
-    s:S
+    ra = RegA
+    rb = RegB
+    rc = Operand
+    s  = S
 
 class AND(_Data):
     pass
@@ -87,9 +87,9 @@ class Data(Sum[AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC,
     TST, TEQ, CMP, CMN, ORR, MOV, BIC, MVN]): pass
 
 class _LDST(Product):
-    ra:RegA
-    rb:RegB
-    rc:Operand
+    ra = RegA
+    rb = RegB
+    rc = Operand
 
 class LDR(_LDST):
     pass
@@ -106,9 +106,9 @@ L = bitfield(24)(new(BitVector, 1))
 BI = bitfield(25)(new(BitVector, 1))
 
 class B(Product):
-    offset:Offset
-    l:L
-    i:BI = BI(1)
+    offset = Offset
+    l      = L
+    i      = BI
 
 @bitfield(28)
 class Cond(Enum):
@@ -134,6 +134,6 @@ class Cond(Enum):
 class BaseInst(Sum[Data, LDST, B]): pass
 
 class Inst(Product):
-    inst:BaseInst
-    cond:Cond
+    inst = BaseInst
+    cond = Cond
 

@@ -1,3 +1,4 @@
+from peak import PeakNotImplementedError
 from peak.alu import gen_alu, Inst, ALUOP
 from hwtypes import BitVector
 
@@ -9,6 +10,18 @@ def test_add():
     inst = Inst(ALUOP.Add)
     assert Data(9) == alu(inst,Data(4), Data(5))
     assert Data(1) == alu(inst,Data(0), Data(1))
+    try:
+        #Need an object that has an alu_op field
+        class A:
+            alu_op = 5
+
+        alu(A,Data(4),Data(5))
+    except PeakNotImplementedError:
+        pass
+    except:
+        print("Did not raise correct error")
+        assert 0
+
 
 if  __name__ == '__main__':
     test_add()
