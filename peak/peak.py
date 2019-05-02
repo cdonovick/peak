@@ -1,7 +1,6 @@
 from collections import OrderedDict
-from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit
+from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type
 import functools
-from .adt import ISABuilder
 
 class Peak:
     pass
@@ -50,7 +49,7 @@ def name_outputs(**outputs):
         isa = []
         for name in input_names:
             input_type= in_types[name]
-            if issubclass(input_type,ISABuilder):
+            if is_adt_type(input_type):
                 isa.append((name,input_type))
                 continue
             call_wrapper._peak_inputs_[name] = in_types[name]

@@ -1,8 +1,9 @@
-from .adt import Enum, ISABuilder, Product, Sum, Tuple
 import typing as tp
 from collections import OrderedDict
 from functools import reduce
 from hwtypes import AbstractBitVector, BitVector, AbstractBit, Bit
+from hwtypes.adt import Enum, Product, Sum, Tuple
+from hwtypes.adt_meta import EnumMeta
 import operator
 import ast
 import magma as m
@@ -14,21 +15,9 @@ def _issubclass(sub , parent : type) -> bool:
     except TypeError:
         return False
 
-def get_width(isa : ISABuilder):
+def get_width(isa):
     if _issubclass(isa, Enum):
-        width = 0
-        for e in map(lambda x : x.value, isa):
-            if isinstance(e, int):
-                width = max(width, e.bit_length())
-            elif isinstance(e, AbstractBitVector):
-                width = max(width, e.size)
-            elif isinstance(e, bool):
-                width = max(width, 1)
-            elif isinstance(e, AbstractBit):
-                width = max(width, 1)
-            else:
-                raise TypeError()
-        return width
+        return _enum(isa)[2]
     elif _issubclass(isa, (Tuple, Product)):
         return sum(map(get_width, isa.fields))
     elif _issubclass(isa, Sum):
@@ -48,10 +37,29 @@ def _enum(isa : Enum):
     encoding = {}
     decoding = {}
     layout = {}
-    width = get_width(isa)
-    for inst in isa:
+
+    free  = []
+    used  = set()
+    i_map = {}
+    for inst in isa.enumerate():
+        if isinstance(inst.value, int):
+            used.add(inst.value)
+            i_map[inst] = inst.value
+        else:
+            assert isinstance(inst.value, EnumMeta.Auto)
+            free.append(inst)
+    c = 0
+    while free:
+        inst = free.pop()
+        while c in used:
+            c += 1
+        used.add(c)
+        i_map[inst] = c
+
+    width = max(used).bit_length()
+    for inst in isa.enumerate():
         layout[inst] = (0, width, None)
-        opcode = BitVector[width](inst.value)
+        opcode = BitVector[width](i_map[inst])
         encoding[inst] = opcode
         decoding[opcode]  = inst
 
@@ -70,7 +78,7 @@ def _product(isa : Product):
     width = get_width(isa)
 
     base = 0
-    for name,field in isa._fields_dict.items():
+    for name,field in isa.field_dict.items():
         e, d, w, l = generate_assembler(field)
         encoding[name] = e
         decoding[name] = d
@@ -81,7 +89,7 @@ def _product(isa : Product):
 
     def assembler(inst):
         opcode = BitVector[width](0)
-        for name,v in inst._as_dict().items():
+        for name,v in inst.value_dict.items():
             v = BitVector[width](encoding[name](v))
             opcode |= v << layout[name][0]
         return opcode
@@ -102,7 +110,7 @@ def _sum(isa : Sum):
     width = get_width(isa)
     tag_width = len(isa.fields).bit_length()
 
-    for tag, field in enumerate(isa.fields):
+    for tag, field in enumerate(sorted(isa.fields, key=lambda field: (field.__name__, field.__module__))):
         tag = BitVector[tag_width](tag)
         e, d, w, l = generate_assembler(field)
         assert tag_width + w <= width
@@ -148,7 +156,7 @@ def _bv_const(isa : AbstractBitVector):
         return T(opcode)
     return assembler, disassembler, get_width(isa), None
 
-def generate_assembler(isa : ISABuilder):
+def generate_assembler(isa):
     if _issubclass(isa, Enum):
         return _enum(isa)
     elif _issubclass(isa, Product):

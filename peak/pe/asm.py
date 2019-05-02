@@ -1,4 +1,4 @@
-from peak import Enum, Product, Tuple
+from hwtypes import Enum, Product, Tuple
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT_t

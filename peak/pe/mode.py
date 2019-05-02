@@ -1,5 +1,5 @@
 from peak import Peak, gen_register
-from peak.adt import Enum
+from hwtypes.adt import Enum
 from .lut import Bit
 from hwtypes import TypeFamily
 

@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, Enum
+from hwtypes.adt import Product, Sum, new_instruction, Enum
 
 DATAWIDTH = 16
 
@@ -9,4 +9,4 @@ class ALU_INST(Enum):
     Shft = new_instruction()
 
 class INST(Product):
-    ALU      : ALU_INST
+    ALU      = ALU_INST

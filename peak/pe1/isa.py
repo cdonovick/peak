@@ -1,4 +1,4 @@
-from peak import Enum, Product
+from hwtypes import Enum, Product
 from .cond import Cond
 from .mode import Mode
 from .lut import Bit, LUT
@@ -50,18 +50,18 @@ class Signed(Enum):
 # Each configuration is given by the following fields
 #
 class Inst(Product):
-    alu:ALU          # ALU operation
-    signed:Signed    # unsigned or signed 
-    lut:LUT          # LUT operation as a 3-bit LUT
-    cond:Cond        # Condition code (see cond.py)
-    rega:RegA_Mode   # RegA mode (see mode.py)
-    data0:RegA_Const # RegA constant (16-bits)
-    regb:RegB_Mode   # RegB mode
-    data1:RegB_Const # RegB constant (16-bits)
-    regd:RegD_Mode   # RegD mode
-    bit0:RegD_Const  # RegD constant (1-bit)
-    rege:RegE_Mode   # RegE mode
-    bit1:RegE_Const  # RegE constant (1-bit)
-    regf:RegF_Mode   # RegF mode
-    bit2:RegF_Const  # RegF constant (1-bit)
+    alu    = ALU        # ALU operation
+    signed = Signed     # unsigned or signed 
+    lut    = LUT        # LUT operation as a 3-bit LUT
+    cond   = Cond       # Condition code (see cond.py)
+    rega   = RegA_Mode  # RegA mode (see mode.py)
+    data0  = RegA_Const # RegA constant (16-bits)
+    regb   = RegB_Mode  # RegB mode
+    data1  = RegB_Const # RegB constant (16-bits)
+    regd   = RegD_Mode  # RegD mode
+    bit0   = RegD_Const # RegD constant (1-bit)
+    rege   = RegE_Mode  # RegE mode
+    bit1   = RegE_Const # RegE constant (1-bit)
+    regf   = RegF_Mode  # RegF mode
+    bit2   = RegF_Const # RegF constant (1-bit)
 

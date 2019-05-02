@@ -1,4 +1,4 @@
-from peak import Enum
+from hwtypes import Enum
 from .lut import Bit
 
 #

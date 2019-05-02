@@ -13,6 +13,7 @@ def test_imm():
     imm = isa.Imm(2)
     assert encode(imm) == 2
 
+@pytest.mark.skip
 def test_jmp():
     inst = asm.jmp(0)
     assert encode(inst) == 0xcf00

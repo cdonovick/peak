@@ -1,10 +1,10 @@
-from peak.adt import Product, Sum, Enum
 from peak.auto_assembler import generate_assembler, ISABuilderAssembler, \
     assemble_values_in_func
 from peak.demo_pes.pe5.isa import INST as pe5_isa
 from peak.arm.isa import Inst as arm_isa
 from peak.pico.isa import Inst as pico_isa
 from hwtypes import BitVector
+from hwtypes.adt import Product, Sum, Enum, new_instruction
 import inspect
 import magma as m
 import ast
@@ -156,3 +156,62 @@ def test_ast_rewrite():
 
     # Call the front end to make sure it works
     cond = assemble_values_in_func(assembler, cond, locals(), globals())
+
+def test_enum_determinism():
+    def assemble():
+        class ALUOP(Enum):
+            Add = new_instruction()
+            Sub = new_instruction()
+            Or =  new_instruction()
+            And = new_instruction()
+            XOr = new_instruction()
+
+        assembler, disassembler, width, layout =  generate_assembler(ALUOP)
+        instr_bv = assembler(ALUOP.Or)
+        return int(instr_bv)
+    val = assemble()
+    for _ in range(100):
+        assert val == assemble()
+
+def test_product_determinism():
+    def assemble():
+        class ALUOP(Enum):
+            Add = new_instruction()
+            Sub = new_instruction()
+            Or =  new_instruction()
+            And = new_instruction()
+            XOr = new_instruction()
+
+        class Inst(Product):
+            alu_op1 = ALUOP
+            alu_op2 = ALUOP
+
+        assembler, disassembler, width, layout =  generate_assembler(Inst)
+        instr_bv = assembler(Inst(ALUOP.Add, ALUOP.Sub))
+        return int(instr_bv)
+    val = assemble()
+    for _ in range(100):
+        assert val == assemble()
+
+def test_sum_determinism():
+    def assemble():
+        class OP1(Enum):
+            Add = new_instruction()
+            Sub = new_instruction()
+
+        class OP2(Enum):
+            Or =  new_instruction()
+            And = new_instruction()
+            XOr = new_instruction()
+
+
+        class Inst(Sum[OP1, OP2]): pass
+
+        assembler, disassembler, width, layout =  generate_assembler(Inst)
+        add_instr = Inst(OP1.Add)
+        instr_bv = assembler(add_instr)
+        return int(instr_bv)
+
+    val = assemble()
+    for _ in range(100):
+        assert val == assemble()

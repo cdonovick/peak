@@ -1,6 +1,6 @@
 from hwtypes import BitVector, Bit
 
-from peak import Enum, Product, Sum, Tuple
+from hwtypes.adt import Enum, Product, Sum, Tuple
 from .mode import Mode
 from .lut import LUT_t
 from .cond import Cond
@@ -23,17 +23,17 @@ Bit1_Mode = Mode
 Bit2_Mode = Mode
 
 class LUT(Product):
-    bit0_mode:Bit0_Mode
-    bit0_const:Bit0_Const
-    bit1_mode:Bit1_Mode
-    bit1_const:Bit1_Const
-    bit2_mode:Bit2_Mode
-    bit2_const:Bit2_Const
-    table:LUT_t
+    bit0_mode=Bit0_Mode
+    bit0_const=Bit0_Const
+    bit1_mode=Bit1_Mode
+    bit1_const=Bit1_Const
+    bit2_mode=Bit2_Mode
+    bit2_const=Bit2_Const
+    table=LUT_t
 
 class _ALU(Product):
-    data_modes  : Tuple[(Data_Mode for _ in range(NUM_INPUTS))]
-    data_consts : Tuple[(Data_Const for _ in range(NUM_INPUTS))]
+    data_modes  = Tuple[(Data_Mode for _ in range(NUM_INPUTS))]
+    data_consts = Tuple[(Data_Const for _ in range(NUM_INPUTS))]
 
 class Add(_ALU):
   # returns res, res_p, C, V
@@ -62,7 +62,7 @@ class XOr(_ALU):
 ALU = Sum[Add, Sub, And, Or, XOr]
 
 class Inst(Product):
-    alu:ALU
-    lut:LUT
-    cond:Cond
+    alu=ALU
+    lut=LUT
+    cond=Cond
 

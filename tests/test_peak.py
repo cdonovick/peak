@@ -1,6 +1,6 @@
 import pytest
 from peak import *
-from peak.adt import new
+from hwtypes.adt import new
 from hwtypes import BitVector
 
 @pytest.mark.parametrize("n", [4])

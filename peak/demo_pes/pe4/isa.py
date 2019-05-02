@@ -1,4 +1,4 @@
-from peak.adt import Product, Sum, new_instruction, Enum
+from hwtypes.adt import Product, Sum, new_instruction, Enum
 
 DATAWIDTH = 16
 
@@ -21,7 +21,7 @@ class BIT_CONSTANT(Enum):
     One  = 1
 
 class INST(Product):
-    ALU      : ALU_INST
-    FLAG     : FLAG_INST
-    INVERTER : INVERTER_INST
-    BIT      : BIT_CONSTANT
+    ALU      = ALU_INST
+    FLAG     = FLAG_INST
+    INVERTER = INVERTER_INST
+    BIT      = BIT_CONSTANT
