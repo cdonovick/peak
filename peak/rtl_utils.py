@@ -1,6 +1,7 @@
 import magma as m
 
 
+@m.cache_definition
 def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
     WrappedIO = []
     for key, value in PE.interface.ports.items():

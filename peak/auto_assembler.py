@@ -7,6 +7,7 @@ import operator
 import ast
 import magma as m
 
+
 def _issubclass(sub , parent : type) -> bool:
     try:
         return issubclass(sub, parent)
