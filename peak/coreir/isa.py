@@ -6,6 +6,10 @@ LOGWIDTH = 5
 Data = BitVector[WIDTH]
 LogData = BitVector[LOGWIDTH]
 
+
+binaryops = ["add","mul","sub","or_","and_","shl","lshr","xor"]
+unaryops
+
 class BinaryOp(Enum):
     add = new_instruction()
     mul = new_instruction()
@@ -15,6 +19,10 @@ class BinaryOp(Enum):
     shl = new_instruction()
     lshr = new_instruction()
     xor = new_instruction()
+
+class BinaryCoreIR(Peak):
+    def __call__(self, inst : Inst, in0 : Data, in1 : Data):
+
 
 class UnaryOp(Enum):
     not_ = new_instruction()
