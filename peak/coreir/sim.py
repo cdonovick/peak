@@ -3,6 +3,8 @@ import typing as tp
 from .isa import *
 from hwtypes import TypeFamily
 
+class CoreIR(Peak):
+    def __call__(self, inst : Inst, in0 : Data, in1 : Data):
 
 def binary_op(inst, in0 : Data, in1 : Data):
     if inst == BinaryOp.add:
@@ -54,10 +56,10 @@ def mask(size):
     return (Data(1)<<size)-Data(1)
 
 class CoreIR(Peak):
-    
+
     def __call__(self, inst : Inst, in0 : Data, in1 : Data):
         kind, inst = inst.match()
-        
+
         res = Data(0)
         res_b = Bit(0)
         if kind==BinaryOp:
