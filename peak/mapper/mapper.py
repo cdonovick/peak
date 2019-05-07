@@ -13,6 +13,10 @@ from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
+def print_if(pred,msg):
+    if pred:
+        print(msg)
+
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
     nd = {}
     for k,v in d.items():
@@ -81,21 +85,23 @@ def gen_mapping(
         return
     def f_fun(inst):
         return all(constraint(inst) for constraint in constraints)
+    print_if(verbose,"Enumerating bv instructions")
     bv_isa_list = list(filter(f_fun, bv_isa.enumerate()))
     bv_isa_len = len(bv_isa_list)
+    print_if(verbose,"Enumerating smt instructions")
     smt_isa_list = list(filter(f_fun, smt_isa.enumerate()))
     smt_isa_len = len(smt_isa_list)
 
+    print_if(verbose,"Starting search")
+
     for ii,smt_inst in enumerate(smt_isa_list):
-        if verbose:
-            print(f"inst {ii+1}/{isa_len}")
-            print(smt_inst)
+        print_if(verbose,f"inst {ii+1}/{bv_isa_len}")
+        print_if(verbose,smt_inst)
 
         for bi,binding in enumerate(bindings):
             binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
             name_binding = {k : v if v is not None else 0 for v,k in binding}
-            if verbose:
-                print(f"binding {bi+1}/{len(bindings)}")
+            #print_if(verbose,f"binding {bi+1}/{len(bindings)}")
 
             rvals = peak_inst(smt_inst, **binding_dict)
             if not isinstance(rvals, tuple):
