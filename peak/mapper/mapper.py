@@ -8,7 +8,7 @@ from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
 from hwtypes.adt_meta import BoundMeta
-from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
+from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
