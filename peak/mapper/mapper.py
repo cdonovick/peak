@@ -1,6 +1,7 @@
 import typing as tp
 import itertools as it
 import functools as ft
+import logging
 from ..peak import Peak
 import coreir
 
@@ -13,9 +14,6 @@ from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
-def print_if(pred,msg):
-    if pred:
-        print(msg)
 
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
     nd = {}
@@ -23,6 +21,7 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
         nd.setdefault(v, []).append(k)
 
     return nd
+
 
 def _convert_io_types(peak_io):
     width_map = {}
@@ -33,6 +32,7 @@ def _convert_io_types(peak_io):
         width = 1 if not hasattr(btype,"size") else btype.size
         width_map[name] = width
     return width_map
+
 
 def gen_mapping(
         peak_class : Peak,
@@ -46,6 +46,9 @@ def gen_mapping(
         solver_name : str = 'z3',
         constraints = []
         ):
+
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     peak_inst = peak_class() #This cannot take any args
 
@@ -85,18 +88,18 @@ def gen_mapping(
         return
     def f_fun(inst):
         return all(constraint(inst) for constraint in constraints)
-    print_if(verbose,"Enumerating bv instructions")
+    logging.debug("Enumerating bv instructions")
     bv_isa_list = list(filter(f_fun, bv_isa.enumerate()))
     bv_isa_len = len(bv_isa_list)
-    print_if(verbose,"Enumerating smt instructions")
+    logging.debug("Enumerating smt instructions")
     smt_isa_list = list(filter(f_fun, smt_isa.enumerate()))
     smt_isa_len = len(smt_isa_list)
 
-    print_if(verbose,"Starting search")
+    logging.debug("Starting search")
 
     for ii,smt_inst in enumerate(smt_isa_list):
-        print_if(verbose,f"inst {ii+1}/{bv_isa_len}")
-        print_if(verbose,smt_inst)
+        logging.debug(f"inst {ii+1}/{bv_isa_len}")
+        logging.debug(smt_inst)
 
         for bi,binding in enumerate(bindings):
             binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
