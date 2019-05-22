@@ -1,9 +1,14 @@
 from collections import OrderedDict
-from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type
+from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type, make_modifier
 import functools
 
 class Peak:
     pass
+
+
+# Global signal modifier.
+Global = make_modifier("Global")
+
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
