@@ -35,7 +35,7 @@ before_install:
 install:
 - pip install pytest-cov
 - pip install git+git://github.com/leonardt/Pyverilog.git#egg=pyverilog
-- pip install git+git://github.com/leonardt/hwtypes.git@fp#egg=hwtypes
+- pip install git+git://github.com/leonardt/hwtypes.git#egg=hwtypes
 - pip install -e .
 script:
 - py.test --cov=peak tests/
