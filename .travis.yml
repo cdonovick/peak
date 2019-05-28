@@ -36,5 +36,6 @@ install:
 - pip install pytest-cov
 - pip install git+git://github.com/leonardt/Pyverilog.git#egg=pyverilog
 - pip install -e .
+- pip install -I git+git://github.com/leonardt/hwtypes.git@abc-simple#egg=hwtypes
 script:
 - py.test --cov=peak tests/
