@@ -205,9 +205,6 @@ class ISABuilderAssembler(ast.NodeTransformer):
 def assemble_values_in_func(assemblers, peak_fn, _locals, _globals):
     func_def = m.ast_utils.get_ast(peak_fn).body[0]
     func_def = ISABuilderAssembler(assemblers, _locals, _globals).visit(func_def)
-    # Uncomment to see result of AST rewrite
-    # import astor
-    # print(astor.to_source(func_def))
     func_def = ast.fix_missing_locations(func_def)
     os.makedirs(".peak", exist_ok=True)
     file_name = os.path.join(".peak", peak_fn.__name__ + ".py")
