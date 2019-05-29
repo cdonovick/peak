@@ -14,6 +14,7 @@ setup(
     ],
     install_requires=[
         "hwtypes >= 1.0.1",
+        "astor",
         "pysmt",
         "magma-lang",
         "coreir",

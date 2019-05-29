@@ -1,3 +1,7 @@
+import sys
+import traceback
+import os
+import astor
 import typing as tp
 from collections import OrderedDict
 from functools import reduce
@@ -176,7 +180,8 @@ def generate_assembler(isa):
 
 
 class ISABuilderAssembler(ast.NodeTransformer):
-    def __init__(self, _locals, _globals):
+    def __init__(self, assemblers, _locals, _globals):
+        self.assemblers = assemblers
         self._locals = _locals
         self._globals = _globals
 
@@ -186,23 +191,33 @@ class ISABuilderAssembler(ast.NodeTransformer):
                 value = eval(compile(ast.Expression(node.value),
                                      filename="<ast>", mode="eval"),
                              self._locals, self._globals)
-                if getattr(value, "_is_magma_enum", False):
-                    return ast.Call(
-                        ast.Name("assemble", ast.Load()),
-                        [node], []
-                    )
+                if value in self.assemblers:
+                    node_val = eval(compile(ast.Expression(node),
+                                            filename="<ast>", mode="eval"),
+                                    self._locals, self._globals)
+                    bv_type, assembler = self.assemblers[value]
+                    return ast.Num(int(assembler(getattr(bv_type, node.attr))))
             except NameError:
                 pass
         return node
 
 
-def assemble_values_in_func(assembler, peak_fn, _locals, _globals):
+def assemble_values_in_func(assemblers, peak_fn, _locals, _globals):
     func_def = m.ast_utils.get_ast(peak_fn).body[0]
-    func_def = ISABuilderAssembler(_locals, _globals).visit(func_def)
+    func_def = ISABuilderAssembler(assemblers, _locals, _globals).visit(func_def)
     # Uncomment to see result of AST rewrite
     # import astor
     # print(astor.to_source(func_def))
     func_def = ast.fix_missing_locations(func_def)
-    exec(compile(ast.Module([func_def]), filename="<ast>", mode="exec"),
-         _locals, _globals)
+    os.makedirs(".peak", exist_ok=True)
+    file_name = os.path.join(".peak", peak_fn.__name__ + ".py")
+    with open(file_name, "w") as fp:
+        fp.write(astor.to_source(func_def))
+    try:
+        exec(compile(ast.Module([func_def]), filename=file_name, mode="exec"),
+             _globals, _locals)
+    except:
+        tb = traceback.format_exc()
+        print(tb)
+        raise Exception(f"Error occured when compiling and executing assemble_values_in_func on function {peak_fn.__name__}, see above") from None
     return _locals[peak_fn.__name__]
