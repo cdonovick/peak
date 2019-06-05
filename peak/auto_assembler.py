@@ -1,4 +1,3 @@
-import sys
 import traceback
 import os
 import astor
