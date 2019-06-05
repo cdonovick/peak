@@ -51,6 +51,12 @@ def test_assembler_disassembler(isa):
 
 
 def test_ast_rewrite():
+    """
+    This test takes a function `cond` that is generic (e.g. uses `Cond.Z`) and
+    runs the AST rewrite logic to replace uses of the `Cond` enum type with the
+    assembled value (using `ISABuilderAssembler` which is the core logic of
+    `assemble_values_in_func`).
+    """
     def gen_cond(enum):
         class Cond(enum):
             Z = 0    # EQ
@@ -154,8 +160,6 @@ def test_ast_rewrite():
         Cond: (peak_cond, assembler)
     }
     func_def = ISABuilderAssembler(assemblers, locals(), globals()).visit(func_def)
-    # import astor
-    # print(astor.to_source(func_def))
     assert [ast.dump(s) for s in func_def.body] == \
         [ast.dump(s) for s in m.ast_utils.get_ast(cond_expected).body[0].body]
 
