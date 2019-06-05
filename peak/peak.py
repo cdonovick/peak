@@ -64,4 +64,7 @@ def name_outputs(**outputs):
 class PeakNotImplementedError(NotImplementedError):
     pass
 
+class PeakUnreachableError(NotImplementedError):
+    pass
+
 
