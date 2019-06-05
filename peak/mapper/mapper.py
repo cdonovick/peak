@@ -1,6 +1,7 @@
 import typing as tp
 import itertools as it
 import functools as ft
+import logging
 from ..peak import Peak
 import coreir
 
@@ -8,10 +9,11 @@ from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
 from hwtypes.adt_meta import BoundMeta
-from .SMT_bit_vector import SMTBit, SMTBitVector, SMTSIntVector
+from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
+
 
 def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.Any]]:
     nd = {}
@@ -19,6 +21,7 @@ def _group_by_value(d : tp.Mapping[tp.Any, int]) -> tp.Mapping[int, tp.List[tp.A
         nd.setdefault(v, []).append(k)
 
     return nd
+
 
 def _convert_io_types(peak_io):
     width_map = {}
@@ -29,6 +32,7 @@ def _convert_io_types(peak_io):
         width = 1 if not hasattr(btype,"size") else btype.size
         width_map[name] = width
     return width_map
+
 
 def gen_mapping(
         peak_class : Peak,
@@ -42,6 +46,9 @@ def gen_mapping(
         solver_name : str = 'z3',
         constraints = []
         ):
+
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     peak_inst = peak_class() #This cannot take any args
 
@@ -81,21 +88,23 @@ def gen_mapping(
         return
     def f_fun(inst):
         return all(constraint(inst) for constraint in constraints)
+    logging.debug("Enumerating bv instructions")
     bv_isa_list = list(filter(f_fun, bv_isa.enumerate()))
     bv_isa_len = len(bv_isa_list)
+    logging.debug("Enumerating smt instructions")
     smt_isa_list = list(filter(f_fun, smt_isa.enumerate()))
     smt_isa_len = len(smt_isa_list)
 
+    logging.debug("Starting search")
+
     for ii,smt_inst in enumerate(smt_isa_list):
-        if verbose:
-            print(f"inst {ii+1}/{isa_len}")
-            print(smt_inst)
+        logging.debug(f"inst {ii+1}/{bv_isa_len}")
+        logging.debug(smt_inst)
 
         for bi,binding in enumerate(bindings):
             binding_dict = {k : core_smt_vars[v] if v is not None else SMTBitVector[peak_inputs[k]](0) for v,k in binding}
             name_binding = {k : v if v is not None else 0 for v,k in binding}
-            if verbose:
-                print(f"binding {bi+1}/{len(bindings)}")
+            #print_if(verbose,f"binding {bi+1}/{len(bindings)}")
 
             rvals = peak_inst(smt_inst, **binding_dict)
             if not isinstance(rvals, tuple):

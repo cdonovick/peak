@@ -18,5 +18,5 @@ setup(
         "magma-lang",
         "coreir",
     ],
-    python_requires='>=3.7.2'
+    python_requires='>=3.7'
 )
