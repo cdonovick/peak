@@ -56,6 +56,10 @@ def test_ast_rewrite():
     runs the AST rewrite logic to replace uses of the `Cond` enum type with the
     assembled value (using `ISABuilderAssembler` which is the core logic of
     `assemble_values_in_func`).
+
+    The function `cond_expected` is the expected code after running the AST
+    rewriter (we dump the rewritten AST and compare it to the AST of
+    `cond_expected` as the check)
     """
     def gen_cond(enum):
         class Cond(enum):
