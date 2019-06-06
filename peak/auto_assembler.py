@@ -207,8 +207,8 @@ def assemble_values_in_func(assemblers, peak_fn, _locals, _globals):
     func_def = m.ast_utils.get_ast(peak_fn).body[0]
     func_def = ISABuilderAssembler(assemblers, _locals, _globals).visit(func_def)
     func_def = ast.fix_missing_locations(func_def)
-    temp_dir = tempfile.TemporaryDirectory()
-    file_name = os.path.join(temp_dir.name, peak_fn.__name__ + ".py")
+    temp_dir = tempfile.mkdtemp()
+    file_name = os.path.join(temp_dir, peak_fn.__name__ + ".py")
     with open(file_name, "w") as fp:
         fp.write(astor.to_source(func_def))
     try:
