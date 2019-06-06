@@ -11,6 +11,7 @@ import operator
 import ast
 import magma as m
 import tempfile
+import logging
 
 
 def _issubclass(sub , parent : type) -> bool:
@@ -215,6 +216,6 @@ def assemble_values_in_func(assemblers, peak_fn, _locals, _globals):
              _globals, _locals)
     except:
         tb = traceback.format_exc()
-        print(tb)
+        logging.error(tb)
         raise Exception(f"Error occured when compiling and executing assemble_values_in_func on function {peak_fn.__name__}, see above") from None
     return _locals[peak_fn.__name__]
