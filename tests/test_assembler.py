@@ -51,6 +51,16 @@ def test_assembler_disassembler(isa):
 
 
 def test_ast_rewrite():
+    """
+    This test takes a function `cond` that is generic (e.g. uses `Cond.Z`) and
+    runs the AST rewrite logic to replace uses of the `Cond` enum type with the
+    assembled value (using `ISABuilderAssembler` which is the core logic of
+    `assemble_values_in_func`).
+
+    The function `cond_expected` is the expected code after running the AST
+    rewriter (we dump the rewritten AST and compare it to the AST of
+    `cond_expected` as the check)
+    """
     def gen_cond(enum):
         class Cond(enum):
             Z = 0    # EQ
@@ -112,50 +122,53 @@ def test_ast_rewrite():
         elif code == Cond.LUT:
             return lut
 
-    def cond_expected(code: Cond, alu: Bit, lut: Bit, Z: Bit, N: Bit, C: Bit,
-                      V: Bit) -> Bit:
-        if code == assemble(Cond.Z):
+    def cond_expected(code: Cond, alu: Bit, lut: Bit, Z: Bit, N: Bit, C: Bit, V: Bit) ->Bit:
+        if code == 0:
             return Z
-        elif code == assemble(Cond.Z_n):
+        elif code == 1:
             return not Z
-        elif code == assemble(Cond.C) or code == assemble(Cond.UGE):
+        elif code == 2 or code == 2:
             return C
-        elif code == assemble(Cond.C_n) or code == assemble(Cond.ULT):
+        elif code == 3 or code == 3:
             return not C
-        elif code == assemble(Cond.N):
+        elif code == 4:
             return N
-        elif code == assemble(Cond.N_n):
+        elif code == 5:
             return not N
-        elif code == assemble(Cond.V):
+        elif code == 6:
             return V
-        elif code == assemble(Cond.V_n):
+        elif code == 7:
             return not V
-        elif code == assemble(Cond.UGT):
+        elif code == 8:
             return C and not Z
-        elif code == assemble(Cond.ULE):
+        elif code == 9:
             return not C or Z
-        elif code == assemble(Cond.SGE):
+        elif code == 10:
             return N == V
-        elif code == assemble(Cond.SLT):
+        elif code == 11:
             return N != V
-        elif code == assemble(Cond.SGT):
-            return not Z and (N == V)
-        elif code == assemble(Cond.SLE):
-            return Z or (N != V)
-        elif code == assemble(Cond.ALU):
+        elif code == 12:
+            return not Z and N == V
+        elif code == 13:
+            return Z or N != V
+        elif code == 15:
             return alu
-        elif code == assemble(Cond.LUT):
+        elif code == 14:
             return lut
 
+    peak_cond = gen_cond(Enum)
     assembler, disassembler, width, layout = \
-        generate_assembler(gen_cond(Enum))
+        generate_assembler(peak_cond)
     func_def = m.ast_utils.get_ast(cond).body[0]
-    func_def = ISABuilderAssembler(locals(), globals()).visit(func_def)
+    assemblers = {
+        Cond: (peak_cond, assembler)
+    }
+    func_def = ISABuilderAssembler(assemblers, locals(), globals()).visit(func_def)
     assert [ast.dump(s) for s in func_def.body] == \
         [ast.dump(s) for s in m.ast_utils.get_ast(cond_expected).body[0].body]
 
     # Call the front end to make sure it works
-    cond = assemble_values_in_func(assembler, cond, locals(), globals())
+    cond = assemble_values_in_func(assemblers, cond, locals(), globals())
 
 def test_enum_determinism():
     def assemble():
