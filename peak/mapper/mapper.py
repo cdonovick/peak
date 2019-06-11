@@ -113,9 +113,7 @@ def gen_mapping(
             for idx, bv in enumerate(rvals):
                 if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
                     with smt.Solver(solver_name, logic=QF_BV) as solver:
-                        expr = bv != core_smt_expr
-                        solver.add_assertion(expr.value)
-                        if not solver.solve():
+                        if check_equal(solver_name, binding_dict, bv, core_smt_expr):
                             #Create output and input map
                             output_map = {"out":list(peak_class.__call__._peak_outputs_.items())[idx][0]}
                             input_map = {}
@@ -135,3 +133,15 @@ def gen_mapping(
                             found  += 1
                             if found >= max_mappings:
                                 return
+
+def check_equal(solver_name, smt_vars, expr1, expr2):
+    with smt.Solver(solver_name, logic=QF_BV) as solver:
+        expr = expr1 != expr2
+        solver.add_assertion(expr.value)
+        if not solver.solve():
+            return True
+        else:
+            model = solver.get_model()
+            model = {k : model[v.value] for k,v in smt_vars.items()}
+            logging.debug(model)
+            return False
