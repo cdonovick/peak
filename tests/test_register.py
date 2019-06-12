@@ -26,4 +26,3 @@ def test_register():
     tester.step(2)
     tester.circuit.O.expect(2)
     tester.compile_and_run("verilator")
-
