@@ -21,5 +21,9 @@ def test_register():
     tester.circuit.en = 1
     tester.step(2)
     tester.circuit.O.expect(2)
+    tester.circuit.en = 0
+    tester.circuit.value = 3
+    tester.step(2)
+    tester.circuit.O.expect(2)
     tester.compile_and_run("verilator")
 
