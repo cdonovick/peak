@@ -13,6 +13,10 @@ def gen_register(family, T, init=0):
             retvalue = self.value
             if en:
                 self.value = value
+            else:
+                # Bug in magma sequential syntax without default values, we
+                # explicitly set it for now
+                self.value = self.value
             return retvalue
 
     if family.Bit is m.Bit:
