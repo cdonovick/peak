@@ -78,7 +78,7 @@ class Pico(Peak):
         self.V = gen_register(family, Bit, ZERO)()
 
     def __call__(self):
-        pc = self.PC()
+        pc = self.PC(0, 0)
         inst = self.mem(pc)
         type, inst = inst.match()
         if type == Logic or type == Arith:
@@ -92,51 +92,51 @@ class Pico(Peak):
 
     def alu(self, type, inst):
         subtype, inst = inst.match()
-        a = self.reg(inst.ra)
-        b = self.reg(inst.rb)
+        a = self.reg(inst.ra, 0, 0)
+        b = self.reg(inst.rb, 0, 0)
         if type == Logic:
             res = logic(subtype, a, b)
         else:
-            res, res_p = arith(subtype, a, b, self.C())
-        self.reg(inst.ra,res)
-        self.Z(res==0)
-        self.N(Bit(res[-1]))
+            res, res_p = arith(subtype, a, b, self.C(0, 0))
+        self.reg(inst.ra,res, 1)
+        self.Z(res==0, 1)
+        self.N(Bit(res[-1]), 1)
         if type == Arith:
-            self.C(res_p)
-            self.V(overflow(a,b,res))
-        self.PC(self.PC()+1)
+            self.C(res_p, 1)
+            self.V(overflow(a,b,res), 1)
+        self.PC(self.PC(0, 0)+1, 1)
 
     def memory(self, inst):
         type, inst = inst.match()
         if   type == LDLO:
-            self.reg(inst.ra,Word(inst.imm))
+            self.reg(inst.ra,Word(inst.imm), 1)
         elif type == LDHI:
-            self.reg(inst.ra,Word(int(inst.imm) << 8))
+            self.reg(inst.ra,Word(int(inst.imm) << 8), 1)
         elif type == ST:
             if inst.imm == 0:
-                print(f'st {self.reg(inst.ra)}')
+                print(f'st {self.reg(inst.ra, 0, 0)}')
         else:
             raise NotImplemented(inst)
-        self.PC(self.PC()+1)
+        self.PC(self.PC(0, 0)+1, 1)
 
     def control(self, inst):
         type, inst = inst.match()
         if     type == Jump:
-            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                self.PC(Word(inst.imm))
+            if cond(inst.cond, self.Z(0, 0), self.N(0, 0), self.C(0, 0), self.V(0, 0)):
+                self.PC(Word(inst.imm), 1)
             else:
-                self.PC(self.PC()+1)
+                self.PC(self.PC(0, 0)+1, 1)
         elif   type == Call:
-            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                self.reg(LR, self.PC()+1)
-                self.PC(Word(inst.imm))
+            if cond(inst.cond, self.Z(0, 0), self.N(0, 0), self.C(0, 0), self.V(0, 0)):
+                self.reg(LR, self.PC(0, 0)+1, 1)
+                self.PC(Word(inst.imm), 1)
             else:
-                self.PC(self.PC()+1)
+                self.PC(self.PC(0, 0)+1, 1)
         elif   type == Return:
-            if cond(inst.cond, self.Z(), self.N(), self.C(), self.V()):
-                self.PC(self.reg(LR))
+            if cond(inst.cond, self.Z(0, 0), self.N(0, 0), self.C(0, 0), self.V(0, 0)):
+                self.PC(self.reg(LR, 0, 0), 1)
             else:
-                self.PC(self.PC()+1)
+                self.PC(self.PC(0, 0)+1, 1)
         else:
             raise NotImplemented(inst)
 
@@ -144,13 +144,13 @@ class Pico(Peak):
 
     def peak_flag(self, flag):
         if   flag == 'Z':
-            return self.Z()
+            return self.Z(0, 0)
         elif flag == 'N':
-            return self.N()
+            return self.N(0, 0)
         elif flag == 'C':
-            return self.C()
+            return self.C(0, 0)
         elif flag == 'V':
-            return self.C()
+            return self.C(0, 0)
         raise NotImplemented(flag)
 
     def poke_flag(self, flag, value):
@@ -165,13 +165,13 @@ class Pico(Peak):
         raise NotImplemented(flag)
 
     def peak_pc(self):
-        return int(self.PC())
+        return int(self.PC(0, 0))
 
     def poke_pc(self, value):
         return int(self.PC(Word(value)))
 
     def peak_reg(self, addr):
-        return int(self.reg(Reg4(addr)))
+        return int(self.reg(Reg4(addr), 0, 0))
 
     def poke_reg(self, addr, value):
         return int(self.reg(Reg4(addr),Word(value),wen=1))
