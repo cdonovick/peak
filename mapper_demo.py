@@ -1,3 +1,4 @@
+import hwtypes
 import functools as ft
 from peak.mapper import SMTBitVector
 from peak.mapper import gen_mapping
@@ -48,11 +49,14 @@ for mod in mods:
     if mod.name in __COREIR_MODELS:
         found = False
         mappings = list(gen_mapping(
-                sim.gen_alu,
+                sim.gen_alu(hwtypes.SMTBitVector.get_family()),
+                isa.INST,
                 isa.INST,
                 mod,
                 __COREIR_MODELS[mod.name],
-                1,))
+                1,
+#                verbose=True,
+                ))
         if mappings:
             print(f'Mappings found for {mod.name}')
             for mapping in mappings:
