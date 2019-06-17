@@ -40,13 +40,15 @@ def gen_mapping(
         coreir_model : tp.Callable,
         max_mappings : int,
         *,
-        verbose : bool = False,
+        verbose : int = 0,
         solver_name : str = 'z3',
         constraints = []
         ):
 
-    if verbose:
+    if verbose == 1:
         logging.getLogger().setLevel(logging.DEBUG)
+    elif verbose == 2:
+        logging.getLogger().setLevel(logging.DEBUG - 1)
 
     peak_inst = peak_class() #This cannot take any args
 
@@ -141,6 +143,6 @@ def check_equal(solver_name, smt_vars, expr1, expr2, name_binding):
         else:
             model = solver.get_model()
             model = {k : model[v.value] for k,v in smt_vars.items()}
-            logging.debug(name_binding)
-            logging.debug(model)
+            logging.log(logging.DEBUG - 1, name_binding)
+            logging.log(logging.DEBUG - 1, model)
             return False
