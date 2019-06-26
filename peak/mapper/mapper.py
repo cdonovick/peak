@@ -12,9 +12,7 @@ from hwtypes.adt_meta import BoundMeta
 from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 
 import pysmt.shortcuts as smt
-from pysmt.logics import QF_BV
-
-
+from pysmt.logics import QF_BV, BV
 
 def _group_by_value(d : tp.Mapping[tp.Any, type]) -> tp.Mapping[type, tp.List[tp.Any]]:
     nd = {}
@@ -42,7 +40,8 @@ def gen_mapping(
         *,
         verbose : int = 0,
         solver_name : str = 'z3',
-        constraints = []
+        constraints = [],
+        assembler_generator=None,
         ):
 
     if verbose == 1:
@@ -89,60 +88,49 @@ def gen_mapping(
     def f_fun(inst):
         return all(constraint(inst) for constraint in constraints)
 
-    logging.debug("Enumerating bv instructions")
-    bv_isa_list = list(filter(f_fun, bv_isa.enumerate()))
-    bv_isa_len = len(bv_isa_list)
-    logging.debug("Enumerating smt instructions")
-    smt_isa_list = list(filter(f_fun, smt_isa.enumerate()))
-    smt_isa_len = len(smt_isa_list)
 
-    logging.debug("Starting search")
+    assembler, disassembler, i_width, _ = assembler_generator(bv_isa)
 
-    for ii,smt_inst in enumerate(smt_isa_list):
-        logging.debug(f"inst {ii+1}/{bv_isa_len}")
-        logging.debug(smt_inst)
+    smt_inst = SMTBitVector[i_width](name='inst')
+    for bi,binding in enumerate(bindings):
+        binding_dict = {k : core_smt_vars[v] if v is not None else peak_inputs[k](0) for v,k in binding}
+        name_binding = {k : v if v is not None else 0 for v,k in binding}
 
-        for bi,binding in enumerate(bindings):
-            binding_dict = {k : core_smt_vars[v] if v is not None else peak_inputs[k](0) for v,k in binding}
-            name_binding = {k : v if v is not None else 0 for v,k in binding}
+        rvals = peak_inst(smt_inst, **binding_dict)
+        if not isinstance(rvals, tuple):
+            rvals = rvals,
 
-            rvals = peak_inst(smt_inst, **binding_dict)
-            if not isinstance(rvals, tuple):
-                rvals = rvals,
+        for idx, bv in enumerate(rvals):
+            if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
+                with smt.Solver(solver_name, logic=BV) as solver:
+                    if check_equal(solver, binding_dict, smt_inst, bv, core_smt_expr, name_binding):
+                        #Create output and input map
+                        model = solver.get_model()
+                        mapped_inst = BitVector[i_width](model[smt_inst.value].constant_value())
+                        output_map = {"out":list(peak_class.__call__._peak_outputs_.items())[idx][0]}
+                        input_map = {}
+                        for k,v in name_binding.items():
+                            if v == 0:
+                                v = "0"
+                            elif v == "in_":
+                                v = "in"
+                            input_map[v] = k
 
-            for idx, bv in enumerate(rvals):
-                if isinstance(bv, (SMTBit, SMTBitVector)) and bv.value.get_type() == core_smt_expr.value.get_type():
-                    with smt.Solver(solver_name, logic=QF_BV) as solver:
-                        if check_equal(solver_name, binding_dict, bv, core_smt_expr, name_binding):
-                            #Create output and input map
-                            output_map = {"out":list(peak_class.__call__._peak_outputs_.items())[idx][0]}
-                            input_map = {}
-                            for k,v in name_binding.items():
-                                if v == 0:
-                                    v = "0"
-                                elif v == "in_":
-                                    v = "in"
-                                input_map[v] = k
+                        mapping = dict(
+                            instruction=disassembler(mapped_inst),
+                            output_map=output_map,
+                            input_map=input_map
+                        )
+                        yield mapping
+                        found  += 1
+                        if found >= max_mappings:
+                            return
 
-                            mapping = dict(
-                                instruction=bv_isa_list[ii],
-                                output_map=output_map,
-                                input_map=input_map
-                            )
-                            yield mapping
-                            found  += 1
-                            if found >= max_mappings:
-                                return
-
-def check_equal(solver_name, smt_vars, expr1, expr2, name_binding):
-    with smt.Solver(solver_name, logic=QF_BV) as solver:
-        expr = expr1 != expr2
-        solver.add_assertion(expr.value)
-        if not solver.solve():
-            return True
-        else:
-            model = solver.get_model()
-            model = {k : model[v.value] for k,v in smt_vars.items()}
-            logging.log(logging.DEBUG - 1, name_binding)
-            logging.log(logging.DEBUG - 1, model)
-            return False
+def check_equal(solver, smt_vars, inst, expr1, expr2, name_binding):
+    expr =  smt.ForAll([v.value for v in smt_vars.values() if not v.value.is_constant()], (expr1 == expr2).value)
+    solver.add_assertion(expr)
+    if solver.solve():
+        model = solver.get_model()
+        return True
+    else:
+        return False

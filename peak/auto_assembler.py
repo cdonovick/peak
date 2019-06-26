@@ -22,7 +22,7 @@ def _issubclass(sub , parent : type) -> bool:
 
 def get_width(isa):
     if _issubclass(isa, Enum):
-        return _enum(isa)[2]
+        return _enum(isa, BitVector)[2]
     elif _issubclass(isa, (Tuple, Product)):
         return sum(map(get_width, isa.fields))
     elif _issubclass(isa, Sum):
@@ -38,7 +38,7 @@ def get_width(isa):
     else:
         raise TypeError(isa)
 
-def _enum(isa : Enum):
+def _enum(isa : Enum, bv_type):
     encoding = {}
     decoding = {}
     layout = {}
@@ -64,9 +64,10 @@ def _enum(isa : Enum):
     width = max(used).bit_length()
     for inst in isa.enumerate():
         layout[inst] = (0, width, None)
-        opcode = BitVector[width](i_map[inst])
+        opcode = bv_type[width](i_map[inst])
+        opcode_d = BitVector[width](i_map[inst])
         encoding[inst] = opcode
-        decoding[opcode]  = inst
+        decoding[opcode_d] = inst
 
     def assembler(inst):
         return encoding[inst]
@@ -75,7 +76,7 @@ def _enum(isa : Enum):
 
     return assembler, disassembler, width, layout
 
-def _product(isa : Product):
+def _product(isa : Product, bv_type):
     encoding = {}
     decoding = {}
     layout = {}
@@ -93,9 +94,9 @@ def _product(isa : Product):
     assert base == width
 
     def assembler(inst):
-        opcode = BitVector[width](0)
+        opcode = bv_type[width](0)
         for name,v in inst.value_dict.items():
-            v = BitVector[width](encoding[name](v))
+            v = bv_type[width](encoding[name](v))
             opcode |= v << layout[name][0]
         return opcode
 
@@ -108,7 +109,7 @@ def _product(isa : Product):
 
     return assembler, disassembler, width, layout
 
-def _sum(isa : Sum):
+def _sum(isa : Sum, bv_type):
     encoding = {}
     decoding = {}
     layout = {}
@@ -124,7 +125,7 @@ def _sum(isa : Sum):
         layout[field] = (tag_width, tag_width+w, l)
 
     def assembler(inst):
-        opcode = BitVector[width](0)
+        opcode = bv_type[width](0)
         field = type(inst.value)
         tag, e = encoding[field]
         assert tag.size == tag_width, (tag, tag.size, tag_width)
@@ -142,14 +143,14 @@ def _sum(isa : Sum):
 
     return assembler, disassembler, width, layout
 
-def _bv_field(isa : tp.Type[AbstractBitVector]):
+def _bv_field(isa : tp.Type[AbstractBitVector], bv_type):
     def assembler(inst):
         return inst
     def disassembler(opcode):
         return isa(opcode)
     return assembler, disassembler, get_width(isa), None
 
-def _bv_const(isa : AbstractBitVector):
+def _bv_const(isa : AbstractBitVector, bv_type):
     T = type(isa)
     def assembler(inst):
         if inst != isa:
@@ -161,21 +162,21 @@ def _bv_const(isa : AbstractBitVector):
         return T(opcode)
     return assembler, disassembler, get_width(isa), None
 
-def generate_assembler(isa):
+def generate_assembler(isa, *, bv_type=BitVector):
     if _issubclass(isa, Enum):
-        return _enum(isa)
+        return _enum(isa, bv_type=bv_type)
     elif _issubclass(isa, Product):
-        return _product(isa)
+        return _product(isa, bv_type=bv_type)
     elif _issubclass(isa, Sum):
-        return _sum(isa)
+        return _sum(isa, bv_type=bv_type)
     elif _issubclass(isa, AbstractBitVector):
-        return _bv_field(isa)
+        return _bv_field(isa, bv_type=bv_type)
     elif isinstance(isa, AbstractBitVector):
-        return _bv_const(isa)
+        return _bv_const(isa, bv_type=bv_type)
     elif _issubclass(isa, AbstractBit):
-        return _bv_field(isa)
+        return _bv_field(isa, bv_type=bv_type)
     elif isinstance(isa, AbstractBit):
-        return _bv_const(isa)
+        return _bv_const(isa, bv_type=bv_type)
     else:
         raise TypeError(isa)
 
