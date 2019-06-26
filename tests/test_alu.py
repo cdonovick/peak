@@ -1,5 +1,5 @@
 from peak import PeakNotImplementedError
-from peak.alu import gen_alu, Inst, ALUOP
+from examples.alu import gen_alu, Inst, ALUOP
 from hwtypes import BitVector
 
 ALU = gen_alu(BitVector.get_family(),width=16)

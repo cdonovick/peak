@@ -1,5 +1,5 @@
-import peak.arm.isa as isa
-import peak.arm.asm as asm
+import examples.arm.isa as isa
+import examples.arm.asm as asm
 from peak.bitfield import encode
 
 def test_imm():

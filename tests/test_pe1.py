@@ -1,11 +1,11 @@
-import peak.pe1.asm as asm
-from peak.pe1 import PE, Bit, Data
+import examples.pe1.asm as asm
+from examples.pe1 import PE, Bit, Data
 
 def test_and():
     # instantiate an PE - calls PE.__init__
     pe = PE()
     # format an 'and' instruction
-    inst = asm.and_() 
+    inst = asm.and_()
     # execute PE instruction with the arguments as inputs -  call PE.__call__
     res, res_p, irq = pe(inst, Data(1), Data(3))
     assert res==1

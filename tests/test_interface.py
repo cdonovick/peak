@@ -1,4 +1,4 @@
-from peak.pe1 import PE, Inst, Bit, Data
+from examples.pe1 import PE, Inst, Bit, Data
 
 
 def test_inputs():
