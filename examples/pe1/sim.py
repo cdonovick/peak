@@ -1,5 +1,5 @@
 from hwtypes import BitVector, SIntVector, overflow
-from .. import Peak, name_outputs
+from peak import Peak, name_outputs
 from .mode import Mode, gen_register_mode
 from .lut import Bit, LUT, lut
 from .cond import Cond, cond
