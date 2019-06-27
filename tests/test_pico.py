@@ -1,8 +1,8 @@
 import random
 from collections import namedtuple
-from peak.pico import Pico, Word
-import peak.pico.isa as isa
-import peak.pico.asm as asm
+from examples.pico import Pico, Word
+import examples.pico.isa as isa
+import examples.pico.asm as asm
 import pytest
 
 def test_ldlo():

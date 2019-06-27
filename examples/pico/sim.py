@@ -1,6 +1,6 @@
 from hwtypes import BitVector, overflow
 from .isa import *
-from .. import Peak, gen_register, RAM, ROM
+from peak import Peak, gen_register, RAM, ROM
 
 LR = Reg4(15)
 ZERO = Bit(0)

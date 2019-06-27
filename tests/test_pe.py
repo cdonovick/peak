@@ -1,5 +1,5 @@
-from peak.pe import gen_pe, Bit, Data
-import peak.pe.asm as asm
+from examples.pe import gen_pe, Bit, Data
+import examples.pe.asm as asm
 
 PE = gen_pe(2)
 

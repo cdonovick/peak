@@ -1,8 +1,8 @@
 from peak.auto_assembler import generate_assembler, ISABuilderAssembler, \
     assemble_values_in_func
-from peak.demo_pes.pe5.isa import INST as pe5_isa
-from peak.arm.isa import Inst as arm_isa
-from peak.pico.isa import Inst as pico_isa
+from examples.demo_pes.pe5.isa import INST as pe5_isa
+from examples.arm.isa import Inst as arm_isa
+from examples.pico.isa import Inst as pico_isa
 from hwtypes import BitVector
 from hwtypes.adt import Product, Sum, Enum, new_instruction
 import inspect

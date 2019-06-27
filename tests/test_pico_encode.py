@@ -1,5 +1,5 @@
-import peak.pico.isa as isa
-import peak.pico.asm as asm
+import examples.pico.isa as isa
+import examples.pico.asm as asm
 from peak.bitfield import encode
 import pytest
 
