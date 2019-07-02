@@ -57,7 +57,7 @@ def gen_BinarySemantics(family,width):
             elif op == BinaryOp.smod:
                 raise PeakNotImplementedError()
             else:
-                raise Peak
+                raise PeakUnreachableError()
 
 class UnaryOp(Enum):
     wire = new_instruction()
