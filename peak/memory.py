@@ -10,10 +10,10 @@ class ROM(Peak):
             self.mem.append( gen_register(BitVector.get_family(), type, init=data)() )
         
     def __call__(self, addr):
-        return self.mem[int(addr)]()
+        return self.mem[int(addr)](0, 0)
 
 class RAM(ROM):
-    def __call__(self, addr, data=None, wen=1):
+    def __call__(self, addr, data, wen):
         return self.mem[int(addr)](data, wen)
 
 Memory = RAM

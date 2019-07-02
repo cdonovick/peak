@@ -8,11 +8,15 @@ def gen_register(family, T, init=0):
         def __init__(self):
             self.value: T = init
 
-        def __call__(self, value: T=None, en: family.Bit=1) -> T:
+        def __call__(self, value: T, en: family.Bit) -> T:
+            assert value is not None
             retvalue = self.value
-            if value is not None and en:
-                assert value is not None
+            if en:
                 self.value = value
+            else:
+                # Bug in magma sequential syntax without default values, we
+                # explicitly set it for now
+                self.value = self.value
             return retvalue
 
     if family.Bit is m.Bit:

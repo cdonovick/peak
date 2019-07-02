@@ -1,4 +1,4 @@
-from .. import Peak, name_outputs, PeakNotImplementedError
+from peak import Peak, name_outputs, PeakNotImplementedError
 import typing as  tp
 from .isa import *
 from hwtypes import TypeFamily
