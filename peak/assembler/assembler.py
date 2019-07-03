@@ -1,20 +1,26 @@
 from .assembler_abc import AbstractAssembler
 from hwtypes import AbstractBitVector, BitVector, Bit
 from hwtypes.adt import Enum, Product, Sum, Tuple
-from hwtypes.adt_meta import BoundMeta
+from hwtypes.adt_meta import BoundMeta, EnumMeta
 
 from types import MappingProxyType
 import typing as tp
 
+def _issubclass(sub , parent : type) -> bool:
+    try:
+        return issubclass(sub, parent)
+    except TypeError:
+        return False
+
 class Assembler(AbstractAssembler):
-    _asm : tp.Mapping['isa', int]
-    _dsm : tp.Mapping[int, 'isa']
+    _asm : tp.Callable[['isa'], int]
+    _dsm : tp.Callable[[int], 'isa']
     _width : int
     _layout : tp.Mapping[str, tp.Tuple[int, int]]
 
     def __init__(self, isa: BoundMeta):
         super().__init__(isa)
-        if _issubclass(isa, enum):
+        if _issubclass(isa, Enum):
             asm, dsm, width, layout = _enum(isa)
         elif _issubclass(isa, (Tuple, Product)):
             asm, dsm, width, layout = _tuple(isa)
@@ -23,8 +29,7 @@ class Assembler(AbstractAssembler):
         elif _issubclass(isa, (Bit, BitVector)):
             asm, dsm, width, layout = _field(isa)
         else:
-            raise TypeError()
-
+            raise TypeError(f'isa: {isa}')
         self._asm = asm
         self._dsm = dsm
         self._width = width
@@ -41,16 +46,19 @@ class Assembler(AbstractAssembler):
     def assemble(self,
             inst: 'isa',
             bv_type: tp.Type[AbstractBitVector] = BitVector) -> 'bv_type':
-        opcode = self._asm[inst]
+        opcode = self._asm(inst)
         assert opcode.bit_length() <= self.width
         return bv_type[self.width](opcode)
 
     def disassemble(self, opcode: BitVector) -> 'isa':
         opcode = opcode.as_uint()
-        return self._dsm[opcode]
+        return self._dsm(opcode)
+
+    def __repr__(self):
+        return f'{type(self)}({self.isa})'
 
 
-def _enum(isa : Enum):
+def _enum(isa : Enum) -> int:
     asm = {}
     dsm = {}
     layout = {}
@@ -80,13 +88,77 @@ def _enum(isa : Enum):
         asm[inst] = opcode
         dsm[opcode] = inst
 
+    def assembler(inst):
+        return asm[inst]
+
+    def disassembler(opcode):
+        return dsm[opcode]
+
     return assembler, disassembler, width, layout
 
-def _tuple(isa : Tuple):
-    pass
+def _tuple(isa : Tuple) -> int:
+    layout = {}
+    base = 0
+    for name,field in isa.field_dict.items():
+        field_width = Assembler(field).width
+        layout[name] = _, base = (base, base + field_width)
 
-def _sum(isa : Sum):
-    pass
+    width = base
+
+    def assembler(inst):
+        opcode = 0
+        for idx,field in enumerate(isa.fields.items()):
+            assembler = Assembler(field)
+            v = assembler.assemble(inst[idx])
+            opcode |= v << layout[name][0]
+        return opcode
+
+    def disassembler(opcode):
+        args = []
+        for name,field in isa.field_dict.items():
+            idx = slice(*layout[name])
+            args.append(Assembler(field).disassemble(opcode[idx].as_uint()))
+        return isa(*args)
+
+    return assembler, disassembler, width, layout
+
+def _sum(isa : Sum) -> int:
+    tag_2_field = {}
+    field_2_tag = {}
+    layout = {}
+    tag_width = len(isa.fields).bit_length()
+
+    width = 0
+    for tag, field in enumerate(sorted(isa.fields, key=lambda field: (field.__name__, field.__module__))):
+        field_width = Assembler(field).width
+        tag_2_field[tag] = field
+        field_2_tag[field] = tag
+        layout[field.__name__] = _, w = (tag_width, tag_width + field_width)
+        width = max(width, w)
+
+    def assembler(inst):
+        v = inst.value
+        field = type(v)
+        pay_load = Assembler(field).assemble(v)
+        opcode = field_2_tag[field]
+        opcode |= pay_load << tag_width
+        return opcode
+
+    def disassembler(opcode):
+        tag = opcode[0:tag_width].as_uint()
+        field = field_2_tag[tag]
+        pay_load = opcode[slice(*layout[field.__name__])].as_uint()
+        return isa(Assembler(field).disassemble(pay_load))
+
+    return assembler, disassembler, width, layout
 
 def _field(isa : tp.Type[AbstractBitVector]):
-    pass
+    width = isa.size
+    layout = {}
+    def assembler(inst):
+        return inst
+    def disassemble(opcode):
+        return isa(opcode)
+    return assembler, disassembler, width, layout
+
+
