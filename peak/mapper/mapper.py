@@ -26,7 +26,7 @@ class ArchMapper:
     def __init__(self,
         arch_fclosure : tp.Callable,
         solver_name : str = 'z3',
-        constraints = []
+        isa_filters = []
     ):
         self.solver_name = solver_name
 
@@ -45,12 +45,12 @@ class ArchMapper:
         self.arch_inputs = _filter_adt_types(self.arch_inputs)
 
 
-        def constraint_filter(inst):
-            return all(constraint(inst) for constraint in constraints)
+        def isa_filter_fun(inst):
+            return all(isa_filters(inst) for isa_filter in isa_filters)
         logging.debug("Enumerating bv instructions")
-        self.bv_isa_list = list(filter(constraint_filter, self.bv_isa.enumerate()))
+        self.bv_isa_list = list(filter(isa_filter_fun, self.bv_isa.enumerate()))
         logging.debug("Enumerating smt instructions")
-        self.smt_isa_list = list(filter(constraint_filter, self.smt_isa.enumerate()))
+        self.smt_isa_list = list(filter(isa_filter_fun, self.smt_isa.enumerate()))
 
     def map_ir_op(self,
         ir_fclosure : tp.Callable,
