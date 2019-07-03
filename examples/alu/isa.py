@@ -10,6 +10,8 @@ class ALUOP(Enum):
     Or =  new_instruction()
     And = new_instruction()
     XOr = new_instruction()
+    Neg = new_instruction()
+    Not = new_instruction()
 
 class Inst(Product):
     alu_op = ALUOP
