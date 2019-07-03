@@ -5,11 +5,20 @@ import functools
 class Peak:
     pass
 
+
+#This will get the isa from the peak class
+def get_isa(peak_class):
+    inputs = peak_class.__call__._peak_inputs_
+    #Find the arch isa from the arch_inputs
+    _isa_list = list(filter(lambda t: is_adt_type(t), inputs.values()))
+    assert len(_isa_list)==1
+    return _isa_list[0]
+
+
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
     The output types will be stored in fn._peak_outputs__
     The input types will be stored in fn._peak_inputs_
-    The ISA will be stored in fn._peak_isa_
     Will verify that all the inputs have type annotations
     Will also verify that the outputs of running fn will have the correct number of bits
     """
@@ -46,18 +55,10 @@ def name_outputs(**outputs):
             in_type_keys.remove("return")
         if set(input_names) != set(in_type_keys):
             raise TypeError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_type_keys)}")
-        isa = []
         for name in input_names:
             input_type= in_types[name]
-            if is_adt_type(input_type):
-                isa.append((name,input_type))
-                continue
             call_wrapper._peak_inputs_[name] = in_types[name]
-        if len(isa) == 0:
-            raise TypeError("Need to pass peak ISA instruction to __call__")
-        if len(isa) > 1:
-            raise NotImplementedError("Can only pass in single instruction")
-        call_wrapper._peak_isa_ = isa[0]
+
         return call_wrapper
     return decorator
 
