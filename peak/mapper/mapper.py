@@ -78,7 +78,18 @@ class ArchMapper:
         ir_smt_vars = {k : v() for k,v in ir_inputs.items()}
         #This actually contains the symbolic representation
         ir_smt_expr = ir_smt()(**ir_smt_vars)
-        binder = Binder(self.arch_inputs,ir_inputs,ir_smt_vars)
+        print(ir_smt.__name__,ir_smt_expr)
+        binder = Binder(self.arch_inputs,self.arch_outputs,ir_inputs,ir_outputs)
+        #Early out if no bindings
+        if not binder.has_binding:
+            return
+
+        for binding in Binder.enumerate():
+            smt_E = []
+            need_to_enumerate = []
+
+            for enum in enumerate(need_to_enumerate):
+
 
         for ii,smt_inst in enumerate(self.smt_isa_list):
             logging.debug(f"inst {ii+1}/{len(self.bv_isa_list)}")
@@ -89,14 +100,14 @@ class ArchMapper:
                 #enumerate possibilities for missing inputs
                 for missing_inputs in binder.get_missing_inputs_list():
                     #building binding_dict
-                    binding_dict,name_binding = binder.construct_binding_dict(missing_inputs,binding)
+                    binding_dict,name_binding = binder.construct_binding_dict(missing_inputs,binding,ir_smt_vars)
                     rvals = self.arch_sim(smt_inst, **binding_dict)
                     if not isinstance(rvals, tuple):
                         rvals = rvals,
 
                     for ridx, rval in enumerate(rvals):
                         assert isinstance(rval, (SMTBit, SMTBitVector))
-                        assert rval.value.get_type() == ir_smt_expr.value.get_type()
+                        assert rval.value.get_type() == ir_smt_expr.value.get_type(), f"{rval.value.get_type()} != {ir_smt_expr.value.get_type()}"
                         with smt.Solver(self.solver_name, logic=QF_BV) as solver:
                             if self.check_equal(binding_dict, rval, ir_smt_expr, name_binding):
                                 #Create output and input map
