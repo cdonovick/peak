@@ -9,7 +9,7 @@ def is_product(isa):
 
 #finds all paths in the adt
 #A path is a tuple of names that indicate location in nested Product
-#TODO does not deal with Sum
+#TODO does not deal with Sum (treats it as a leaf type)
 def _flatten_adt(isa,path=()) -> tp.Mapping[tuple,type]:
     if issubclass(isa,Product):
         res = {}

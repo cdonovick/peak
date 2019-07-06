@@ -55,13 +55,6 @@ class ArchMapper:
         self.arch_input_isa = _new_product("ArchInput",self.arch_inputs)
         self.arch_output_isa = _new_product("ArchOutput",self.arch_outputs)
 
-        #def isa_filter_fun(inst):
-        #    return all(isa_filters(inst) for isa_filter in isa_filters)
-        #logging.debug("Enumerating bv instructions")
-        #self.bv_isa_list = list(filter(isa_filter_fun, self.bv_isa.enumerate()))
-        #logging.debug("Enumerating smt instructions")
-        #self.smt_isa_list = list(filter(isa_filter_fun, self.smt_isa.enumerate()))
-
     def map_ir_op(self,
         ir_fclosure : tp.Callable,
         max_mappings : int = 1,
