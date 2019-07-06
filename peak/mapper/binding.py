@@ -48,23 +48,6 @@ def _get_from_path(instr,path):
 def _set_from_path(instr,path,val):
     setattr(_get_from_path(instr,path[:-1]),path[-1],val)
 
-def _get_enumerate(t):
-    if is_adt_type(t):
-        def gen():
-            return t.enumerate()
-        return gen
-    elif issubclass(t,SMTBitVector):
-        def gen():
-            for val in (0,-1):
-                yield t(val)
-        return gen
-    elif issubclass(t,SMTBit):
-        def gen():
-            for val in (0,1):
-                yield t(val)
-        return gen
-    else:
-        raise ValueError(str(t))
 
 #Small class that only creates new free smt vars when it needs to
 class SMT_cache:
@@ -93,9 +76,11 @@ class Binder:
     def __init__(self,
         arch_isa : Product,
         ir_isa : Product,
-        allow_exists : bool #allow unbound to be E
+        allow_exists : bool, #allow unbound to be E
+        enumeration_scheme : tp.Mapping[type,tp.Callable] = {}
     ):
         self.smt_cache = SMT_cache()
+        self.enumeration_scheme = enumeration_scheme
         assert issubclass(arch_isa,Product)
         assert issubclass(ir_isa,Product)
         self.arch_isa = arch_isa
@@ -155,6 +140,29 @@ class Binder:
         for l in it.product(*self.possible_matching.values()):
             yield it.chain(*l)
 
+    def get_enumerate(self,t):
+        #custom enumeration
+        if t in self.enumeration_scheme:
+            return self.enumeration_scheme[t]
+
+        #default scheme
+        if is_adt_type(t):
+            def gen():
+                return t.enumerate()
+            return gen
+        elif issubclass(t,SMTBitVector):
+            def gen():
+                for val in (0,-1):
+                    yield t(val)
+            return gen
+        elif issubclass(t,SMTBit):
+            def gen():
+                for val in (0,1):
+                    yield t(val)
+            return gen
+        else:
+            raise ValueError(str(t))
+
     #This will enumerate a particular binding and yield a concrete instruction
     def enumerate_binding(self,binding,ir_instr):
         #I want to modify and return the binding list
@@ -174,9 +182,9 @@ class Binder:
             else:
                 arch_var = _get_from_path(ir_instr,ir_path)
             _set_from_path(arch_instr,arch_path,arch_var)
-        
+
         #enumerate the E_types
-        E_poss = [_get_enumerate(self.arch_flat[path])() for path in E_paths]
+        E_poss = [self.get_enumerate(self.arch_flat[path])() for path in E_paths]
         for E_binding in it.product(*E_poss):
             assert len(E_paths)==len(E_binding)
             assert len(E_paths)==len(E_idxs)
