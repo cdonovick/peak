@@ -103,7 +103,7 @@ class ArchMapper:
         input_binder = Binder(self.arch_input_isa,ir_input_isa,allow_exists=True)
         output_binder = Binder(self.arch_output_isa,ir_output_isa,allow_exists=False)
         #Early out if no bindings
-        if not input_binder.has_binding:
+        if not (input_binder.has_binding and output_binder.has_binding):
             return
 
         for input_binding in input_binder.enumerate():

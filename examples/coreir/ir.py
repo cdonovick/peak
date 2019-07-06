@@ -5,6 +5,18 @@ from peak import Peak, name_outputs
 
 def gen_CoreIR(width):
     CoreIR = IR()
+    def const_family_closure(family):
+        Data = family.BitVector[width]
+        class ConstModParams(Product):
+            value_=Data
+
+        class const(Peak):
+            @name_outputs(out=Data)
+            def __call__(self,modparams : ConstModParams):
+                return modparams.value
+        return const
+    CoreIR.add_instruction("const",const_family_closure)
+
     def add_binary(name,fun):
         def family_closure(family):
             Data = family.BitVector[width]
@@ -113,17 +125,6 @@ def gen_CoreIR(width):
         return mux
     CoreIR.add_instruction("mux",mux_family_closure)
 
-    def const_family_closure(family):
-        Data = family.BitVector[width]
-        class ConstModParams(Product):
-            value=Data
-
-        class const(Peak):
-            @name_outputs(out=Data)
-            def __call__(self,modparams : ConstModParams):
-                return modparams.value
-        return const
-    CoreIR.add_instruction("const",const_family_closure)
 
 #TODO missing:
 # mux, const, slice, concat
