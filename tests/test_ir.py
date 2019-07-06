@@ -18,8 +18,6 @@ def test_smallir():
         print(mapping)
         assert len(mapping) > 0
 
-test_smallir()
-
 def test_coreir():
     #arch
     arch_fc = gen_ALU()
@@ -29,12 +27,9 @@ def test_coreir():
     #IR
     CoreIR = gen_CoreIR(16)
 
+    has_mappings = ("const","add","sub","and_","or_","xor","wire","not_","neg")
+
     for name,ir_fc in CoreIR.instructions.items():
         mapping = list(ALUMapper.map_ir_op(ir_fc))
-        if len(mapping)>0:
-            print(name,mapping)
-        else:
-            print(name,"no mapping found")
-
-
-#test_coreir()
+        has_mapping = len(mapping) > 0
+        assert has_mapping == (name in has_mappings)
