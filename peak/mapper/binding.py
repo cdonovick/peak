@@ -174,7 +174,7 @@ class Binder:
             else:
                 arch_var = _get_from_path(ir_instr,ir_path)
             _set_from_path(arch_instr,arch_path,arch_var)
-
+        
         #enumerate the E_types
         E_poss = [_get_enumerate(self.arch_flat[path])() for path in E_paths]
         for E_binding in it.product(*E_poss):
