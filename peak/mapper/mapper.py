@@ -99,10 +99,9 @@ class ArchMapper:
             return
 
         for input_binding in input_binder.enumerate():
+
             #In the future we can use SMT for some of the variables instead of enumerating
             for arch_instr,input_binding in input_binder.enumerate_binding(input_binding,ir_instr):
-                #logging.debug(f"inst {ii+1}/{len(self.bv_isa_list)}")
-                #logging.debug(smt_inst)
                 arch_rvals = (self.arch_sim(**arch_instr.value_dict))
                 arch_output_instr = _make_adt_instance(arch_rvals,self.arch_outputs,self.arch_output_isa)
                 for output_binding in output_binder.enumerate():
