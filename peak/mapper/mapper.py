@@ -14,14 +14,6 @@ from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
-def _filter_adt_types(peak_io):
-    io_map = {}
-    for name,btype in peak_io.items():
-        if is_adt_type(btype):
-            continue
-        io_map[name] = btype
-    return io_map
-
 def _new_product(class_name,field_dict):
 
     class_str = f"class {class_name}(Product):"
