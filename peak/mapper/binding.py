@@ -8,6 +8,7 @@ def is_product(isa):
     return issubclass(isa,Product)
 
 #finds all paths in the adt
+#A path is a tuple of names that indicate location in nested Product
 #TODO does not deal with Sum
 def _flatten_adt(isa,path=()) -> tp.Mapping[tuple,type]:
     if issubclass(isa,Product):
@@ -65,9 +66,6 @@ def _get_enumerate(t):
     else:
         raise ValueError(str(t))
 
-#Set up binding as a matching between two instructions.
-#The top level interface is itself just a "single instruction" which is a product.
-
 #Small class that only creates new free smt vars when it needs to
 class SMT_cache:
     def __init__(self):
@@ -87,7 +85,10 @@ class SMT_cache:
         self.idx[t] +=1
         return val
 
-#This will deal with bindings
+
+#Set up binding as a matching between two instructions.
+#The top level 'sim' interface is itself just a "single instruction" which is a product.
+
 class Binder:
     def __init__(self,
         arch_isa : Product,
@@ -122,14 +123,13 @@ class Binder:
         if not self.has_binding:
             return
         possible_matching = {}
-        missing_inputs_by_t = {}
         for arch_type, arch_paths in arch_by_t.items():
-            if is_adt_type(arch_type):
+            if is_adt_type(arch_type): #Sum or Enum
                 unbound_possibilities = ("E",)
             elif allow_exists:
                 unbound_possibilities = ("A","E")
             else:
-                unbound_possibilities = ("A")
+                unbound_possibilities = ("A",)
 
             #Returns this list of things that match type t from arch
             ir_paths = ir_by_t.setdefault(arch_type, [])
@@ -140,7 +140,7 @@ class Binder:
             ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities,num_unbound)))
             assert len(ir_path_potentials) == len(arch_paths)
             for ir_path in it.product(*ir_path_potentials):
-                #For every permutation of arch_input_names, match it with ir_input_names
+                #For every permutation of arch, match it with ir
                 for arch_perm in it.permutations(arch_paths):
                     possible_matching.setdefault(arch_type, []).append(list(zip(ir_path, arch_perm)))
 
@@ -149,7 +149,7 @@ class Binder:
         del arch_by_t
         del ir_by_t
 
-    #This will yield a "binding"
+    #This will yield a "binding" which is a list of (ir_path,arch_path) pairs
     def enumerate(self):
         assert self.has_binding
         for l in it.product(*self.possible_matching.values()):
@@ -164,11 +164,11 @@ class Binder:
         E_paths = []
         E_idxs = []
         for bi,(ir_path,arch_path) in enumerate(binding_list):
-            if ir_path == "E":
+            if ir_path == "E": #existentially qualified
                 E_paths.append(arch_path)
                 E_idxs.append(bi)
                 continue
-            if ir_path == "A":
+            if ir_path == "A": #universally qualified
                 arch_type = self.arch_flat[arch_path]
                 arch_var = self.smt_cache[arch_type]
             else:
