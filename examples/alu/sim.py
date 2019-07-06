@@ -7,20 +7,16 @@ def gen_ALU(width=16):
     def family_closure(family):
         Data = family.BitVector[width]
         def alu(op : ALUOP, a : Data, b : Data):
-            if op == ALUOP.Neg:
-                a = Data(0)
-            elif op == ALUOP.Not:
-                a = Data(-1)
 
             if op == ALUOP.Add:
                 res = a + b
-            elif (op == ALUOP.Sub) | (op == ALUOP.Neg):
+            elif (op == ALUOP.Sub):
                 res = a-b
             elif op == ALUOP.And:
                 res = a & b
             elif op == ALUOP.Or:
                 res = a | b
-            elif (op == ALUOP.XOr) | (op == ALUOP.Not):
+            elif (op == ALUOP.XOr):
                 res = a ^ b
             else:
                 raise PeakNotImplementedError(op)
