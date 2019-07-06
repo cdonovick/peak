@@ -5,6 +5,23 @@ from hwtypes.adt import Enum
 
 def gen_SmallIR(width):
     SmallIR = IR()
+    def add_unary(name,fun):
+        def family_closure(family):
+            Data = family.BitVector[width]
+            class Unary(Peak):
+                @name_outputs(out=Data)
+                def __call__(self,in0 : Data):
+                    return fun(in0)
+            Unary.__name__ = name
+            return Unary
+        SmallIR.add_instruction(name,family_closure)
+
+    for name,fun in (
+        ("Not",lambda x: ~x),
+        ("Neg",lambda x: -x)
+    ):
+        add_unary(name,fun)
+
     def add_binary(name,fun):
         def family_closure(family):
             Data = family.BitVector[width]
@@ -22,21 +39,5 @@ def gen_SmallIR(width):
     ):
         add_binary(name,fun)
 
-    def add_unary(name,fun):
-        def family_closure(family):
-            Data = family.BitVector[width]
-            class Unary(Peak):
-                @name_outputs(out=Data)
-                def __call__(self,in0 : Data):
-                    return fun(in0)
-            Unary.__name__ = name
-            return Unary
-        SmallIR.add_instruction(name,family_closure)
-
-    for name,fun in (
-        ("Not",lambda x: ~x),
-        ("Neg",lambda x: -x)
-    ):
-        add_unary(name,fun)
 
     return SmallIR
