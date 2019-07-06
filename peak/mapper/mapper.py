@@ -2,7 +2,7 @@ import typing as tp
 import itertools as it
 import functools as ft
 import logging
-from ..peak import Peak, get_isa
+from ..peak import Peak
 import coreir
 from .binding import Binder, _default_instr, _get_from_path
 from hwtypes import AbstractBitVector
