@@ -178,6 +178,6 @@ class Binder:
             assert len(E_paths)==len(E_idxs)
             for arch_path,inst,idx in zip(E_paths,E_binding,E_idxs):
                 _set_from_path(arch_instr,arch_path,inst)
-                binding_list[idx] = inst
+                binding_list[idx] = (inst,binding_list[idx][1])
             yield arch_instr, binding_list
         self.smt_cache.reset()
