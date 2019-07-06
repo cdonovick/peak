@@ -50,17 +50,21 @@ def _set_from_path(instr,path,val):
 
 def _get_enumerate(t):
     if is_adt_type(t):
-        return t.enumerate()
-    elif issubclass(SMTBitVector,t):
+        def gen():
+            return t.enumerate()
+        return gen
+    elif issubclass(t,SMTBitVector):
         def gen():
             for val in (0,-1):
                 yield t(val)
         return gen
-    elif issubclass(SMTBit):
+    elif issubclass(t,SMTBit):
         def gen():
             for val in (0,1):
                 yield t(val)
         return gen
+    else:
+        raise ValueError(str(t))
 
 #Set up binding as a matching between two instructions.
 #The top level interface is itself just a "single instruction" which is a product.
@@ -124,9 +128,9 @@ class Binder:
             if is_adt_type(arch_type):
                 unbound_possibilities = ("E",)
             elif allow_exists:
-                unbound_possibilities = ("A",)
-            else:
                 unbound_possibilities = ("A","E")
+            else:
+                unbound_possibilities = ("A")
 
             #Returns this list of things that match type t from arch
             ir_paths = ir_by_t.setdefault(arch_type, [])
@@ -154,6 +158,7 @@ class Binder:
 
     #This will enumerate a particular binding and yield a concrete instruction
     def enumerate_binding(self,binding,ir_instr):
+        #I want to modify and return the binding list
         binding_list = list(binding)
         assert self.has_binding
         arch_instr = _default_instr(self.arch_isa)
@@ -172,7 +177,7 @@ class Binder:
             _set_from_path(arch_instr,arch_path,arch_var)
 
         #enumerate the E_types
-        E_poss = [_get_enumerate(self.arch_flat[path]) for path in E_paths]
+        E_poss = [_get_enumerate(self.arch_flat[path])() for path in E_paths]
         for E_binding in it.product(*E_poss):
             assert len(E_paths)==len(E_binding)
             assert len(E_paths)==len(E_idxs)
