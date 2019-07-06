@@ -42,10 +42,10 @@ class ArchMapper:
     def __init__(self,
         arch_fclosure : tp.Callable,
         solver_name : str = 'z3',
-        isa_filters = []
+        custom_enumeration : tp.Mapping[type,tp.Callable] = {}
     ):
         self.solver_name = solver_name
-
+        self.custom_enumeration = custom_enumeration
         #should contain instruction as first argument
         arch_smt = arch_fclosure(SMTBitVector.get_family())
         self.arch_sim = arch_smt()
@@ -92,7 +92,12 @@ class ArchMapper:
         ir_rvals = ir_smt()(**ir_instr.value_dict)
         ir_output_instr = _make_adt_instance(ir_rvals,ir_outputs,ir_output_isa)
 
-        input_binder = Binder(self.arch_input_isa,ir_input_isa,allow_exists=True)
+        input_binder = Binder(
+            self.arch_input_isa,
+            ir_input_isa,
+            allow_exists=True,
+            enumeration_scheme=self.custom_enumeration
+        )
         output_binder = Binder(self.arch_output_isa,ir_output_isa,allow_exists=False)
         #Early out if no bindings
         if not (input_binder.has_binding and output_binder.has_binding):
