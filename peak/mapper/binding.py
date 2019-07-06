@@ -37,7 +37,6 @@ def _default_instr(isa,forall=False):
     else:
         return isa(0)
 
-
 def _get_from_path(instr,path):
     if path is ():
         return instr
@@ -69,7 +68,7 @@ def _get_enumerate(t):
 #Set up binding as a matching between two instructions.
 #The top level interface is itself just a "single instruction" which is a product.
 
-#Small class that only creates free smt vars when it needs to
+#Small class that only creates new free smt vars when it needs to
 class SMT_cache:
     def __init__(self):
         self.cache = {}
