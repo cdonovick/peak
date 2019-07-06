@@ -100,6 +100,7 @@ class ArchMapper:
                 #logging.debug(smt_inst)
                 arch_rvals = _tupleify(self.arch_sim(**arch_instr.value_dict))
                 print(arch_rvals)
+                print(input_binding)
                 assert 0
                 for ridx, rval in enumerate(rvals):
                     assert isinstance(rval, (SMTBit, SMTBitVector))
