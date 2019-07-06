@@ -1,5 +1,4 @@
 from examples.pe1 import PE, Inst, Bit, Data
-from peak import get_isa
 
 def test_inputs():
     #Expected inputs
@@ -22,7 +21,3 @@ def test_outputs():
     for i, (oname,otype) in enumerate(outputs.items()):
         assert oname == expected_names[i]
         assert otype == expected_types[i]
-
-def test_isa():
-    isa = get_isa(PE)
-    assert isa == Inst
