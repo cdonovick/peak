@@ -46,7 +46,7 @@ class ArchMapper:
     ):
         self.solver_name = solver_name
         self.custom_enumeration = custom_enumeration
-        #should contain instruction as first argument
+
         arch_smt = arch_fclosure(SMTBitVector.get_family())
         self.arch_sim = arch_smt()
 
