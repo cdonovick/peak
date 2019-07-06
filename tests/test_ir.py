@@ -18,6 +18,8 @@ def test_smallir():
         print(mapping)
         assert len(mapping) > 0
 
+test_smallir()
+
 def test_coreir():
     #arch
     arch_fc = gen_ALU()
@@ -35,4 +37,4 @@ def test_coreir():
             print(name,"no mapping found")
 
 
-test_coreir()
+#test_coreir()

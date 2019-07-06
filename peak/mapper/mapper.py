@@ -4,11 +4,11 @@ import functools as ft
 import logging
 from ..peak import Peak, get_isa
 import coreir
-from .binding import Binder
+from .binding import Binder, _default_instr
 from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
-from hwtypes.adt_meta import BoundMeta
+from hwtypes.adt import Product
 from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 
 import pysmt.shortcuts as smt
@@ -22,6 +22,22 @@ def _filter_adt_types(peak_io):
         io_map[name] = btype
     return io_map
 
+def _new_product(class_name,field_dict):
+
+    class_str = f"class {class_name}(Product):"
+    for name,t in field_dict.items():
+        class_str += f"\n    {name}={name}"
+    class_str += "\n"
+    exec_globals={**dict(field_dict),"Product":Product}
+    exec_locals = {}
+    exec(class_str,exec_globals,exec_locals)
+    return exec_locals[class_name]
+
+def _tupleify(vals):
+    if not isinstance(vals, tuple):
+        vals = vals,
+    return vals
+
 class ArchMapper:
     def __init__(self,
         arch_fclosure : tp.Callable,
@@ -32,25 +48,18 @@ class ArchMapper:
 
         #should contain instruction as first argument
         arch_smt = arch_fclosure(SMTBitVector.get_family())
-        self.smt_isa = get_isa(arch_smt)
-        self.bv_isa = get_isa(arch_fclosure(BitVector.get_family()))
-
         self.arch_sim = arch_smt()
 
         self.arch_inputs = arch_smt.__call__._peak_inputs_
         self.arch_outputs = arch_smt.__call__._peak_outputs_
+        self.arch_input_isa = _new_product("ArchInput",self.arch_inputs)
 
-
-        #remove isa from arch_inputs list
-        self.arch_inputs = _filter_adt_types(self.arch_inputs)
-
-
-        def isa_filter_fun(inst):
-            return all(isa_filters(inst) for isa_filter in isa_filters)
-        logging.debug("Enumerating bv instructions")
-        self.bv_isa_list = list(filter(isa_filter_fun, self.bv_isa.enumerate()))
-        logging.debug("Enumerating smt instructions")
-        self.smt_isa_list = list(filter(isa_filter_fun, self.smt_isa.enumerate()))
+        #def isa_filter_fun(inst):
+        #    return all(isa_filters(inst) for isa_filter in isa_filters)
+        #logging.debug("Enumerating bv instructions")
+        #self.bv_isa_list = list(filter(isa_filter_fun, self.bv_isa.enumerate()))
+        #logging.debug("Enumerating smt instructions")
+        #self.smt_isa_list = list(filter(isa_filter_fun, self.smt_isa.enumerate()))
 
     def map_ir_op(self,
         ir_fclosure : tp.Callable,
@@ -68,6 +77,7 @@ class ArchMapper:
 
         ir_inputs = ir_smt.__call__._peak_inputs_
         ir_outputs = ir_smt.__call__._peak_outputs_
+        ir_input_isa = _new_product("IRInput",ir_inputs)
 
         found = 0
         if found >= max_mappings:
@@ -75,53 +85,39 @@ class ArchMapper:
         #--------
 
         logging.debug("Starting search")
-        ir_smt_vars = {k : v() for k,v in ir_inputs.items()}
-        #This actually contains the symbolic representation
-        ir_smt_expr = ir_smt()(**ir_smt_vars)
-        print(ir_smt.__name__,ir_smt_expr)
-        binder = Binder(self.arch_inputs,self.arch_outputs,ir_inputs,ir_outputs)
+
+        ir_instr = _default_instr(ir_input_isa,forall=True)
+        ir_rvals = _tupleify(ir_smt()(**ir_instr.value_dict))
+        input_binder = Binder(self.arch_input_isa,ir_input_isa,allow_exists=True)
         #Early out if no bindings
-        if not binder.has_binding:
+        if not input_binder.has_binding:
             return
 
-        for binding in Binder.enumerate():
-            smt_E = []
-            need_to_enumerate = []
+        for input_binding in input_binder.enumerate():
+            #In the future we can use SMT for some of the variables instead of enumerating
+            for arch_instr,input_binding in input_binder.enumerate_binding(input_binding,ir_instr):
+                #logging.debug(f"inst {ii+1}/{len(self.bv_isa_list)}")
+                #logging.debug(smt_inst)
+                arch_rvals = _tupleify(self.arch_sim(**arch_instr.value_dict))
+                print(arch_rvals)
+                assert 0
+                for ridx, rval in enumerate(rvals):
+                    assert isinstance(rval, (SMTBit, SMTBitVector))
+                    assert rval.value.get_type() == ir_smt_expr.value.get_type(), f"{rval.value.get_type()} != {ir_smt_expr.value.get_type()}"
 
-            for enum in enumerate(need_to_enumerate):
-
-
-        for ii,smt_inst in enumerate(self.smt_isa_list):
-            logging.debug(f"inst {ii+1}/{len(self.bv_isa_list)}")
-            logging.debug(smt_inst)
-
-            for bi,binding in enumerate(binder.get_bindings()):
-
-                #enumerate possibilities for missing inputs
-                for missing_inputs in binder.get_missing_inputs_list():
-                    #building binding_dict
-                    binding_dict,name_binding = binder.construct_binding_dict(missing_inputs,binding,ir_smt_vars)
-                    rvals = self.arch_sim(smt_inst, **binding_dict)
-                    if not isinstance(rvals, tuple):
-                        rvals = rvals,
-
-                    for ridx, rval in enumerate(rvals):
-                        assert isinstance(rval, (SMTBit, SMTBitVector))
-                        assert rval.value.get_type() == ir_smt_expr.value.get_type(), f"{rval.value.get_type()} != {ir_smt_expr.value.get_type()}"
-                        with smt.Solver(self.solver_name, logic=QF_BV) as solver:
-                            if self.check_equal(binding_dict, rval, ir_smt_expr, name_binding):
-                                #Create output and input map
-                                output_map = {"out":list(ir_outputs.items())[ridx][0]}
-                                input_map = name_binding
-                                mapping = dict(
-                                    instruction=self.bv_isa_list[ii],
-                                    output_map=output_map,
-                                    input_map=input_map
-                                )
-                                yield mapping
-                                found  += 1
-                                if found >= max_mappings:
-                                    return
+                    if self.check_equal(binding_dict, rval, ir_smt_expr, name_binding):
+                        #Create output and input map
+                        output_map = {"out":list(ir_outputs.items())[ridx][0]}
+                        input_map = binding
+                        mapping = dict(
+                            instruction=self.bv_isa_list[ii],
+                            output_map=output_map,
+                            input_map=input_map
+                        )
+                        yield mapping
+                        found  += 1
+                        if found >= max_mappings:
+                            return
 
     def check_equal(self, smt_vars, expr1, expr2, name_binding):
         with smt.Solver(self.solver_name, logic=QF_BV) as solver:
