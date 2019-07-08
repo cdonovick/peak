@@ -89,7 +89,7 @@ class ArchMapper:
             self.arch_input_isa,
             ir_input_isa,
             allow_exists=True,
-            enumeration_scheme=self.custom_enumeration
+            custom_enumeration=self.custom_enumeration
         )
         output_binder = Binder(self.arch_output_isa,ir_output_isa,allow_exists=False)
         #Early out if no bindings
