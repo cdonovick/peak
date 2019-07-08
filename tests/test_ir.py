@@ -1,5 +1,5 @@
 from examples.smallir import gen_SmallIR
-from examples.coreir import gen_CoreIR
+from peak.irs import gen_CoreIR
 from examples.alu import gen_ALU
 from peak.mapper import ArchMapper
 from hwtypes import SMTBitVector
