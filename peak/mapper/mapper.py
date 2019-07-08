@@ -130,8 +130,3 @@ class ArchMapper:
                 return True
             else:
                 return False
-            #    model = solver.get_model()
-            #    model = {k : model[v.value] for k,v in smt_vars.items()}
-            #    logging.log(logging.DEBUG - 1, name_binding)
-            #    logging.log(logging.DEBUG - 1, model)
-            #    return False

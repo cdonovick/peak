@@ -4,6 +4,11 @@ from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 from hwtypes import is_adt_type
 from hwtypes.adt import Product, Enum
 
+
+class Unbound(Enum):
+    E=0
+    A=1
+
 def is_product(isa):
     return issubclass(isa,Product)
 
@@ -49,26 +54,6 @@ def _set_from_path(instr,path,val):
     setattr(_get_from_path(instr,path[:-1]),path[-1],val)
 
 
-#Small class that only creates new free smt vars when it needs to
-class SMT_cache:
-    def __init__(self):
-        self.cache = {}
-        self.idx = {}
-
-    def reset(self):
-        self.idx = {}
-
-    def __getitem__(self,t):
-        idx = self.idx.setdefault(t,0)
-        if not t in self.cache:
-            self.cache[t] = [t()]
-        if len(self.cache[t])==idx:
-            self.cache[t].append(t())
-        val = self.cache[t][idx]
-        self.idx[t] +=1
-        return val
-
-
 #Set up binding as a matching between two instructions.
 #The top level 'sim' interface is itself just a "single instruction" which is a product.
 
@@ -76,11 +61,12 @@ class Binder:
     def __init__(self,
         arch_isa : Product,
         ir_isa : Product,
-        allow_exists : bool, #allow unbound to be E
+        allow_exists : bool, #allow unbound to be Existential
         enumeration_scheme : tp.Mapping[type,tp.Callable] = {}
     ):
-        self.smt_cache = SMT_cache()
         self.enumeration_scheme = enumeration_scheme
+
+        #highest level interface to binder must be a Product.
         assert issubclass(arch_isa,Product)
         assert issubclass(ir_isa,Product)
         self.arch_isa = arch_isa
@@ -110,18 +96,18 @@ class Binder:
         possible_matching = {}
         for arch_type, arch_paths in arch_by_t.items():
             if is_adt_type(arch_type): #Sum or Enum
-                unbound_possibilities = ("E",)
+                unbound_possibilities = (Unbound.E,)
             elif allow_exists:
-                unbound_possibilities = ("A","E")
+                unbound_possibilities = (Unbound.A,Unbound.E)
             else:
-                unbound_possibilities = ("A",)
+                unbound_possibilities = (Unbound.A,)
 
             #Returns this list of things that match type t from arch
             ir_paths = ir_by_t.setdefault(arch_type, [])
             num_unbound = len(arch_paths) - len(ir_paths)
 
             #Create a potentials list (to be passed to product)
-            #This will tie each unbound variable with either "A" or "E"
+            #This will tie each unbound variable with either "Universal" or "Existential"
             ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities,num_unbound)))
             assert len(ir_path_potentials) == len(arch_paths)
             for ir_path in it.product(*ir_path_potentials):
@@ -142,26 +128,26 @@ class Binder:
 
     def get_enumerate(self,t):
         #custom enumeration
-        if t in self.enumeration_scheme:
+        try:
             return self.enumeration_scheme[t]
-
-        #default scheme
-        if is_adt_type(t):
-            def gen():
-                return t.enumerate()
-            return gen
-        elif issubclass(t,SMTBitVector):
-            def gen():
-                for val in (0,-1):
-                    yield t(val)
-            return gen
-        elif issubclass(t,SMTBit):
-            def gen():
-                for val in (0,1):
-                    yield t(val)
-            return gen
-        else:
-            raise ValueError(str(t))
+        except:
+            #default scheme
+            if is_adt_type(t):
+                def gen():
+                    return t.enumerate()
+                return gen
+            elif issubclass(t,SMTBitVector):
+                def gen():
+                    for val in (0,-1):
+                        yield t(val)
+                return gen
+            elif issubclass(t,SMTBit):
+                def gen():
+                    for val in (0,1):
+                        yield t(val)
+                return gen
+            else:
+                raise ValueError(str(t))
 
     #This will enumerate a particular binding and yield a concrete instruction
     def enumerate_binding(self,binding,ir_instr):
@@ -172,13 +158,13 @@ class Binder:
         E_paths = []
         E_idxs = []
         for bi,(ir_path,arch_path) in enumerate(binding_list):
-            if ir_path == "E": #existentially qualified
+            if ir_path == Unbound.E: #existentially qualified
                 E_paths.append(arch_path)
                 E_idxs.append(bi)
                 continue
-            if ir_path == "A": #universally qualified
+            if ir_path == Unbound.A: #universally qualified
                 arch_type = self.arch_flat[arch_path]
-                arch_var = self.smt_cache[arch_type]
+                arch_var = arch_type()
             else:
                 arch_var = _get_from_path(ir_instr,ir_path)
             _set_from_path(arch_instr,arch_path,arch_var)
@@ -192,4 +178,3 @@ class Binder:
                 _set_from_path(arch_instr,arch_path,inst)
                 binding_list[idx] = (inst,binding_list[idx][1])
             yield arch_instr, binding_list
-        self.smt_cache.reset()
