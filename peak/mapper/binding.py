@@ -32,7 +32,7 @@ def _sort_by_t(path2t : tp.Mapping[tuple,type]) ->tp.Mapping[type,tp.List[tuple]
 
     return t2path
 
-#constructs a default instruction
+#constructs a default adt object from an adt type.
 def _default_instr(isa,forall=False):
     if issubclass(isa,Product):
         return isa(**{name:_default_instr(t,forall) for name,t in isa.field_dict.items()})
@@ -43,6 +43,7 @@ def _default_instr(isa,forall=False):
     else:
         return isa(0)
 
+#Given an adt object and a tree path to a node in that adt, returns the node
 def _get_from_path(instr,path):
     if path is ():
         return instr
@@ -50,8 +51,11 @@ def _get_from_path(instr,path):
         assert isinstance(instr,Product)
         return _get_from_path(getattr(instr,path[0]),path[1:])
 
+#Given an adt object and a tree path to a node in that adt, sets that node
 def _set_from_path(instr,path,val):
-    setattr(_get_from_path(instr,path[:-1]),path[-1],val)
+    instr = _get_from_path(instr,path[:-1])
+    assert type(getattr(instr,path[-1])) == type(val)
+    setattr(instr,path[-1],val)
 
 
 #Set up binding as a matching between two instructions.
@@ -130,24 +134,26 @@ class Binder:
         #custom enumeration
         try:
             return self.enumeration_scheme[t]
-        except:
-            #default scheme
-            if is_adt_type(t):
-                def gen():
-                    return t.enumerate()
-                return gen
-            elif issubclass(t,SMTBitVector):
-                def gen():
-                    for val in (0,-1):
-                        yield t(val)
-                return gen
-            elif issubclass(t,SMTBit):
-                def gen():
-                    for val in (0,1):
-                        yield t(val)
-                return gen
-            else:
-                raise ValueError(str(t))
+        except KeyError:
+            pass
+
+        #default scheme
+        if is_adt_type(t):
+            def gen():
+                return t.enumerate()
+            return gen
+        elif issubclass(t,SMTBitVector):
+            def gen():
+                for val in (0,-1):
+                    yield t(val)
+            return gen
+        elif issubclass(t,SMTBit):
+            def gen():
+                for val in (0,1):
+                    yield t(val)
+            return gen
+        else:
+            raise ValueError(str(t))
 
     #This will enumerate a particular binding and yield a concrete instruction
     def enumerate_binding(self,binding,ir_instr):
