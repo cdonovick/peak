@@ -2,7 +2,7 @@ import typing as tp
 import itertools as it
 from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 from hwtypes import is_adt_type
-from hwtypes.adt import Product, Enum
+from hwtypes.adt import Product, Enum, Sum
 
 
 class Unbound(Enum):
@@ -58,6 +58,19 @@ def _set_from_path(instr,path,val):
     setattr(instr,path[-1],val)
 
 
+
+def _default_adt_scheme(t):
+    for k in t.enumerate():
+        yield k
+
+def _default_bv_scheme(t):
+    for val in (0,-1):
+        yield t(val)
+
+def _default_bit_scheme(t):
+    for val in (0,1):
+        yield t(val)
+
 #Set up binding as a matching between two instructions.
 #The top level 'sim' interface is itself just a "single instruction" which is a product.
 
@@ -66,9 +79,13 @@ class Binder:
         arch_isa : Product,
         ir_isa : Product,
         allow_exists : bool, #allow unbound to be Existential
-        enumeration_scheme : tp.Mapping[type,tp.Callable] = {}
+        custom_enumeration : tp.Mapping[type,tp.Callable] = {}
     ):
-        self.enumeration_scheme = enumeration_scheme
+        self.enumeration_scheme = custom_enumeration
+        for t in (Sum,Enum):
+            self.enumeration_scheme.setdefault(t,_default_adt_scheme)
+        self.enumeration_scheme.setdefault(SMTBitVector,_default_bv_scheme)
+        self.enumeration_scheme.setdefault(SMTBit,_default_bit_scheme)
 
         #highest level interface to binder must be a Product.
         assert issubclass(arch_isa,Product)
@@ -133,27 +150,14 @@ class Binder:
     def get_enumerate(self,t):
         #custom enumeration
         try:
-            return self.enumeration_scheme[t]
+            return self.enumeration_scheme[t](t)
         except KeyError:
             pass
 
-        #default scheme
-        if is_adt_type(t):
-            def gen():
-                return t.enumerate()
-            return gen
-        elif issubclass(t,SMTBitVector):
-            def gen():
-                for val in (0,-1):
-                    yield t(val)
-            return gen
-        elif issubclass(t,SMTBit):
-            def gen():
-                for val in (0,1):
-                    yield t(val)
-            return gen
-        else:
-            raise ValueError(str(t))
+        for _t,fun in self.enumeration_scheme.items():
+            if issubclass(t,_t):
+                return fun(t)
+        raise KeyError(str(t))
 
     #This will enumerate a particular binding and yield a concrete instruction
     def enumerate_binding(self,binding,ir_instr):
@@ -176,7 +180,7 @@ class Binder:
             _set_from_path(arch_instr,arch_path,arch_var)
 
         #enumerate the E_types
-        E_poss = [self.get_enumerate(self.arch_flat[path])() for path in E_paths]
+        E_poss = [self.get_enumerate(self.arch_flat[path]) for path in E_paths]
         for E_binding in it.product(*E_poss):
             assert len(E_paths)==len(E_binding)
             assert len(E_paths)==len(E_idxs)

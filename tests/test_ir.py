@@ -25,8 +25,9 @@ def test_smallir_custom_enum():
     arch_fc = gen_ALU()
 
     ALUOP = arch_fc(SMTBitVector.get_family()).__call__._peak_inputs_["inst"].alu_op
-    def filter_out_and():
-        return filter(lambda inst: inst !=ALUOP.And,ALUOP.enumerate())
+    def filter_out_and(t):
+        for k in filter(lambda inst: inst !=ALUOP.And,ALUOP.enumerate()):
+            yield k
     ALUMapper = ArchMapper(arch_fc,custom_enumeration={ALUOP:filter_out_and})
 
     #IR
