@@ -125,18 +125,7 @@ def gen_CoreIR(width):
         return mux
     CoreIR.add_instruction("mux",mux_family_closure)
 
-
-#TODO missing:
-# mux, const, slice, concat
     return CoreIR
 
-#LOGWIDTH = 5
-#LogData = BitVector[LOGWIDTH]
-#
-#class Slice(Product):
-#    lo : LogData
-#    hi : LogData
-#
-#class Concat(Product):
-#    width0 : LogData
-#    width1 : LogData
+#TODO missing:
+# slice, concat, sext, zext
