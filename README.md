@@ -1,5 +1,7 @@
 ## Peak : Processor Specification Language ala Newell and Bell's ISP
-[![Build Status](https://travis-ci.org/phanrahan/peak.svg?branch=master)](https://travis-ci.org/phanrahan/peak)
+[![Build Status](https://travis-ci.org/cdonovick/peak.svg?branch=master)](https://travis-ci.org/cdonovick/peak)
+[![Coverage Status](https://coveralls.io/repos/github/cdonovick/peak/badge.svg?branch=master)](https://coveralls.io/github/cdonovick/peak)
+
 ### References
 
 The PMS and ISP descriptive systems for computer structures,
