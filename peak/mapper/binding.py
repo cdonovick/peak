@@ -145,12 +145,13 @@ class Binder:
         del ir_by_t
 
     #This will yield a "binding" which is a list of (ir_path, arch_path) pairs
+    #the ir_path can be "unbound" which is either Existentially unbound or Universally unoound
     def enumerate(self):
         assert self.has_binding
         for l in it.product(*self.possible_matching.values()):
             yield it.chain(*l)
 
-    #This will enumerate a particular binding and yield a concrete instruction
+    #This will enumerate a particular binding and yield a concrete instruction along with a concrete binding
     def enumerate_binding(self, binding, ir_instr):
         def _get_enumeration(t):
             return self.enumeration_scheme[t](t)
