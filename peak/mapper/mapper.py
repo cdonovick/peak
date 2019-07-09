@@ -4,7 +4,7 @@ import functools as ft
 import logging
 from ..peak import Peak
 import coreir
-from .binding import Binder, _default_instr, _get_from_path
+from .binding import Binder, default_instr, get_from_path
 from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
@@ -81,17 +81,17 @@ class ArchMapper:
 
         logging.debug("Starting search")
 
-        ir_instr = _default_instr(ir_input_isa, forall=True)
+        ir_instr = default_instr(ir_input_isa, forall=True)
         ir_rvals = ir_smt()(**ir_instr.value_dict)
         ir_output_instr = _make_adt_instance(ir_rvals, ir_outputs, ir_output_isa)
 
         input_binder = Binder(
             self.arch_input_isa,
             ir_input_isa,
-            allow_exists=True,
+            allow_existential=True,
             custom_enumeration=self.custom_enumeration
         )
-        output_binder = Binder(self.arch_output_isa, ir_output_isa, allow_exists=False)
+        output_binder = Binder(self.arch_output_isa, ir_output_isa, allow_existential=False)
         #Early out if no bindings
         if not (input_binder.has_binding and output_binder.has_binding):
             return
@@ -108,8 +108,8 @@ class ArchMapper:
                     for ir_path, arch_path in output_binding:
                         if not isinstance(ir_path, tuple):
                             continue
-                        ir_val = _get_from_path(ir_output_instr, ir_path)
-                        arch_val = _get_from_path(arch_output_instr, arch_path)
+                        ir_val = get_from_path(ir_output_instr, ir_path)
+                        arch_val = get_from_path(arch_output_instr, arch_path)
 
                         mapping_found &= self.smt_check_equal(ir_val, arch_val)
                     if mapping_found:
