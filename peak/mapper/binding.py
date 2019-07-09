@@ -6,9 +6,11 @@ from hwtypes.adt import Product, Enum, Sum
 from .util import SubTypeDict
 
 
+__ALL__ = ['Binder','default_instr', 'get_from_path', 'set_from_path']
+
 class Unbound(Enum):
-    E=0
-    A=1
+    Existential=0
+    Universal=1
 
 def is_product(isa):
     return issubclass(isa, Product)
@@ -34,9 +36,9 @@ def _sort_by_t(path2t : tp.Mapping[tuple, type]) ->tp.Mapping[type, tp.List[tupl
     return t2path
 
 #constructs a default adt object from an adt type.
-def _default_instr(isa, forall=False):
+def default_instr(isa, forall=False):
     if issubclass(isa, Product):
-        return isa(**{name:_default_instr(t, forall) for name, t in isa.field_dict.items()})
+        return isa(**{name:default_instr(t, forall) for name, t in isa.field_dict.items()})
     elif issubclass(isa, Enum):
         return isa.fields[0]
     elif forall:
@@ -45,16 +47,16 @@ def _default_instr(isa, forall=False):
         return isa(0)
 
 #Given an adt object and a tree path to a node in that adt, returns the node
-def _get_from_path(instr, path):
+def get_from_path(instr, path):
     if path is ():
         return instr
     else:
         assert isinstance(instr, Product)
-        return _get_from_path(getattr(instr, path[0]), path[1:])
+        return get_from_path(getattr(instr, path[0]), path[1:])
 
 #Given an adt object and a tree path to a node in that adt, sets that node
-def _set_from_path(instr, path, val):
-    instr = _get_from_path(instr, path[:-1])
+def set_from_path(instr, path, val):
+    instr = get_from_path(instr, path[:-1])
     assert type(getattr(instr, path[-1])) == type(val)
     setattr(instr, path[-1], val)
 
@@ -79,7 +81,7 @@ class Binder:
     def __init__(self,
         arch_isa : Product,
         ir_isa : Product,
-        allow_exists : bool, #allow unbound to be Existential
+        allow_existential : bool, #allow unbound to be Existential
         custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ):
         self.enumeration_scheme = SubTypeDict(custom_enumeration)
@@ -118,11 +120,11 @@ class Binder:
         possible_matching = {}
         for arch_type, arch_paths in arch_by_t.items():
             if is_adt_type(arch_type): #Sum or Enum
-                unbound_possibilities = (Unbound.E,)
-            elif allow_exists:
-                unbound_possibilities = (Unbound.A, Unbound.E)
+                unbound_possibilities = (Unbound.Existential,)
+            elif allow_existential:
+                unbound_possibilities = (Unbound.Universal, Unbound.Existential)
             else:
-                unbound_possibilities = (Unbound.A,)
+                unbound_possibilities = (Unbound.Universal,)
 
             #Returns this list of things that match type t from arch
             ir_paths = ir_by_t.setdefault(arch_type, [])
@@ -156,20 +158,20 @@ class Binder:
         #I want to modify and return the binding list
         binding_list = list(binding)
         assert self.has_binding
-        arch_instr = _default_instr(self.arch_isa)
+        arch_instr = default_instr(self.arch_isa)
         E_paths = []
         E_idxs = []
         for bi,(ir_path, arch_path) in enumerate(binding_list):
-            if ir_path == Unbound.E: #existentially qualified
+            if ir_path == Unbound.Existential: #existentially qualified
                 E_paths.append(arch_path)
                 E_idxs.append(bi)
                 continue
-            if ir_path == Unbound.A: #universally qualified
+            if ir_path == Unbound.Universal: #universally qualified
                 arch_type = self.arch_flat[arch_path]
                 arch_var = arch_type()
             else:
-                arch_var = _get_from_path(ir_instr, ir_path)
-            _set_from_path(arch_instr, arch_path, arch_var)
+                arch_var = get_from_path(ir_instr, ir_path)
+            set_from_path(arch_instr, arch_path, arch_var)
 
         #enumerate the E_types
         E_poss = [_get_enumeration(self.arch_flat[path]) for path in E_paths]
@@ -177,6 +179,6 @@ class Binder:
             assert len(E_paths)==len(E_binding)
             assert len(E_paths)==len(E_idxs)
             for arch_path, inst, idx in zip(E_paths, E_binding, E_idxs):
-                _set_from_path(arch_instr, arch_path, inst)
+                set_from_path(arch_instr, arch_path, inst)
                 binding_list[idx] = (inst, binding_list[idx][1])
             yield arch_instr, binding_list
