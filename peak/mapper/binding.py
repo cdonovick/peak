@@ -11,33 +11,33 @@ class Unbound(Enum):
     A=1
 
 def is_product(isa):
-    return issubclass(isa,Product)
+    return issubclass(isa, Product)
 
 #finds all paths in the adt
 #A path is a tuple of names that indicate location in nested Product
 #TODO does not deal with Sum (treats it as a leaf type)
-def _flatten_adt(isa,path=()) -> tp.Mapping[tuple,type]:
-    if issubclass(isa,Product):
+def _flatten_adt(isa, path=()) -> tp.Mapping[tuple, type]:
+    if issubclass(isa, Product):
         res = {}
-        for name,t in isa.field_dict.items():
-            res.update(_flatten_adt(t,path+(name,)))
+        for name, t in isa.field_dict.items():
+            res.update(_flatten_adt(t, path+(name,)))
         return res
     else:
         return {path:isa}
 
-def _sort_by_t(path2t : tp.Mapping[tuple,type]) ->tp.Mapping[type,tp.List[tuple]]:
+def _sort_by_t(path2t : tp.Mapping[tuple, type]) ->tp.Mapping[type, tp.List[tuple]]:
 
     t2path = {}
-    for tup,t in path2t.items():
+    for tup, t in path2t.items():
         t2path.setdefault(t, []).append(tup)
 
     return t2path
 
 #constructs a default adt object from an adt type.
-def _default_instr(isa,forall=False):
-    if issubclass(isa,Product):
-        return isa(**{name:_default_instr(t,forall) for name,t in isa.field_dict.items()})
-    elif issubclass(isa,Enum):
+def _default_instr(isa, forall=False):
+    if issubclass(isa, Product):
+        return isa(**{name:_default_instr(t, forall) for name, t in isa.field_dict.items()})
+    elif issubclass(isa, Enum):
         return isa.fields[0]
     elif forall:
         return isa()
@@ -45,18 +45,18 @@ def _default_instr(isa,forall=False):
         return isa(0)
 
 #Given an adt object and a tree path to a node in that adt, returns the node
-def _get_from_path(instr,path):
+def _get_from_path(instr, path):
     if path is ():
         return instr
     else:
-        assert isinstance(instr,Product)
-        return _get_from_path(getattr(instr,path[0]),path[1:])
+        assert isinstance(instr, Product)
+        return _get_from_path(getattr(instr, path[0]), path[1:])
 
 #Given an adt object and a tree path to a node in that adt, sets that node
-def _set_from_path(instr,path,val):
-    instr = _get_from_path(instr,path[:-1])
-    assert type(getattr(instr,path[-1])) == type(val)
-    setattr(instr,path[-1],val)
+def _set_from_path(instr, path, val):
+    instr = _get_from_path(instr, path[:-1])
+    assert type(getattr(instr, path[-1])) == type(val)
+    setattr(instr, path[-1], val)
 
 
 
@@ -69,7 +69,7 @@ def _default_bv_scheme(t):
         yield t(val)
 
 def _default_bit_scheme(t):
-    for val in (0,1):
+    for val in (0, 1):
         yield t(val)
 
 #Set up binding as a matching between two instructions.
@@ -80,17 +80,17 @@ class Binder:
         arch_isa : Product,
         ir_isa : Product,
         allow_exists : bool, #allow unbound to be Existential
-        custom_enumeration : tp.Mapping[type,tp.Callable] = {}
+        custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ):
         self.enumeration_scheme = SubTypeDict(custom_enumeration)
-        for t in (Sum,Enum):
-            self.enumeration_scheme.setdefault(t,_default_adt_scheme)
-        self.enumeration_scheme.setdefault(SMTBitVector,_default_bv_scheme)
-        self.enumeration_scheme.setdefault(SMTBit,_default_bit_scheme)
+        for t in (Sum, Enum):
+            self.enumeration_scheme.setdefault(t, _default_adt_scheme)
+        self.enumeration_scheme.setdefault(SMTBitVector, _default_bv_scheme)
+        self.enumeration_scheme.setdefault(SMTBit, _default_bit_scheme)
 
         #highest level interface to binder must be a Product.
-        assert issubclass(arch_isa,Product)
-        assert issubclass(ir_isa,Product)
+        assert issubclass(arch_isa, Product)
+        assert issubclass(ir_isa, Product)
         self.arch_isa = arch_isa
         self.ir_isa = ir_isa
 
@@ -100,7 +100,7 @@ class Binder:
         arch_by_t = _sort_by_t(self.arch_flat)
         ir_by_t = _sort_by_t(self.ir_flat)
 
-        def _has_binding(arch_by_t,ir_by_t):
+        def _has_binding(arch_by_t, ir_by_t):
             #for each type, each input of the type in the IR needs to at least be able to bind to one other in the arch
             for t in ir_by_t:
                 if not (t in arch_by_t):
@@ -110,7 +110,7 @@ class Binder:
             return True
 
         #Check if there is at least one input binding
-        self.has_binding = _has_binding(arch_by_t,ir_by_t)
+        self.has_binding = _has_binding(arch_by_t, ir_by_t)
 
         #check for early out
         if not self.has_binding:
@@ -120,7 +120,7 @@ class Binder:
             if is_adt_type(arch_type): #Sum or Enum
                 unbound_possibilities = (Unbound.E,)
             elif allow_exists:
-                unbound_possibilities = (Unbound.A,Unbound.E)
+                unbound_possibilities = (Unbound.A, Unbound.E)
             else:
                 unbound_possibilities = (Unbound.A,)
 
@@ -130,7 +130,7 @@ class Binder:
 
             #Create a potentials list (to be passed to product)
             #This will tie each unbound variable with either "Universal" or "Existential"
-            ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities,num_unbound)))
+            ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities, num_unbound)))
             assert len(ir_path_potentials) == len(arch_paths)
             for ir_path in it.product(*ir_path_potentials):
                 #For every permutation of arch, match it with ir
@@ -142,14 +142,14 @@ class Binder:
         del arch_by_t
         del ir_by_t
 
-    #This will yield a "binding" which is a list of (ir_path,arch_path) pairs
+    #This will yield a "binding" which is a list of (ir_path, arch_path) pairs
     def enumerate(self):
         assert self.has_binding
         for l in it.product(*self.possible_matching.values()):
             yield it.chain(*l)
 
     #This will enumerate a particular binding and yield a concrete instruction
-    def enumerate_binding(self,binding,ir_instr):
+    def enumerate_binding(self, binding, ir_instr):
         def _get_enumeration(t):
             return self.enumeration_scheme[t](t)
 
@@ -159,7 +159,7 @@ class Binder:
         arch_instr = _default_instr(self.arch_isa)
         E_paths = []
         E_idxs = []
-        for bi,(ir_path,arch_path) in enumerate(binding_list):
+        for bi,(ir_path, arch_path) in enumerate(binding_list):
             if ir_path == Unbound.E: #existentially qualified
                 E_paths.append(arch_path)
                 E_idxs.append(bi)
@@ -168,15 +168,15 @@ class Binder:
                 arch_type = self.arch_flat[arch_path]
                 arch_var = arch_type()
             else:
-                arch_var = _get_from_path(ir_instr,ir_path)
-            _set_from_path(arch_instr,arch_path,arch_var)
+                arch_var = _get_from_path(ir_instr, ir_path)
+            _set_from_path(arch_instr, arch_path, arch_var)
 
         #enumerate the E_types
         E_poss = [_get_enumeration(self.arch_flat[path]) for path in E_paths]
         for E_binding in it.product(*E_poss):
             assert len(E_paths)==len(E_binding)
             assert len(E_paths)==len(E_idxs)
-            for arch_path,inst,idx in zip(E_paths,E_binding,E_idxs):
-                _set_from_path(arch_instr,arch_path,inst)
-                binding_list[idx] = (inst,binding_list[idx][1])
+            for arch_path, inst, idx in zip(E_paths, E_binding, E_idxs):
+                _set_from_path(arch_instr, arch_path, inst)
+                binding_list[idx] = (inst, binding_list[idx][1])
             yield arch_instr, binding_list
