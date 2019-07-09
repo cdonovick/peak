@@ -14,15 +14,15 @@ from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
-def _new_product(class_name,field_dict):
+def _new_product(class_name, field_dict):
 
     class_str = f"class {class_name}(Product):"
-    for name,t in field_dict.items():
+    for name, t in field_dict.items():
         class_str += f"\n    {name}={name}"
     class_str += "\n"
     exec_globals={**dict(field_dict),"Product":Product}
     exec_locals = {}
-    exec(class_str,exec_globals,exec_locals)
+    exec(class_str, exec_globals, exec_locals)
     return exec_locals[class_name]
 
 def _tupleify(vals):
@@ -31,10 +31,10 @@ def _tupleify(vals):
     return vals
 
 #Will not need 'ordered_dict once hwtypes #57 is resolved
-def _make_adt_instance(rvals,ordered_dict,isa):
+def _make_adt_instance(rvals, ordered_dict, isa):
     rvals = _tupleify(rvals)
     rdict = {}
-    for i,name in enumerate(ordered_dict):
+    for i, name in enumerate(ordered_dict):
         rdict[name] = rvals[i]
     return isa(**rdict)
 
@@ -42,7 +42,7 @@ class ArchMapper:
     def __init__(self,
         arch_fclosure : tp.Callable,
         solver_name : str = 'z3',
-        custom_enumeration : tp.Mapping[type,tp.Callable] = {}
+        custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ):
         self.solver_name = solver_name
         self.custom_enumeration = custom_enumeration
@@ -52,8 +52,8 @@ class ArchMapper:
 
         self.arch_inputs = arch_smt.__call__._peak_inputs_
         self.arch_outputs = arch_smt.__call__._peak_outputs_
-        self.arch_input_isa = _new_product("ArchInput",self.arch_inputs)
-        self.arch_output_isa = _new_product("ArchOutput",self.arch_outputs)
+        self.arch_input_isa = _new_product("ArchInput", self.arch_inputs)
+        self.arch_output_isa = _new_product("ArchOutput", self.arch_outputs)
 
     def map_ir_op(self,
         ir_fclosure : tp.Callable,
@@ -71,8 +71,8 @@ class ArchMapper:
 
         ir_inputs = ir_smt.__call__._peak_inputs_
         ir_outputs = ir_smt.__call__._peak_outputs_
-        ir_input_isa = _new_product("IRInput",ir_inputs)
-        ir_output_isa = _new_product("IROutput",ir_outputs)
+        ir_input_isa = _new_product("IRInput", ir_inputs)
+        ir_output_isa = _new_product("IROutput", ir_outputs)
 
         found = 0
         if found >= max_mappings:
@@ -81,9 +81,9 @@ class ArchMapper:
 
         logging.debug("Starting search")
 
-        ir_instr = _default_instr(ir_input_isa,forall=True)
+        ir_instr = _default_instr(ir_input_isa, forall=True)
         ir_rvals = ir_smt()(**ir_instr.value_dict)
-        ir_output_instr = _make_adt_instance(ir_rvals,ir_outputs,ir_output_isa)
+        ir_output_instr = _make_adt_instance(ir_rvals, ir_outputs, ir_output_isa)
 
         input_binder = Binder(
             self.arch_input_isa,
@@ -91,7 +91,7 @@ class ArchMapper:
             allow_exists=True,
             custom_enumeration=self.custom_enumeration
         )
-        output_binder = Binder(self.arch_output_isa,ir_output_isa,allow_exists=False)
+        output_binder = Binder(self.arch_output_isa, ir_output_isa, allow_exists=False)
         #Early out if no bindings
         if not (input_binder.has_binding and output_binder.has_binding):
             return
@@ -99,17 +99,17 @@ class ArchMapper:
         for input_binding in input_binder.enumerate():
 
             #In the future we can use SMT for some of the variables instead of enumerating
-            for arch_instr,input_binding in input_binder.enumerate_binding(input_binding,ir_instr):
+            for arch_instr, input_binding in input_binder.enumerate_binding(input_binding, ir_instr):
                 arch_rvals = (self.arch_sim(**arch_instr.value_dict))
-                arch_output_instr = _make_adt_instance(arch_rvals,self.arch_outputs,self.arch_output_isa)
+                arch_output_instr = _make_adt_instance(arch_rvals, self.arch_outputs, self.arch_output_isa)
                 for output_binding in output_binder.enumerate():
                     output_binding = list(output_binding)
                     mapping_found = True
-                    for ir_path,arch_path in output_binding:
-                        if not isinstance(ir_path,tuple):
+                    for ir_path, arch_path in output_binding:
+                        if not isinstance(ir_path, tuple):
                             continue
-                        ir_val = _get_from_path(ir_output_instr,ir_path)
-                        arch_val = _get_from_path(arch_output_instr,arch_path)
+                        ir_val = _get_from_path(ir_output_instr, ir_path)
+                        arch_val = _get_from_path(arch_output_instr, arch_path)
 
                         mapping_found &= self.smt_check_equal(ir_val, arch_val)
                     if mapping_found:
@@ -122,7 +122,7 @@ class ArchMapper:
                         if found >= max_mappings:
                             return
 
-    def smt_check_equal(self,expr1, expr2):
+    def smt_check_equal(self, expr1, expr2):
         with smt.Solver(self.solver_name, logic=QF_BV) as solver:
             expr = expr1 != expr2
             solver.add_assertion(expr.value)
