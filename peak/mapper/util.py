@@ -2,11 +2,8 @@ from collections.abc import MutableMapping
 from collections import deque
 
 class SubTypeDict(MutableMapping):
-    def __init__(self, d=None):
-        if d is None:
-            d = {}
-
-        self._d = d
+    def __init__(self, d=()):
+        self._d = dict(d)
 
     def __getitem__(self, key: type):
         for T in key.mro():
