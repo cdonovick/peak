@@ -3,6 +3,7 @@ import itertools as it
 from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 from hwtypes import is_adt_type
 from hwtypes.adt import Product, Enum, Sum
+from .util import SubTypeDict
 
 
 class Unbound(Enum):
@@ -81,7 +82,7 @@ class Binder:
         allow_exists : bool, #allow unbound to be Existential
         custom_enumeration : tp.Mapping[type,tp.Callable] = {}
     ):
-        self.enumeration_scheme = custom_enumeration
+        self.enumeration_scheme = SubTypeDict(custom_enumeration)
         for t in (Sum,Enum):
             self.enumeration_scheme.setdefault(t,_default_adt_scheme)
         self.enumeration_scheme.setdefault(SMTBitVector,_default_bv_scheme)
@@ -147,20 +148,11 @@ class Binder:
         for l in it.product(*self.possible_matching.values()):
             yield it.chain(*l)
 
-    def get_enumerate(self,t):
-        #custom enumeration
-        try:
-            return self.enumeration_scheme[t](t)
-        except KeyError:
-            pass
-
-        for _t,fun in self.enumeration_scheme.items():
-            if issubclass(t,_t):
-                return fun(t)
-        raise KeyError(str(t))
-
     #This will enumerate a particular binding and yield a concrete instruction
     def enumerate_binding(self,binding,ir_instr):
+        def _get_enumeration(t):
+            return self.enumeration_scheme[t](t)
+
         #I want to modify and return the binding list
         binding_list = list(binding)
         assert self.has_binding
@@ -180,7 +172,7 @@ class Binder:
             _set_from_path(arch_instr,arch_path,arch_var)
 
         #enumerate the E_types
-        E_poss = [self.get_enumerate(self.arch_flat[path]) for path in E_paths]
+        E_poss = [_get_enumeration(self.arch_flat[path]) for path in E_paths]
         for E_binding in it.product(*E_poss):
             assert len(E_paths)==len(E_binding)
             assert len(E_paths)==len(E_idxs)
