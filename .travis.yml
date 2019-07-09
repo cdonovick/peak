@@ -15,6 +15,9 @@ before_install:
 - pip install -U pip
 install:
 - pip install pytest-cov fault mantle
+- pip install python-coveralls
 - pip install -e .
 script:
 - py.test --cov=peak tests/
+after_success:
+- coveralls
