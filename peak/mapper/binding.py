@@ -82,7 +82,7 @@ class Binder:
         arch_isa : Product,
         ir_isa : Product,
         allow_existential : bool, #allow unbound to be Existential
-        custom_enumeration : tp.Mapping[type, tp.Callable] = None
+        custom_enumeration : tp.Mapping[type, tp.Callable] = ()
     ):
         self.enumeration_scheme = SubTypeDict(custom_enumeration)
         for t in (Sum, Enum):
