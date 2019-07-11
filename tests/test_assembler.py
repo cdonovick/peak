@@ -6,28 +6,31 @@ from hwtypes import AbstractBitVector
 from hwtypes.adt import Enum, Product, Tuple, Sum
 from hwtypes.adt import new_instruction
 from hwtypes import BitVector
+from hwtypes import new
 import pytest
 
+FooBV = new(BitVector, name='FooBV')
 
 @pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa])
-def test_assembler_disassembler(isa):
+@pytest.mark.parametrize("bv_type", [BitVector, FooBV])
+def test_assembler_disassembler(isa, bv_type):
     assembler = Assembler(isa)
     for inst in isa.enumerate():
-        opcode = assembler.assemble(inst)
-        assert isinstance(opcode, BitVector[assembler.width])
+        opcode = assembler.assemble(inst, bv_type=bv_type)
+        assert isinstance(opcode, bv_type[assembler.width])
         assert assembler.disassemble(opcode) == inst
 
         for name,field in isa.field_dict.items():
-            sub_asssembler = Assembler(field)
-            assert getattr(assembler.sub, name).asm is sub_asssembler
-            assert assembler.sub[name].asm is sub_asssembler
+            sub_assembler = Assembler(field)
+            assert getattr(assembler.sub, name).asm is sub_assembler
+            assert assembler.sub[name].asm is sub_assembler
 
             if issubclass(field, (Product, Tuple)) \
                     or (issubclass(field, Sum)
                         and inst.value_dict[name] is not None):
                 sub_opcode = opcode[assembler.sub[name].idx]
-                assert sub_opcode.size <= sub_asssembler.width
-                sub_inst = sub_asssembler.disassemble(sub_opcode)
+                assert isinstance(sub_opcode, bv_type[sub_assembler.width])
+                sub_inst = sub_assembler.disassemble(sub_opcode)
                 assert isinstance(sub_inst, field)
                 assert sub_inst == inst.value_dict[name]
 

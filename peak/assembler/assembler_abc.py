@@ -89,7 +89,7 @@ class Sub(tp.Mapping):
                 if name in isa.field_dict:
                     warnings.warn(f'field {name} is used by the assembler '
                                    'machinery gettattr access will not work')
-        elif not _issubclass(isa, Tuple):
+        elif not _issubclass(isa, (Tuple, AbstractBitVector)):
             raise TypeError(f'Unsported type {isa}')
 
         self._asm = assembler

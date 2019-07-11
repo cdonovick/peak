@@ -26,12 +26,12 @@ from hwtypes import BitVector, Bit
 #1101cccciiiiiiii "callc"
 #1110cccc00000000 "retc"
 
-Word = new(BitVector, 16)
+Word = new(BitVector, 16, name='Word')
 
-Reg4 = new(BitVector, 4)
-RegA = bitfield(8)(new(BitVector, 4))
-RegB = bitfield(4)(new(BitVector, 4))
-Imm = bitfield(0)(new(BitVector, 8))
+Reg4 = new(BitVector, 4, name='Reg4')
+RegA = bitfield(8)(new(BitVector, 4, name='RegA'))
+RegB = bitfield(4)(new(BitVector, 4, name='RegB'))
+Imm  = bitfield(0)(new(BitVector, 8, name='Imm'))
 
 @bitfield(8)
 class Cond(Enum):

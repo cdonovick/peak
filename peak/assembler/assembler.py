@@ -47,11 +47,10 @@ class Assembler(AbstractAssembler):
             inst: 'isa',
             bv_type: tp.Type[AbstractBitVector] = BitVector) -> 'bv_type':
         opcode = self._asm(inst)
-        assert opcode.bit_length() <= self.width
+        assert opcode.bit_length() <= self.width, (opcode, self.width)
         return bv_type[self.width](opcode)
 
     def disassemble(self, opcode: BitVector) -> 'isa':
-        opcode = opcode.as_uint()
         return self._dsm(opcode)
 
     def __repr__(self):
@@ -107,9 +106,9 @@ def _tuple(isa : Tuple) -> int:
 
     def assembler(inst):
         opcode = 0
-        for idx,field in enumerate(isa.fields.items()):
+        for name,field in isa.field_dict.items():
             assembler = Assembler(field)
-            v = assembler.assemble(inst[idx])
+            v = assembler._asm(inst.value_dict[name])
             opcode |= v << layout[name][0]
         return opcode
 
@@ -117,7 +116,7 @@ def _tuple(isa : Tuple) -> int:
         args = []
         for name,field in isa.field_dict.items():
             idx = slice(*layout[name])
-            args.append(Assembler(field).disassemble(opcode[idx].as_uint()))
+            args.append(Assembler(field).disassemble(opcode[idx]))
         return isa(*args)
 
     return assembler, disassembler, width, layout
@@ -139,16 +138,17 @@ def _sum(isa : Sum) -> int:
     def assembler(inst):
         v = inst.value
         field = type(v)
-        pay_load = Assembler(field).assemble(v)
+        pay_load = Assembler(field)._asm(v)
         opcode = field_2_tag[field]
         opcode |= pay_load << tag_width
         return opcode
 
     def disassembler(opcode):
         tag = opcode[0:tag_width].as_uint()
-        field = field_2_tag[tag]
-        pay_load = opcode[slice(*layout[field.__name__])].as_uint()
-        return isa(Assembler(field).disassemble(pay_load))
+        field = tag_2_field[tag]
+        pay_load = opcode[slice(*layout[field.__name__])]
+        inst = isa(Assembler(field).disassemble(pay_load))
+        return inst
 
     return assembler, disassembler, width, layout
 
@@ -156,8 +156,8 @@ def _field(isa : tp.Type[AbstractBitVector]):
     width = isa.size
     layout = {}
     def assembler(inst):
-        return inst
-    def disassemble(opcode):
+        return int(inst)
+    def disassembler(opcode):
         return isa(opcode)
     return assembler, disassembler, width, layout
 
