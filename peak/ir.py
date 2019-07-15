@@ -5,8 +5,7 @@ from hwtypes import AbstractBitVector, AbstractBit
 from .peak import Peak, name_outputs
 import itertools as it
 
-#This will 
-def _bound_family(atype):
+def _get_type_str(atype):
     if issubclass(atype,AbstractBitVector):
         return f"family.BitVector[{atype.size}]"
     elif issubclass(atype,AbstractBit):
@@ -40,7 +39,7 @@ class IR:
                 t_to_tname[t] = f"t{idx}"
                 idx +=1
         for t,tname in t_to_tname.items():
-            fc_str += f"{ts(1)}{tname}={_bound_family(t)}\n"
+            fc_str += f"{ts(1)}{tname}={_get_type_str(t)}\n"
         fc_str += f"{ts(1)}class {name}(Peak):\n"
         output_types = ", ".join([f"{field} = {t_to_tname[t]}" for field,t in outputs.items()])
         input_types = ", ".join([f"{field} : {t_to_tname[t]}" for field,t in inputs.items()])
