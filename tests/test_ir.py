@@ -24,14 +24,6 @@ def test_add_peak_instruction():
 
     ir.add_peak_instruction("simple",Input,Output,fun)
 
-    #def fc(family):
-    #    t0 = family.BitVector[16]
-    #    t1 = family.BitVector[16]
-
-    #    class simple(Peak):
-    #        @name_outputs()
-    #        def __call__(self, a : BitVector[16], b : BitVector[16])
-
     assert "simple" in ir.instructions
     fc = ir.instructions["simple"]
     try:
@@ -42,8 +34,6 @@ def test_add_peak_instruction():
         assert y == Bit(1)
     except:
         assert 0
-
-test_add_peak_instruction()
 
 #This test will try to run the ir mapper function
 def test_smallir():
