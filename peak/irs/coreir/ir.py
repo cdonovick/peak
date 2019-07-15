@@ -1,5 +1,5 @@
 from peak.ir import IR
-from hwtypes import BitVector, Bit
+from hwtypes import AbstractBitVector, AbstractBit
 from hwtypes.adt import Product
 from peak import Peak, name_outputs
 
@@ -17,16 +17,24 @@ def gen_CoreIR(width):
         return const
     CoreIR.add_instruction("const",const_family_closure)
 
-    def add_binary(name,fun):
-        def family_closure(family):
-            Data = family.BitVector[width]
-            class Binary(Peak):
-                @name_outputs(out=Data)
-                def __call__(self,in0 : Data, in1 : Data):
-                    return fun(in0,in1)
-            Binary.__name__ = name
-            return Binary
-        CoreIR.add_instruction(name,family_closure)
+    class UnaryInput(Product):
+        in0=AbstractBitVector[width]
+
+    class BinaryInput(Product):
+        in0=AbstractBitVector[width]
+        in1=AbstractBitVector[width]
+
+    class TernaryInput(Product):
+        in0=AbstractBitVector[width]
+        in1=AbstractBitVector[width]
+        sel=AbstractBit
+
+    class OutputBV(Product):
+        out=AbstractBitVector[width]
+
+    class OutputBit(Product):
+        out=AbstractBit
+
     for name,fun in (
         ("add",lambda x,y: x+y),
         ("sub",lambda x,y: x-y),
@@ -43,37 +51,14 @@ def gen_CoreIR(width):
         #("srem",lambda x,y: x.bvsrem(y)),
         #("smod",lambda x,y: x.bvsmod(y)),
     ):
-        add_binary(name,fun)
-
-    def add_unary(name,fun):
-        def family_closure(family):
-            Data = family.BitVector[width]
-            class Unary(Peak):
-                @name_outputs(out=Data)
-                def __call__(self,in_ : Data):
-                    return fun(in_)
-            Unary.__name__ = name
-            return Unary
-        CoreIR.add_instruction(name,family_closure)
+        CoreIR.add_peak_instruction(name,BinaryInput,OutputBV,fun)
 
     for name,fun in (
         ("wire",lambda x: x),
         ("not_",lambda x: ~x),
         ("neg",lambda x: -x)
     ):
-        add_unary(name,fun)
-
-    def add_unary_reduce(name,fun):
-        def family_closure(family):
-            Data = family.BitVector[width]
-            Bit = family.Bit
-            class UnaryReduce(Peak):
-                @name_outputs(out=Bit)
-                def __call__(self,in_ : Data):
-                    return fun(in_)
-            UnaryReduce.__name__ = name
-            return UnaryReduce
-        CoreIR.add_instruction(name,family_closure)
+        CoreIR.add_peak_instruction(name,UnaryInput,OutputBV,fun)
 
     def reduce(fun):
         def _reduce(val):
@@ -88,19 +73,8 @@ def gen_CoreIR(width):
         ("orr",lambda x: reduce(lambda a,b : a|b)(x)),
         ("xorr",lambda x: reduce(lambda a,b : a^b)(x)),
     ):
-        add_unary_reduce(name,fun)
+        CoreIR.add_peak_instruction(name,UnaryInput,OutputBit,fun)
 
-    def add_binary_reduce(name,fun):
-        def family_closure(family):
-            Data = family.BitVector[width]
-            Bit = family.Bit
-            class BinaryReduce(Peak):
-                @name_outputs(out=Bit)
-                def __call__(self,in0 : Data, in1 : Data):
-                    return fun(in0,in1)
-            BinaryReduce.__name__ = name
-            return BinaryReduce
-        CoreIR.add_instruction(name,family_closure)
     for name, fun in (
         ("eq" ,lambda x,y: x==y),
         ("neq",lambda x,y: x!=y),
@@ -113,17 +87,10 @@ def gen_CoreIR(width):
         ("ugt",lambda x,y: x.bvugt(y)),
         ("uge",lambda x,y: x.bvuge(y)),
     ):
-        add_binary_reduce(name,fun)
+        CoreIR.add_peak_instruction(name,BinaryInput,OutputBit,fun)
 
-    def mux_family_closure(family):
-        Data = family.BitVector[width]
-        Bit = family.Bit
-        class mux(Peak):
-            @name_outputs(out=Data)
-            def __call__(self,in0 : Data, in1 : Data, sel : Bit):
-                return sel.ite(in1,in0)
-        return mux
-    CoreIR.add_instruction("mux",mux_family_closure)
+    #add mux
+    CoreIR.add_peak_instruction("mux",TernaryInput,OutputBV,lambda in0,in1,sel: sel.ite(in1,in0))
 
     return CoreIR
 
