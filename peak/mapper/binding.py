@@ -60,8 +60,6 @@ def set_from_path(instr, path, val):
     assert type(getattr(instr, path[-1])) == type(val)
     setattr(instr, path[-1], val)
 
-
-
 def _default_adt_scheme(t):
     for k in t.enumerate():
         yield k
@@ -145,7 +143,7 @@ class Binder:
         del ir_by_t
 
     #This will yield a "binding" which is a list of (ir_path, arch_path) pairs
-    #the ir_path can be "unbound" which is either Existentially unbound or Universally unoound
+    #the ir_path can be "unbound" being specified by either Existential or Universal
     def enumerate(self):
         assert self.has_binding
         for l in it.product(*self.possible_matching.values()):
@@ -156,14 +154,15 @@ class Binder:
         def _get_enumeration(t):
             return self.enumeration_scheme[t](t)
 
+        assert self.has_binding
+
         #I want to modify and return the binding list
         binding_list = list(binding)
-        assert self.has_binding
         arch_instr = default_instr(self.arch_isa)
         E_paths = []
         E_idxs = []
         for bi,(ir_path, arch_path) in enumerate(binding_list):
-            if ir_path == Unbound.Existential: #existentially qualified
+            if ir_path is Unbound.Existential: #existentially qualified
                 E_paths.append(arch_path)
                 E_idxs.append(bi)
                 continue
