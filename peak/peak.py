@@ -1,9 +1,57 @@
 from collections import OrderedDict
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type
 import functools
+import inspect
+import textwrap
 
-class Peak:
+
+def _transform_type(T,family):
+    if not inspect.isclass(T):
+        return T
+    if issubclass(T,AbstractBitVector):
+        if T is AbstractBitVector:
+            return T
+        elif T.size is None:
+            return family.BitVector
+        else:
+            return family.BitVector[T.size]
+    else:
+        return T
+
+#This will save the locals and globals in Class._env_
+class PeakMeta(type):
+    def __new__(mcs,name,bases,attrs,**kwargs):
+        stack = inspect.stack()
+        env = {}
+        for i in reversed(range(1,len(stack))):
+            for key, value in stack[i].frame.f_globals.items():
+                env[key] = value
+        for i in reversed(range(1,len(stack))):
+            for key, value in stack[i].frame.f_locals.items():
+                env[key] = value
+        cls = super().__new__(mcs,name,bases,attrs,**kwargs)
+        print("cls",cls)
+        cls._env_ = env
+        return cls
+
+    #def __call__(cls, *args, **kwargs):
+    #    obj = cls.__new__(cls, *args, **kwargs)
+    #    obj.__init__(*args, **kwargs)
+    #    return super().__call__(*args, **kwargs)
+
+    #This will rebind the class to a specific family
+    def rebind(cls,family):
+        assert hasattr(cls,"_env_")
+        env = {k:_transform_type(t,family) for k,t in cls._env_.items()}
+        indented_program_txt = inspect.getsource(cls)
+        program_txt = textwrap.dedent(indented_program_txt)
+        exec_ls = {}
+        exec(program_txt,env,exec_ls)
+        return exec_ls[cls.__name__]
+
+class Peak(metaclass=PeakMeta):
     pass
+
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
