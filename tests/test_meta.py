@@ -1,5 +1,7 @@
 from peak import Peak, name_outputs
 from hwtypes import BitVector, SMTBitVector
+from examples.alu import gen_alu, Inst, ALUOP
+
 
 def test_meta():
     x = 5
@@ -16,6 +18,7 @@ def test_meta():
 
 def test_rebind():
     Data = BitVector[16]
+    #Bug in inspect.getsource if I try to name this class to A
     class B(Peak):
         def __init__(self):
             self.Data = Data
@@ -26,7 +29,24 @@ def test_rebind():
     assert B_smt().Data == SMTBitVector[16]
     try:
         b_sym = B_smt()(SMTBitVector[16]())
-        print(b_sym)
     except:
         assert 0
-test_rebind()
+
+ALU = gen_alu(BitVector.get_family())
+def test_alu():
+    assert hasattr(ALU,"_env_")
+    Data = BitVector[16]
+    assert ALU()(Inst(ALUOP.Add),Data(3),Data(5)) == Data(8)
+    ALU_smt = ALU.rebind(SMTBitVector.get_family())
+    alu_smt = ALU_smt()
+    Data = SMTBitVector[16]
+    assert alu_smt(Inst(ALUOP.Add),Data(3),Data(5)) == Data(8)
+    #Try to pass in original bitvector to smt
+    Data = BitVector[16]
+    try:
+        alu_smt(Inst(ALUOP.Add),Data(3),Data(5))
+    except TypeError:
+        pass
+    else:
+        assert 0
+
