@@ -19,7 +19,7 @@ def _rebind_type(T,family):
     elif issubclass(T,AbstractBit):
         return family.Bit
     elif issubclass(T,Product):
-        return Product.from_fields(T.__name__,{field:_rebind_type(t,family) for field,t in T.field_dict.items()})
+        return Product.from_fields(T.__name__,{field:_rebind_type(t,family) for field,t in T.field_dict.items()},None,None)
     elif issubclass(T,Enum):
         return T
     elif issubclass(T,Sum):
