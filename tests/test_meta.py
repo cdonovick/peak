@@ -16,6 +16,20 @@ def test_meta():
     assert A._env_['stack'] == 4
     assert A._env_['env'] == 3
 
+    def f():
+        x = 4
+        stack = 2
+        env = 1
+        class A1(Peak):
+            pass
+        return A1
+    A1 = f()
+    assert hasattr(A1,"_env_")
+    assert A1._env_['x'] == 4
+    assert A1._env_['stack'] == 2
+    assert A1._env_['env'] == 1
+
+
 def test_rebind():
     Data = BitVector[16]
     #Bug in inspect.getsource if I try to name this class to A
