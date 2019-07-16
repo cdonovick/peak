@@ -9,9 +9,9 @@ import textwrap
 def _rebind_type(T,family):
     if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple, Enum):
         return T
-    if not inspect.isclass(T):
+    elif not inspect.isclass(T):
         return T
-    if issubclass(T,AbstractBitVector):
+    elif issubclass(T,AbstractBitVector):
         if T.size is None: #This is BitVector
             return family.BitVector
         else:
