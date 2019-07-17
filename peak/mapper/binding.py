@@ -1,6 +1,6 @@
 import typing as tp
 import itertools as it
-from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
+from hwtypes import SMTBit, SMTBitVector, SMTSIntVector, AbstractBitVector, AbstractBit
 from hwtypes import is_adt_type
 from hwtypes.adt import Product, Enum, Sum
 from .util import SubTypeDict
@@ -15,17 +15,34 @@ class Unbound(Enum):
 def is_product(isa):
     return issubclass(isa, Product)
 
-#finds all paths in the adt
-#A path is a tuple of names that indicate location in nested Product
-#TODO does not deal with Sum (treats it as a leaf type)
-def _flatten_adt(isa, path=()) -> tp.Mapping[tuple, type]:
-    if issubclass(isa, Product):
-        res = {}
-        for name, t in isa.field_dict.items():
-            res.update(_flatten_adt(t, path+(name,)))
-        return res
+def _has_binding(arch_by_t, ir_by_t):
+#for each type, each input of the type in the IR needs to at least be able to bind to one other in the arch
+    for t in ir_by_t:
+        if not (t in arch_by_t):
+            return False
+        if len(arch_by_t[t]) < len(ir_by_t[t]):
+            return False
+    return True
+
+def _enumerate_forms(isa,path=()):
+    if issubclass(isa,Product):
+        sub_forms = []
+        for field,t in isa.field_dict.items():
+            sub_forms.append(_enumerate_forms(t,path+(field,)))
+        forms = []
+        for form in it.product(*sub_forms):
+            fs = {}
+            for f in form:
+                fs.update(f)
+            forms.append(fs)
+        return forms
+    elif issubclass(isa,Sum):
+        sums = []
+        for field,t in isa.field_dict.items():
+            sums += _enumerate_forms(t,path+(field,))
+        return sums
     else:
-        return {path:isa}
+        return [{path:isa}]
 
 def _sort_by_t(path2t : tp.Mapping[tuple, type]) ->tp.Mapping[type, tp.List[tuple]]:
 
@@ -39,20 +56,27 @@ def _sort_by_t(path2t : tp.Mapping[tuple, type]) ->tp.Mapping[type, tp.List[tupl
 def default_instr(isa, forall=False):
     if issubclass(isa, Product):
         return isa(**{name:default_instr(t, forall) for name, t in isa.field_dict.items()})
+    elif issubclass(isa, Sum):
+        return isa(default_instr(list(isa.fields)[0]))
     elif issubclass(isa, Enum):
         return isa.fields[0]
     elif forall:
         return isa()
-    else:
+    elif issubclass(isa,AbstractBitVector):
         return isa(0)
+    elif issubclass(isa,AbstractBit):
+        return isa(False)
+    else:
+        raise ValueError(str(isa))
 
 #Given an adt object and a tree path to a node in that adt, returns the node
 def get_from_path(instr, path):
     if path is ():
         return instr
-    else:
-        assert isinstance(instr, Product)
+    elif isinstance(instr,Product):
         return get_from_path(getattr(instr, path[0]), path[1:])
+    elif isinstance(instr,Sum):
+        return get_from_path(instr.value_dict[path[0]], path[1:])
 
 #Given an adt object and a tree path to a node in that adt, sets that node
 def set_from_path(instr, path, val):
@@ -82,6 +106,7 @@ class Binder:
         allow_existential : bool, #allow unbound to be Existential
         custom_enumeration : tp.Mapping[type, tp.Callable] = ()
     ):
+        self.allow_existential = allow_existential
         self.enumeration_scheme = SubTypeDict(custom_enumeration)
         for t in (Sum, Enum):
             self.enumeration_scheme.setdefault(t, _default_adt_scheme)
@@ -94,67 +119,55 @@ class Binder:
         self.arch_isa = arch_isa
         self.ir_isa = ir_isa
 
-        self.arch_flat = _flatten_adt(self.arch_isa)
-        self.ir_flat = _flatten_adt(self.ir_isa)
+    #returns arch_flat,ir_flat
+    def enumerate_forms(self):
+        yield from it.product(_enumerate_forms(self.arch_isa),_enumerate_forms(self.ir_isa))
 
-        arch_by_t = _sort_by_t(self.arch_flat)
-        ir_by_t = _sort_by_t(self.ir_flat)
-
-        def _has_binding(arch_by_t, ir_by_t):
-            #for each type, each input of the type in the IR needs to at least be able to bind to one other in the arch
-            for t in ir_by_t:
-                if not (t in arch_by_t):
-                    return False
-                if len(arch_by_t[t]) < len(ir_by_t[t]):
-                    return False
-            return True
-
-        #Check if there is at least one input binding
-        self.has_binding = _has_binding(arch_by_t, ir_by_t)
-
-        #check for early out
-        if not self.has_binding:
-            return
-        possible_matching = {}
-        for arch_type, arch_paths in arch_by_t.items():
-            if is_adt_type(arch_type): #Sum or Enum
-                unbound_possibilities = (Unbound.Existential,)
-            elif allow_existential:
-                unbound_possibilities = (Unbound.Universal, Unbound.Existential)
-            else:
-                unbound_possibilities = (Unbound.Universal,)
-
-            #Returns this list of things that match type t from arch
-            ir_paths = ir_by_t.setdefault(arch_type, [])
-            num_unbound = len(arch_paths) - len(ir_paths)
-
-            #Create a potentials list (to be passed to product)
-            #This will tie each unbound variable with either "Universal" or "Existential"
-            ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities, num_unbound)))
-            assert len(ir_path_potentials) == len(arch_paths)
-            for ir_path in it.product(*ir_path_potentials):
-                #For every permutation of arch, match it with ir
-                for arch_perm in it.permutations(arch_paths):
-                    possible_matching.setdefault(arch_type, []).append(list(zip(ir_path, arch_perm)))
-
-        self.possible_matching = possible_matching
-
-        del arch_by_t
-        del ir_by_t
-
-    #This will yield a "binding" which is a list of (ir_path, arch_path) pairs
-    #the ir_path can be "unbound" being specified by either Existential or Universal
     def enumerate(self):
-        assert self.has_binding
-        for l in it.product(*self.possible_matching.values()):
-            yield it.chain(*l)
+        cnt = 0
+        for arch_flat,ir_flat in self.enumerate_forms():
+            arch_by_t = _sort_by_t(arch_flat)
+            ir_by_t = _sort_by_t(ir_flat)
+            #slightly a hack. Assuming you will call enumerate_binding after every yield
+            self.arch_flat = arch_flat
+            self.ir_flat = ir_flat
+            #early out (skip) if no binding
+            if not _has_binding(arch_by_t,ir_by_t):
+                continue
+
+            possible_matching = {}
+            for arch_type, arch_paths in arch_by_t.items():
+                if is_adt_type(arch_type): #Sum or Enum
+                    unbound_possibilities = (Unbound.Existential,)
+                elif self.allow_existential:
+                    unbound_possibilities = (Unbound.Universal, Unbound.Existential)
+                else:
+                    unbound_possibilities = (Unbound.Universal,)
+
+                #Returns this list of things that match type t from arch
+                ir_paths = ir_by_t.setdefault(arch_type, [])
+                num_unbound = len(arch_paths) - len(ir_paths)
+
+                #Create a potentials list (to be passed to product)
+                #This will tie each unbound variable with either "Universal" or "Existential"
+                ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities, num_unbound)))
+                assert len(ir_path_potentials) == len(arch_paths)
+                for ir_path in it.product(*ir_path_potentials):
+                    #For every permutation of arch, match it with ir
+                    for arch_perm in it.permutations(arch_paths):
+                        possible_matching.setdefault(arch_type, []).append(list(zip(ir_path, arch_perm)))
+
+            del arch_by_t
+            del ir_by_t
+        #This will yield a "binding" which is a list of (ir_path, arch_path) pairs
+        #the ir_path can be "unbound" being specified by either Existential or Universal
+            for l in it.product(*possible_matching.values()):
+                yield it.chain(*l)
 
     #This will enumerate a particular binding and yield a concrete instruction along with a concrete binding
     def enumerate_binding(self, binding, ir_instr):
         def _get_enumeration(t):
             return self.enumeration_scheme[t](t)
-
-        assert self.has_binding
 
         #I want to modify and return the binding list
         binding_list = list(binding)
