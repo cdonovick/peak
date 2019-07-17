@@ -6,11 +6,7 @@ from hwtypes.adt_meta import BoundMeta, EnumMeta
 from types import MappingProxyType
 import typing as tp
 
-def _issubclass(sub , parent : type) -> bool:
-    try:
-        return issubclass(sub, parent)
-    except TypeError:
-        return False
+from .assembler_util import _issubclass
 
 class Assembler(AbstractAssembler):
     _asm : tp.Callable[['isa'], int]

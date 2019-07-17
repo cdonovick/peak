@@ -7,11 +7,7 @@ import typing as tp
 import warnings
 import weakref
 
-def _issubclass(sub , parent : type) -> bool:
-    try:
-        return issubclass(sub, parent)
-    except TypeError:
-        return False
+from .assembler_util import _issubclass
 
 # Basically just handles instance caching
 class AssemblerMeta(ABCMeta):
