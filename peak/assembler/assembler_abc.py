@@ -1,0 +1,153 @@
+from abc import ABCMeta, abstractmethod
+from hwtypes import AbstractBitVector, BitVector
+from hwtypes.adt import Enum, Product, Sum, Tuple
+from hwtypes.adt_meta import BoundMeta
+
+import typing as tp
+import warnings
+import weakref
+
+from .assembler_util import _issubclass
+
+# Basically just handles instance caching
+class AssemblerMeta(ABCMeta):
+    # cls -> ((init args -> object) | None)
+    _cache = dict()
+    def __new__(mcs, name, bases, namespace, cache=True, **kwargs):
+        return super().__new__(mcs, name, bases, namespace, **kwargs)
+
+    def __init__(cls, name, bases, namespace, cache=True, **kwargs):
+        if cache:
+            type(cls)._cache[cls] = dict()
+        else:
+            type(cls)._cache[cls] = None
+
+        return super().__init__(name, bases, namespace, **kwargs)
+
+    def __call__(cls, *args, **kwargs):
+        i_cache = type(cls)._cache[cls]
+        if i_cache is not None:
+            idx = (args, tuple(kwargs.items()))
+            try:
+                return i_cache[idx]
+            except KeyError:
+                pass
+            obj = super().__call__(*args, **kwargs)
+            i_cache[idx] = obj
+        else:
+            obj = super().__call__(*args, **kwargs)
+
+        return obj
+
+class AbstractAssembler(metaclass=AssemblerMeta):
+    _isa : BoundMeta
+
+    def __init__(self, isa: BoundMeta):
+        self._isa = isa
+
+
+    def __init_subclass__(cls, cache=True, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+    @property
+    def isa(self):
+        return self._isa
+
+    @property
+    def sub(self) -> 'Sub':
+        return Sub(self)
+
+    @property
+    @abstractmethod
+    def width(self) -> int:
+        pass
+
+    @property
+    @abstractmethod
+    def layout(self) -> tp.Mapping[str, tp.Tuple[int, int]]:
+        pass
+
+    @abstractmethod
+    def assemble(self, inst: 'isa', bv_type: tp.Type[AbstractBitVector]) -> AbstractBitVector:
+        pass
+
+    @abstractmethod
+    def disassemble(self, opcode: BitVector) -> 'isa':
+        pass
+
+class Sub(tp.Mapping):
+    _reserved_names = ('asm', 'idx', '_asm', '_offset', '_path')
+
+    def __init__(self, assembler, offset=0, path=None):
+        isa = assembler.isa
+        if _issubclass(isa, (Enum, Product, Sum)):
+            for name in type(self)._reserved_names:
+                if name in isa.field_dict:
+                    warnings.warn(f'field {name} is used by the assembler '
+                                   'machinery gettattr access will not work')
+        elif not _issubclass(isa, (Tuple, AbstractBitVector)):
+            raise TypeError(f'Unsported type {isa}')
+
+        self._asm = assembler
+        self._offset = offset
+        if path is None:
+            self._path = [f'{self.asm.isa}.sub']
+        else:
+            self._path = path
+
+
+    def __getattr__(self, attr):
+        return self[attr]
+
+    def __getitem__(self, path):
+        if not isinstance(path, tuple):
+            path = path,
+        elif not path:
+            # empty path
+            return self
+
+        isa = self.asm.isa
+        attr = path[0]
+        if isinstance(attr, str) and _issubclass(isa, (Enum, Product, Sum)):
+            try:
+                field = isa.field_dict[attr]
+            except KeyError:
+                raise AttributeError(f'Bad path {attr} for {self.asm.isa}')
+        elif isinstance(attr, int) and _issubclass(isa, (Tuple, Product)):
+            try:
+                field = isa[attr]
+            except (KeyError, IndexError):
+                raise AttributeError(f'Bad path {attr} for {self.asm.isa}')
+        else:
+            raise AttributeError(f'Bad path {attr} for {self.asm.isa}')
+
+        sub_asm = type(self.asm)(field)
+        offset = self._offset + self.asm.layout[attr][0]
+
+        return type(self)(sub_asm, offset, self._path + [attr])[path[1:]]
+
+    def __iter__(self):
+        isa = self.asm.isa
+        if _issubclass(isa, (Enum, Product, Sum)):
+            yield from isa.field_dict
+        elif _issubclass(isa, Tuple):
+            yield from range(len(isa.fields))
+        else:
+            raise TypeError(f'Unsported type {isa}')
+
+    def __len__(self):
+        return len(self.asm.isa.fields)
+
+
+    def __repr__(self):
+        path = '.'.join(self._path)
+        return path
+
+    @property
+    def asm(self):
+        return self._asm
+
+    @property
+    def idx(self):
+        o = self._offset
+        return slice(o, o + self.asm.width)
