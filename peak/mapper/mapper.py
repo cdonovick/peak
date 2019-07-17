@@ -92,10 +92,9 @@ class ArchMapper:
             custom_enumeration=self.custom_enumeration
         )
         output_binder = Binder(self.arch_output_isa, ir_output_isa, allow_existential=False)
-        #Early out if no bindings
-        if not (input_binder.has_binding and output_binder.has_binding):
-            return
-
+        ##Early out if no bindings
+        #if not (input_binder.has_binding and output_binder.has_binding):
+        #    return
         for input_binding in input_binder.enumerate():
 
             #In the future we can use SMT for some of the variables instead of enumerating
