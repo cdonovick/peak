@@ -2,11 +2,13 @@ from examples.smallir import gen_SmallIR
 from peak.irs import gen_CoreIR
 from peak.ir import IR
 from examples.alu import gen_ALU
+from examples.simple_sum import simple_sum_fc, Instr
 from peak.mapper import ArchMapper
 from hwtypes import BitVector, SMTBitVector, Bit, SMTBit
 from hwtypes import AbstractBitVector as ABV
 from hwtypes import AbstractBit
-from hwtypes.adt import Product
+from hwtypes.adt import Product, Sum
+import itertools as it
 
 def test_add_peak_instruction():
     class Input(Product):
@@ -51,6 +53,8 @@ def test_smallir():
         has_mapping = len(mapping) > 0
         assert has_mapping == (name in has_mappings)
 
+#test_smallir()
+
 def test_smallir_custom_enum():
     #arch
     arch_fc = gen_ALU()
@@ -87,3 +91,23 @@ def test_coreir():
         mapping = list(ALUMapper.map_ir_op(ir_fc))
         has_mapping = len(mapping) > 0
         assert has_mapping == (name in has_mappings)
+
+#This test will try to run the ir mapper function
+def test_simple_sum():
+    #arch
+    arch_fc = simple_sum_fc
+
+    SSMapper = ArchMapper(arch_fc)
+
+    #IR
+    SmallIR = gen_SmallIR(16)
+
+    has_mappings = ("Not","Neg","Add","Sub")
+    for name,ir_fc in SmallIR.instructions.items():
+        print("trying",name)
+        mapping = list(SSMapper.map_ir_op(ir_fc))
+        print(name,mapping)
+        has_mapping = len(mapping) > 0
+        assert has_mapping == (name in has_mappings)
+
+#test_simple_sum()
