@@ -2,7 +2,7 @@ from examples.smallir import gen_SmallIR
 from peak.irs import gen_CoreIR
 from peak.ir import IR
 from examples.alu import gen_ALU
-from examples.simple_sum import simple_sum_fc, Instr
+from examples.simple_sum import simple_sum_fc 
 from peak.mapper import ArchMapper
 from hwtypes import BitVector, SMTBitVector, Bit, SMTBit
 from hwtypes import AbstractBitVector as ABV
@@ -92,7 +92,7 @@ def test_coreir():
         has_mapping = len(mapping) > 0
         assert has_mapping == (name in has_mappings)
 
-#This test will try to run the ir mapper function
+
 def test_simple_sum():
     #arch
     arch_fc = simple_sum_fc
@@ -102,12 +102,20 @@ def test_simple_sum():
     #IR
     SmallIR = gen_SmallIR(16)
 
-    has_mappings = ("Not","Neg","Add","Sub")
+    gold_mappings = {
+        "Not":1,
+        "Neg":1,
+        "Add":72,
+        "Sub":3
+    }
     for name,ir_fc in SmallIR.instructions.items():
-        print("trying",name)
-        mapping = list(SSMapper.map_ir_op(ir_fc))
-        print(name,mapping)
-        has_mapping = len(mapping) > 0
-        assert has_mapping == (name in has_mappings)
+        mappings = list(SSMapper.map_ir_op(ir_fc,max_mappings=100))
+        num_mappings = len(mappings)
+        print(name,num_mappings,gold_mappings.setdefault(name,0))
+        assert num_mappings == gold_mappings.setdefault(name,0)
+        print(f"mappings found for {name}")
+        for mapping in mappings:
+            for mapping in mappings:
+                print(mapping)
 
-#test_simple_sum()
+test_simple_sum()
