@@ -124,9 +124,6 @@ class Binder:
         allow_existential : bool, #allow unbound to be Existential
         custom_enumeration : tp.Mapping[type, tp.Callable] = ()
     ):
-        #debug
-        self.cnt = 0
-        self.bs = set()
         self.allow_existential = allow_existential
         self.enumeration_scheme = SubTypeDict(custom_enumeration)
         for t in (Sum, Enum):
@@ -145,6 +142,9 @@ class Binder:
     def enumerate_forms(self):
         yield from it.product(_enumerate_forms(self.arch_isa),_enumerate_forms(self.ir_isa))
 
+    #yields (arch_instr, Binding)
+    #The Binding still can contain Unbound.Existential
+    #Use enumerate_binding() to enumerate out the Unbound.Existentials
     def enumerate(self):
         for (arch_flat,arch_instr),(ir_flat,ir_instr) in self.enumerate_forms():
             arch_by_t = _sort_by_t(arch_flat)
@@ -154,7 +154,7 @@ class Binder:
             if not _has_binding(arch_by_t,ir_by_t):
                 continue
 
-            #slightly a hack. Assuming you will call enumerate_binding after every yield
+            #This assumes you will call enumerate_binding after every yield
             self.arch_instr = arch_instr
             self.arch_flat = arch_flat
             self.ir_flat = ir_flat
