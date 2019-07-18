@@ -13,7 +13,7 @@ def gen_CoreIR(width):
         class const(Peak):
             @name_outputs(out=Data)
             def __call__(self,modparams : ConstModParams):
-                return modparams.value
+                return modparams.value_
         return const
     CoreIR.add_instruction("const",const_family_closure)
 
