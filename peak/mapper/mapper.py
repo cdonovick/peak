@@ -93,7 +93,7 @@ class ArchMapper:
         #if not (input_binder.has_binding and output_binder.has_binding):
         #    return
         for input_binding in input_binder.enumerate():
-            #This is a bit of a hack really should be output from input_binder
+
             ir_instr = input_binder.ir_instr
             ir_rvals = ir_smt()(**ir_instr.value_dict)
             ir_output_instr = _make_adt_instance(ir_rvals, ir_output_isa)
