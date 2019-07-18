@@ -92,7 +92,7 @@ def test_coreir():
         has_mapping = len(mapping) > 0
         assert has_mapping == (name in has_mappings)
 
-
+#Finds all the unique mappings
 def test_simple_sum():
     #arch
     arch_fc = simple_sum_fc
@@ -103,21 +103,20 @@ def test_simple_sum():
     SmallIR = gen_SmallIR(16)
 
     gold_mappings = {
-        "Not":1,
-        "Neg":1,
+        "Not":18,
+        "Neg":18,
         "Add":36,
-        "Sub":3
+        "Sub":18
     }
     for name,ir_fc in SmallIR.instructions.items():
-        mappings = list(SSMapper.map_ir_op(ir_fc,max_mappings=100))
+        mappings = list(SSMapper.map_ir_op(ir_fc,max_mappings=1000))
         num_mappings = len(mappings)
-        print(name,num_mappings,gold_mappings.setdefault(name,0))
         assert num_mappings == gold_mappings.setdefault(name,0)
-        print(f"mappings found for {name} {{")
-        for mi,mapping in enumerate(mappings):
-            print(f"  Mapping {mi}")
-            binding_pretty_print(mapping['input_binding'],ts="    ")
-        print("-------")
-        print("}")
+        #print(f"mappings found for {name} {{")
+        #for mi,mapping in enumerate(mappings):
+        #    print(f"  Mapping {mi}")
+        #    binding_pretty_print(mapping['input_binding'],ts="    ")
+        #print("-------")
+        #print("}")
 
 test_simple_sum()
