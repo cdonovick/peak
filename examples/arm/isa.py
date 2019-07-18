@@ -4,19 +4,19 @@ from peak.bitfield import bitfield
 from hwtypes import BitVector, Bit
 
 
-Byte = new(BitVector, 8)
-Half = new(BitVector, 16)
-Word = new(BitVector, 32)
+Byte = new(BitVector, 8, name="Byte")
+Half = new(BitVector, 16, name="Half")
+Word = new(BitVector, 32, name="Word")
 
-Imm = bitfield(0)(new(BitVector, 8))
-Rotate = bitfield(8)(new(BitVector, 4))
+Imm = bitfield(0)(new(BitVector, 8, name="Imm"))
+Rotate = bitfield(8)(new(BitVector, 4, name="Rotate"))
 
 class ImmOperand(Product):
     imm = Imm
     rotate = Rotate
 
-RegC = bitfield(0)(new(BitVector, 4))
-Shift = bitfield(4)(new(BitVector, 8))
+RegC = bitfield(0)(new(BitVector, 4, name="RegC"))
+Shift = bitfield(4)(new(BitVector, 8, name="Shift"))
 
 class RegOperand(Product):
     rc = RegC
@@ -25,9 +25,9 @@ class RegOperand(Product):
 @bitfield(25)
 class Operand(Sum[RegOperand, ImmOperand]): pass
 
-RegA = bitfield(16)(new(BitVector, 4))
-RegB = bitfield(12)(new(BitVector, 4))
-S = bitfield(20)(new(BitVector, 1))
+RegA = bitfield(16)(new(BitVector, 4, name="RegA"))
+RegB = bitfield(12)(new(BitVector, 4, name="RegB"))
+S = bitfield(20)(new(BitVector, 1, name="S"))
 
 class _Data(Product):
     ra = RegA
@@ -102,9 +102,9 @@ class STR(_LDST):
 class LDST(Sum[STR, LDR]): pass
 
 
-Offset = bitfield(0)(new(BitVector, 24))
-L = bitfield(24)(new(BitVector, 1))
-BI = bitfield(25)(new(BitVector, 1))
+Offset = bitfield(0)(new(BitVector, 24, name="Offset"))
+L = bitfield(24)(new(BitVector, 1, name="L"))
+BI = bitfield(25)(new(BitVector, 1, name="BI"))
 
 class B(Product):
     offset = Offset

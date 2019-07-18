@@ -28,8 +28,8 @@ from .isa import *
 def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
     if signed:
-        a = SIntVector(a)
-        b = SIntVector(b)
+        a = SIntVector[DATAWIDTH](a)
+        b = SIntVector[DATAWIDTH](b)
         mula, mulb = a.sext(16), b.sext(16)
     else:
         mula, mulb = a.zext(16), b.zext(16)

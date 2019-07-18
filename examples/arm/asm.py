@@ -28,7 +28,7 @@ def _imm(val):
     for i in range(16):
         r = rol(w,2*i)
         if r < 256:
-            return r, i
+            return r[:Rotate.size], i
     raise ValueError(f"Can't convert {val} to an immediate")
 
 def data(Op, ra, rb, rc, shift, imm, s, cond):
@@ -36,7 +36,7 @@ def data(Op, ra, rb, rc, shift, imm, s, cond):
     rb = RegB(rb)
     s = S(s)
     if rc is None:
-        imm, rotate = _imm(imm)
+        rotate, imm = _imm(imm)
         rc = Operand(ImmOperand(Imm(imm),Rotate(rotate)))
     else:
         rc = Operand(RegOperand(RegC(rc),Shift(shift)))
