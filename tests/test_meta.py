@@ -1,5 +1,6 @@
-from peak import Peak, name_outputs
-from hwtypes import BitVector, SMTBitVector
+from peak import Peak, name_outputs, rebind_type
+from hwtypes import Bit, BitVector, SMTBit, SMTBitVector
+from hwtypes.adt import Sum, Product
 from examples.alu import gen_alu, Inst, ALUOP
 
 
@@ -30,21 +31,34 @@ def test_meta():
     assert A1._env_['env'] == 1
 
 
+Data = BitVector[16]
+#Bug in inspect.getsource if I try to name this class to A
+BV = BitVector
+DBSum = Sum[Data,BV[8]]
+class Instr(Product):
+    a=DBSum
+    b=Bit
+
+def test_rebind_type():
+    Instr_smt = rebind_type(Instr,SMTBitVector.get_family())
+    assert Instr_smt.a == Sum[SMTBitVector[16],SMTBitVector[8]]
+    assert Instr_smt.b == SMTBit
+
 def test_rebind():
-    Data = BitVector[16]
-    #Bug in inspect.getsource if I try to name this class to A
     class B(Peak):
         def __init__(self):
             self.Data = Data
-        def __call__(self,a : Data):
+        @name_outputs(out=BV[16])
+        def __call__(self, instr : Instr, a : Data):
             return a + BitVector[16](5)
-    assert Data(6) == B()(Data(1))
+
+    assert Data(6) == B()(None,Data(1))
     B_smt = B.rebind(SMTBitVector.get_family())
     assert B_smt().Data == SMTBitVector[16]
-    try:
-        b_sym = B_smt()(SMTBitVector[16]())
-    except:
-        assert 0
+    Instr_smt = rebind_type(Instr,SMTBitVector.get_family())
+    instr_smt = Instr_smt(a=Instr_smt.a(SMTBitVector[8](9)),b=SMTBit(0))
+    assert SMTBitVector[16](10) == B_smt()(instr=instr_smt,a=SMTBitVector[16](5))
+
 
 ALU = gen_alu(BitVector.get_family())
 def test_alu():
