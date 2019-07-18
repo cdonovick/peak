@@ -4,7 +4,7 @@ import functools as ft
 import logging
 from ..peak import Peak
 import coreir
-from .binding import Binder, get_from_path
+from .binding import Binder, get_from_path, binding_pretty_print
 from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
@@ -93,7 +93,6 @@ class ArchMapper:
         #if not (input_binder.has_binding and output_binder.has_binding):
         #    return
         for input_binding in input_binder.enumerate():
-
             #This is a bit of a hack really should be output from input_binder
             ir_instr = input_binder.ir_instr
             ir_rvals = ir_smt()(**ir_instr.value_dict)
@@ -122,6 +121,7 @@ class ArchMapper:
                         found  += 1
                         if found >= max_mappings:
                             return
+
 
     def smt_check_equal(self, expr1, expr2):
         with smt.Solver(self.solver_name, logic=QF_BV) as solver:

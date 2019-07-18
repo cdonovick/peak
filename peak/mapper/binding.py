@@ -6,14 +6,41 @@ from hwtypes.adt import Product, Enum, Sum
 from .util import SubTypeDict
 
 
-__ALL__ = ['Binder', 'get_from_path', 'set_from_path']
+__ALL__ = ['Binder', 'get_from_path', 'set_from_path', 'binding_pretty_print']
+
+def copy_smt_value(val):
+    if isinstance(val,(SMTBit,SMTBitVector)):
+        return type(val)(val.value)
+    else:
+        return val
+
+def binding_pretty_print(binding,ts="  "):
+    for p0,p1 in binding:
+        if isinstance(p0,tuple):
+            p0_str = ".".join(p0)
+        elif isinstance(p0,Enum):
+            p0_str = str(p0)
+        else:
+            p0_str = str(p0.value)
+        p1_str = ".".join(p1)
+        print(f"{ts}{p0_str} -> {p1_str}")
+
+def binding_str(binding,ts="  "):
+    ret = ""
+    for p0,p1 in binding:
+        if isinstance(p0,tuple):
+            p0_str = ".".join(p0)
+        elif isinstance(p0,Enum):
+            p0_str = str(p0)
+        else:
+            p0_str = str(p0.value)
+        p1_str = ".".join(p1)
+        ret += f"{ts}{p0_str} -> {p1_str}"
+    return ret
 
 class Unbound(Enum):
     Existential=0
     Universal=1
-
-def is_product(isa):
-    return issubclass(isa, Product)
 
 def _has_binding(arch_by_t, ir_by_t):
 #for each type, each input of the type in the IR needs to at least be able to bind to one other in the arch
@@ -110,6 +137,9 @@ class Binder:
         allow_existential : bool, #allow unbound to be Existential
         custom_enumeration : tp.Mapping[type, tp.Callable] = ()
     ):
+        #debug
+        self.cnt = 0
+        self.bs = set()
         self.allow_existential = allow_existential
         self.enumeration_scheme = SubTypeDict(custom_enumeration)
         for t in (Sum, Enum):
@@ -148,25 +178,41 @@ class Binder:
 
             possible_matching = {}
             for arch_type, arch_paths in arch_by_t.items():
-                if is_adt_type(arch_type): #Sum or Enum
-                    unbound_possibilities = (Unbound.Existential,)
-                elif self.allow_existential:
-                    unbound_possibilities = (Unbound.Universal, Unbound.Existential)
-                else:
-                    unbound_possibilities = (Unbound.Universal,)
-
-                #Returns this list of things that match type t from arch
                 ir_paths = ir_by_t.setdefault(arch_type, [])
-                num_unbound = len(arch_paths) - len(ir_paths)
+                ir_poss = tuple(ir_paths)
+                if issubclass(arch_type,Enum):
+                    ir_poss += (Unbound.Existential,)
+                elif self.allow_existential:
+                    ir_poss += (Unbound.Universal, Unbound.Existential)
+                else:
+                    ir_poss += (Unbound.Universal,)
 
-                #Create a potentials list (to be passed to product)
-                #This will tie each unbound variable with either "Universal" or "Existential"
-                ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities, num_unbound)))
-                assert len(ir_path_potentials) == len(arch_paths)
-                for ir_path in it.product(*ir_path_potentials):
-                    #For every permutation of arch, match it with ir
-                    for arch_perm in it.permutations(arch_paths):
-                        possible_matching.setdefault(arch_type, []).append(list(zip(ir_path, arch_perm)))
+                #Now ir_poss has all the possible mappings for each arch_path
+
+                #Filter out unlikely to work bindings
+                def filt(poss):
+                    ret = True
+                    for ir_path in ir_paths:
+                        num_ir = poss.count(ir_path)
+                        ret = ret and (num_ir==1)
+                        if ret is False:
+                            return False
+                    return ret
+                type_bindings = []
+                for ir_match in filter(filt,it.product(*[ir_poss for _ in range(len(arch_paths))])):
+
+                    type_bindings.append(list(zip(ir_match,arch_paths)))
+                possible_matching[arch_type] = type_bindings
+
+                #for poss in filter(filt,product(
+                ##Create a potentials list (to be passed to product)
+                ##This will tie each unbound variable with either "Universal" or "Existential"
+                #ir_path_potentials = list(it.chain(((path,) for path in ir_paths), it.repeat(unbound_possibilities, num_unbound)))
+                #assert len(ir_path_potentials) == len(arch_paths)
+                #for ir_path in it.product(*ir_path_potentials):
+                #    #For every permutation of arch, match it with ir
+                #    for arch_perm in it.permutations(arch_paths):
+                #        possible_matching.setdefault(arch_type, []).append(list(zip(ir_path, arch_perm)))
 
             del arch_by_t
             del ir_by_t
@@ -180,10 +226,9 @@ class Binder:
     def enumerate_binding(self, binding):
         def _get_enumeration(t):
             return self.enumeration_scheme[t](t)
-
+        arch_instr = self.arch_instr
         #I want to modify and return the binding list
         binding_list = list(binding)
-        arch_instr = self.arch_instr
         E_paths = []
         E_idxs = []
         for bi,(ir_path, arch_path) in enumerate(binding_list):
@@ -206,4 +251,8 @@ class Binder:
             for arch_path, inst, idx in zip(E_paths, E_binding, E_idxs):
                 set_from_path(arch_instr, arch_path, inst)
                 binding_list[idx] = (inst, binding_list[idx][1])
-            yield arch_instr, binding_list
+
+            #Need to copy since this contains SMT objects.
+            #Potentially could store binding value as a string or BitVector
+            binding_copy = [(path,copy_smt_value(val)) for path,val in binding_list]
+            yield arch_instr, binding_copy
