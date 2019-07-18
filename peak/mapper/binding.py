@@ -25,19 +25,6 @@ def binding_pretty_print(binding,ts="  "):
         p1_str = ".".join(p1)
         print(f"{ts}{p0_str} -> {p1_str}")
 
-def binding_str(binding,ts="  "):
-    ret = ""
-    for p0,p1 in binding:
-        if isinstance(p0,tuple):
-            p0_str = ".".join(p0)
-        elif isinstance(p0,Enum):
-            p0_str = str(p0)
-        else:
-            p0_str = str(p0.value)
-        p1_str = ".".join(p1)
-        ret += f"{ts}{p0_str} -> {p1_str}"
-    return ret
-
 class Unbound(Enum):
     Existential=0
     Universal=1
@@ -179,6 +166,8 @@ class Binder:
             possible_matching = {}
             for arch_type, arch_paths in arch_by_t.items():
                 ir_paths = ir_by_t.setdefault(arch_type, [])
+
+                #ir_poss represents all the possible inputs that could be bound to each arch_input
                 ir_poss = tuple(ir_paths)
                 if issubclass(arch_type,Enum):
                     ir_poss += (Unbound.Existential,)
@@ -189,12 +178,16 @@ class Binder:
 
                 #Now ir_poss has all the possible mappings for each arch_path
 
-                #Filter out unlikely to work bindings
+                #Filter out some bindings
+                #Only count bindings where each ir is represented exactly once
+                #Might want to decrease this restriction to find things like (0 -> x^x)
+                #TODO could have this customizable 
                 def filt(poss):
                     ret = True
                     for ir_path in ir_paths:
                         num_ir = poss.count(ir_path)
                         ret = ret and (num_ir==1)
+                        #early out
                         if ret is False:
                             return False
                     return ret
