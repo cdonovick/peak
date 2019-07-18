@@ -4,7 +4,7 @@ import functools as ft
 import logging
 from ..peak import Peak
 import coreir
-from .binding import Binder, default_instr, get_from_path
+from .binding import Binder, get_from_path
 from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
@@ -31,10 +31,10 @@ def _tupleify(vals):
     return vals
 
 #Will not need 'ordered_dict once hwtypes #57 is resolved
-def _make_adt_instance(rvals, ordered_dict, isa):
+def _make_adt_instance(rvals, isa):
     rvals = _tupleify(rvals)
     rdict = {}
-    for i, name in enumerate(ordered_dict):
+    for i, name in enumerate(isa.field_dict.keys()):
         rdict[name] = rvals[i]
     return isa(**rdict)
 
@@ -81,9 +81,6 @@ class ArchMapper:
 
         logging.debug("Starting search")
 
-        ir_instr = default_instr(ir_input_isa, forall=True)
-        ir_rvals = ir_smt()(**ir_instr.value_dict)
-        ir_output_instr = _make_adt_instance(ir_rvals, ir_outputs, ir_output_isa)
 
         input_binder = Binder(
             self.arch_input_isa,
@@ -97,10 +94,15 @@ class ArchMapper:
         #    return
         for input_binding in input_binder.enumerate():
 
+            #This is a bit of a hack really should be output from input_binder
+            ir_instr = input_binder.ir_instr
+            ir_rvals = ir_smt()(**ir_instr.value_dict)
+            ir_output_instr = _make_adt_instance(ir_rvals, ir_output_isa)
+
             #In the future we can use SMT for some of the variables instead of enumerating
-            for arch_instr, input_binding in input_binder.enumerate_binding(input_binding, ir_instr):
+            for arch_instr, input_binding in input_binder.enumerate_binding(input_binding):
                 arch_rvals = (self.arch_sim(**arch_instr.value_dict))
-                arch_output_instr = _make_adt_instance(arch_rvals, self.arch_outputs, self.arch_output_isa)
+                arch_output_instr = _make_adt_instance(arch_rvals, self.arch_output_isa)
                 for output_binding in output_binder.enumerate():
                     output_binding = list(output_binding)
                     mapping_found = True
