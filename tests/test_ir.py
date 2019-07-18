@@ -109,12 +109,10 @@ def test_simple_sum():
         "Sub":3
     }
     for name,ir_fc in SmallIR.instructions.items():
-        if name != "Add":
-            continue
         mappings = list(SSMapper.map_ir_op(ir_fc,max_mappings=100))
         num_mappings = len(mappings)
         print(name,num_mappings,gold_mappings.setdefault(name,0))
-        #assert num_mappings == gold_mappings.setdefault(name,0)
+        assert num_mappings == gold_mappings.setdefault(name,0)
         print(f"mappings found for {name} {{")
         for mi,mapping in enumerate(mappings):
             print(f"  Mapping {mi}")
