@@ -6,8 +6,8 @@ import inspect
 import textwrap
 
 
-def _rebind_type(T,family):
-    if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple, Enum):
+def rebind_type(T,family):
+    if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum):
         return T
     elif not inspect.isclass(T):
         return T
@@ -19,13 +19,15 @@ def _rebind_type(T,family):
     elif issubclass(T,AbstractBit):
         return family.Bit
     elif issubclass(T,Product):
-        return Product.from_fields(T.__name__,{field:_rebind_type(t,family) for field,t in T.field_dict.items()},None,None)
+        return Product.from_fields(T.__name__,{field:rebind_type(t,family) for field,t in T.field_dict.items()})
     elif issubclass(T,Enum):
         return T
     elif issubclass(T,Sum):
-        raise NotImplementedError("NYI dynamic Sum constructor")
-        #return Sum.from_fields(T.__name__,{field:_rebind_type(t,family) for field,t in T.field_dict.items()})
-    else:
+        if len(T.mro()) ==3: #This was constructed directly from Sum[]
+            return Sum[[rebind_type(t,family) for t in T.fields]]
+        else: #Construced by inhereting from Sum
+            raise NotImplementedError("NYI")
+    else: #a Non-ADT class
         return T
 
 
@@ -47,7 +49,7 @@ class PeakMeta(type):
     #This will rebind the class to a specific family
     def rebind(cls,family):
         assert hasattr(cls,"_env_")
-        env = {k:_rebind_type(t,family) for k,t in cls._env_.items()}
+        env = {k:rebind_type(t,family) for k,t in cls._env_.items()}
         indented_program_txt = inspect.getsource(cls)
         program_txt = textwrap.dedent(indented_program_txt)
         exec_ls = {}
