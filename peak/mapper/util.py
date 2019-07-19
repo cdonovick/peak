@@ -11,7 +11,7 @@ class SubTypeDict(MutableMapping):
                 return self._d[T]
             except KeyError:
                 pass
-        raise KeyError()
+        raise KeyError(f"missing key {key}")
 
     def __setitem__(self, key, value):
         if not isinstance(key, type):
