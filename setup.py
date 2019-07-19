@@ -13,7 +13,7 @@ setup(
         "peak",
     ],
     install_requires=[
-        "hwtypes >= 1.1.1",
+        "hwtypes >= 1.1.4",
         "astor",
         "pysmt",
         "magma-lang",
