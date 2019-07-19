@@ -1,7 +1,7 @@
 from peak import Peak, name_outputs, rebind_type
 from hwtypes import Bit, BitVector, SMTBit, SMTBitVector
 from hwtypes.adt import Sum, Product
-from examples.alu import gen_alu, Inst, ALUOP
+from examples.alu import gen_ALU, Inst, ALUOP
 
 
 def test_meta():
@@ -60,7 +60,7 @@ def test_rebind():
     assert SMTBitVector[16](10) == B_smt()(instr=instr_smt,a=SMTBitVector[16](5))
 
 
-ALU = gen_alu(BitVector.get_family())
+ALU = gen_ALU(16)(BitVector.get_family())
 def test_alu():
     assert hasattr(ALU,"_env_")
     Data = BitVector[16]
