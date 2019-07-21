@@ -1,12 +1,10 @@
 from hwtypes.adt import Product, Sum, new_instruction, Enum
 from hwtypes import BitVector
 
-Datawidth = 16
-
 #This is an isa to test products within sums within products
 #This causes a lot of complex bindings to occur
-def gen_isa(family):
-    Data =family.BitVector[Datawidth]
+def gen_isa(width):
+    Data =BitVector[width]
 
     class BinaryOpKind(Product):
         in0 = Data

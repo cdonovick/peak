@@ -3,9 +3,9 @@ import typing as  tp
 from .isa import *
 from hwtypes import TypeFamily
 
-def simple_sum_fc(family):
-    Data = family.BitVector[16]
-    Instr = gen_isa(family)
+def gen_simple_sum(width=16):
+    Data = BitVector[width]
+    Instr = gen_isa(width)
     Op = Instr.op
     class SimpleSum(Peak):
         @name_outputs(out=Data)
@@ -29,7 +29,7 @@ def simple_sum_fc(family):
                 else :
                     res = op.in0 + Data(1)
             else:
-                raise PeakNotImplementedError(op)
+                raise PeakNotImplementedError(op,subtype)
             return res
 
     return SimpleSum
