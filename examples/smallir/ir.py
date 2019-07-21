@@ -1,20 +1,20 @@
 from peak.ir import IR
 from peak import Peak, name_outputs
-from hwtypes import AbstractBitVector
+from hwtypes import BitVector
 from hwtypes.adt import Product
 
 def gen_SmallIR(width):
     SmallIR = IR()
 
     class UnaryInput(Product):
-        in0=AbstractBitVector[width]
+        in0=BitVector[width]
 
     class Output(Product):
-        out=AbstractBitVector[width]
+        out=BitVector[width]
 
     class BinaryInput(Product):
-        in0=AbstractBitVector[width]
-        in1=AbstractBitVector[width]
+        in0=BitVector[width]
+        in1=BitVector[width]
 
     SmallIR.add_peak_instruction("Add",BinaryInput,Output,lambda x,y: x+y)
     SmallIR.add_peak_instruction("Sub",BinaryInput,Output,lambda x,y: x-y)
