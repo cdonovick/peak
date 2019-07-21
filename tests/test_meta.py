@@ -54,27 +54,30 @@ def test_rebind():
 
     assert Data(6) == B()(None,Data(1))
     B_smt = B.rebind(SMTBitVector.get_family())
+    assert B_smt == B.rebind(SMTBitVector.get_family())
     assert B_smt().Data == SMTBitVector[16]
     Instr_smt = rebind_type(Instr,SMTBitVector.get_family())
     instr_smt = Instr_smt(a=Instr_smt.a(SMTBitVector[8](9)),b=SMTBit(0))
     assert SMTBitVector[16](10) == B_smt()(instr=instr_smt,a=SMTBitVector[16](5))
 
+ALU = gen_ALU(16)
 
-ALU = gen_ALU(16)(BitVector.get_family())
 def test_alu():
     assert hasattr(ALU,"_env_")
     Data = BitVector[16]
     assert ALU()(Inst(ALUOP.Add),Data(3),Data(5)) == Data(8)
     ALU_smt = ALU.rebind(SMTBitVector.get_family())
+    print(ALU_smt.get_inputs())
     alu_smt = ALU_smt()
     Data = SMTBitVector[16]
     assert alu_smt(Inst(ALUOP.Add),Data(3),Data(5)) == Data(8)
     #Try to pass in original bitvector to smt
     Data = BitVector[16]
     try:
-        alu_smt(Inst(ALUOP.Add),Data(3),Data(5))
+        res = alu_smt(Inst(ALUOP.Add),Data(3),Data(5))
+        print(res,type(res))
     except TypeError:
         pass
     else:
         assert 0
-
+test_alu()

@@ -1,39 +1,39 @@
 from peak.ir import IR
-from hwtypes import AbstractBitVector, AbstractBit
+from hwtypes import BitVector, Bit
 from hwtypes.adt import Product
 from peak import Peak, name_outputs
 
 def gen_CoreIR(width):
     CoreIR = IR()
-    def const_family_closure(family):
-        Data = family.BitVector[width]
-        class ConstModParams(Product):
-            value_=Data
 
-        class const(Peak):
-            @name_outputs(out=Data)
-            def __call__(self,modparams : ConstModParams):
-                return modparams.value_
-        return const
-    CoreIR.add_instruction("const",const_family_closure)
+    Data = BitVector[width]
+    class ConstModParams(Product):
+        value_=Data
+
+    class const(Peak):
+        @name_outputs(out=Data)
+        def __call__(self,modparams : ConstModParams):
+            return modparams.value_
+
+    CoreIR.add_instruction("const",const)
 
     class UnaryInput(Product):
-        in0=AbstractBitVector[width]
+        in0=BitVector[width]
 
     class BinaryInput(Product):
-        in0=AbstractBitVector[width]
-        in1=AbstractBitVector[width]
+        in0=BitVector[width]
+        in1=BitVector[width]
 
     class TernaryInput(Product):
-        in0=AbstractBitVector[width]
-        in1=AbstractBitVector[width]
-        sel=AbstractBit
+        in0=BitVector[width]
+        in1=BitVector[width]
+        sel=Bit
 
     class OutputBV(Product):
-        out=AbstractBitVector[width]
+        out=BitVector[width]
 
     class OutputBit(Product):
-        out=AbstractBit
+        out=Bit
 
     for name,fun in (
         ("add",lambda x,y: x+y),
