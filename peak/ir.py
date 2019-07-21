@@ -5,15 +5,6 @@ from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
 from .peak import Peak, name_outputs
 import itertools as it
 
-def _get_type_str(atype):
-    if issubclass(atype,AbstractBitVector):
-        return f"BitVector[{atype.size}]"
-    elif issubclass(atype,AbstractBit):
-        return "Bit"
-    else:
-        raise NotImplementedError(str(atype))
-    #For now limit it to bitvector/bit
-
 class IR:
     def __init__(self):
         #Stores a list of instructions (name : family_closure)
@@ -37,10 +28,7 @@ class IR:
             if not t in t_to_tname:
                 t_to_tname[t] = f"t{idx}"
                 idx +=1
-        class_src = ""
-        #for t,tname in t_to_tname.items():
-        #    class_src += f"{tname}={_get_type_str(t)}\n"
-        class_src += f"class {name}(Peak):\n"
+        class_src = f"class {name}(Peak):\n"
         output_types = ", ".join([f"{field} = {t_to_tname[t]}" for field,t in outputs.items()])
         input_types = ", ".join([f"{field} : {t_to_tname[t]}" for field,t in inputs.items()])
         fun_call = ", ".join(inputs.keys())
