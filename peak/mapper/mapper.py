@@ -40,23 +40,21 @@ def _make_adt_instance(rvals, isa):
 
 class ArchMapper:
     def __init__(self,
-        arch_fclosure : tp.Callable,
+        arch_class : Peak,
         solver_name : str = 'z3',
         custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ):
         self.solver_name = solver_name
         self.custom_enumeration = custom_enumeration
 
-        arch_smt = arch_fclosure(SMTBitVector.get_family())
+        arch_smt = arch_class.rebind(SMTBitVector.get_family())
         self.arch_sim = arch_smt()
 
-        self.arch_inputs = arch_smt.__call__._peak_inputs_
-        self.arch_outputs = arch_smt.__call__._peak_outputs_
-        self.arch_input_isa = _new_product("ArchInput", self.arch_inputs)
-        self.arch_output_isa = _new_product("ArchOutput", self.arch_outputs)
+        self.arch_input_isa = arch_smt.get_inputs()
+        self.arch_output_isa = arch_smt.get_outputs()
 
     def map_ir_op(self,
-        ir_fclosure : tp.Callable,
+        ir_class : Peak,
         max_mappings : int = 1,
         verbose : int = 0,
     ):
@@ -66,13 +64,10 @@ class ArchMapper:
         elif verbose == 2:
             logging.getLogger().setLevel(logging.DEBUG - 1)
 
-        #should only contain bitvectors as inputs
-        ir_smt = ir_fclosure(SMTBitVector.get_family())
+        ir_smt = ir_class.rebind(SMTBitVector.get_family())
 
-        ir_inputs = ir_smt.__call__._peak_inputs_
-        ir_outputs = ir_smt.__call__._peak_outputs_
-        ir_input_isa = _new_product("IRInput", ir_inputs)
-        ir_output_isa = _new_product("IROutput", ir_outputs)
+        ir_input_isa = ir_smt.get_inputs()
+        ir_output_isa = ir_smt.get_outputs()
 
         found = 0
         if found >= max_mappings:
@@ -80,7 +75,6 @@ class ArchMapper:
         #--------
 
         logging.debug("Starting search")
-
 
         input_binder = Binder(
             self.arch_input_isa,

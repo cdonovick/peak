@@ -5,9 +5,8 @@ def test_inputs():
     expected_names = ["inst","data0", "data1", "bit0", "bit1", "bit2", "clk_en"]
     expected_types = [Inst,Data,Data,Bit,Bit,Bit,Bit]
 
-    assert hasattr(PE.__call__,"_peak_inputs_")
-    inputs = PE.__call__._peak_inputs_
-    for i, (iname,itype) in enumerate(inputs.items()):
+    input_type = PE.get_inputs()
+    for i, (iname,itype) in enumerate(input_type.field_dict.items()):
         assert iname == expected_names[i]
         assert itype == expected_types[i]
 
@@ -17,7 +16,7 @@ def test_outputs():
     expected_types = [Data,Bit,Bit]
 
     assert hasattr(PE.__call__,"_peak_outputs_")
-    outputs = PE.__call__._peak_outputs_
-    for i, (oname,otype) in enumerate(outputs.items()):
+    output_type = PE.get_outputs()
+    for i, (oname,otype) in enumerate(output_type.field_dict.items()):
         assert oname == expected_names[i]
         assert otype == expected_types[i]
