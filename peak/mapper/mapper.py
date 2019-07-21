@@ -14,17 +14,6 @@ from hwtypes import SMTBit, SMTBitVector, SMTSIntVector
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
 
-def _new_product(class_name, field_dict):
-
-    class_str = f"class {class_name}(Product):"
-    for name, t in field_dict.items():
-        class_str += f"\n    {name}={name}"
-    class_str += "\n"
-    exec_globals={**dict(field_dict),"Product":Product}
-    exec_locals = {}
-    exec(class_str, exec_globals, exec_locals)
-    return exec_locals[class_name]
-
 def _tupleify(vals):
     if not isinstance(vals, tuple):
         vals = vals,
