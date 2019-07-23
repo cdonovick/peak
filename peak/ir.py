@@ -2,8 +2,9 @@ from collections import namedtuple
 import typing as tp
 from hwtypes.adt import Product
 from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
-from .peak import Peak, name_outputs
+from .peak import Peak, name_outputs, Src
 import itertools as it
+
 
 class IR:
     def __init__(self):
@@ -49,7 +50,6 @@ class IR:
         cls = exec_ls[name]
         #Need to manually add the source and the environment
         cls._env_ = exec_gs
-        cls._srccode_ = class_src
-        cls._file_ = "ir.py"
+        cls._src_ = Src(code=class_src,filename="peak/ir.py")
         self.add_instruction(name,cls)
 
