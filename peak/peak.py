@@ -49,8 +49,6 @@ class PeakMeta(type):
 
     #This will rebind the class to a specific family
     def rebind(cls,family):
-        #Do not rebind if you do not need to
-        #I need to write an explicit test about rebinding .. somehow
         assert hasattr(cls,"_env_")
         #try to get the soruce code if it does not have it
         if not hasattr(cls,'_src_'):
@@ -63,16 +61,23 @@ class PeakMeta(type):
             indented_program_txt = "".join(["\n"*(lineno-1)]+src_lines)
             program_txt = textwrap.dedent(indented_program_txt)
             cls._src_ = Src(code=program_txt, filename=filename)
+
+        #check cache
         rebound_cls = peak_cache.get((family,cls._src_))
         if rebound_cls is not None:
             return rebound_cls
+
+        #re-exec the source code
+        #but with a new environment which replaced all references
+        #to a particular BitVector with the passed in family's bitvector
         env = {k:rebind_type(t,family) for k,t in cls._env_.items()}
         env.update({"__file__":cls._src_.filename})
         exec_ls = {}
         exec(compile(cls._src_.code,cls._src_.filename,'exec'),env,exec_ls)
         rebound_cls = exec_ls[cls.__name__]
-        rebound_cls._env_ = env
         rebound_cls._src_ = cls._src_
+
+        #Add back to cache
         peak_cache[(family,cls._src_)] = rebound_cls
         return rebound_cls
 
