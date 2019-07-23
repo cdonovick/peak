@@ -1,9 +1,11 @@
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, is_adt_type, SMTBitVector
 from hwtypes.adt import Product, Sum, Enum, Tuple
 import functools
 import inspect
 import textwrap
+
+Src = namedtuple("Src",["code","filename"])
 
 def rebind_type(T,family):
     if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum):
@@ -51,29 +53,27 @@ class PeakMeta(type):
         #I need to write an explicit test about rebinding .. somehow
         assert hasattr(cls,"_env_")
         #try to get the soruce code if it does not have it
-        if not hasattr(cls,'_srccode_'):
+        if not hasattr(cls,'_src_'):
             try:
                 src_lines, lineno = inspect.getsourcelines(cls)
-                file = inspect.getsourcefile(cls)
+                filename = inspect.getsourcefile(cls)
             except TypeError:
                 raise TypeError(f"PEak class {cls} does not have a source file. Source code needs to be attached directly to {cls.__name_}._srccode_")
             #This magic allows for error messaging to reference the correct line number
             indented_program_txt = "".join(["\n"*(lineno-1)]+src_lines)
             program_txt = textwrap.dedent(indented_program_txt)
-            cls._srccode_ = program_txt
-            cls._file_ = file
-        rebound_cls = peak_cache.get((family,cls._srccode_))
+            cls._src_ = Src(code=program_txt, filename=filename)
+        rebound_cls = peak_cache.get((family,cls._src_))
         if rebound_cls is not None:
             return rebound_cls
         env = {k:rebind_type(t,family) for k,t in cls._env_.items()}
-        env.update({"__file__":cls._file_})
+        env.update({"__file__":cls._src_.filename})
         exec_ls = {}
-        exec(compile(cls._srccode_,cls._file_,'exec'),env,exec_ls)
+        exec(compile(cls._src_.code,cls._src_.filename,'exec'),env,exec_ls)
         rebound_cls = exec_ls[cls.__name__]
         rebound_cls._env_ = env
-        rebound_cls._srccode_ = cls._srccode_
-        rebound_cls._file_ = cls._file_
-        peak_cache[(family,cls._srccode_)] = rebound_cls
+        rebound_cls._src_ = cls._src_
+        peak_cache[(family,cls._src_)] = rebound_cls
         return rebound_cls
 
     #Returns the input interface as a product type
