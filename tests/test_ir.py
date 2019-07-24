@@ -98,7 +98,6 @@ def test_coreir():
         assert has_mapping == (name in has_mappings)
 
 #Finds all the unique mappings
-@pytest.mark.skip("Broken due to hwtypes#76")
 def test_simple_sum():
     #arch
     arch_class = gen_simple_sum(width=16)
@@ -125,4 +124,3 @@ def test_simple_sum():
         #print("-------")
         #print("}")
 
-#test_simple_sum()
