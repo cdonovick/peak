@@ -4,7 +4,7 @@ import functools as ft
 import logging
 from ..peak import Peak
 import coreir
-from .binding import Binder, get_from_path, binding_pretty_print
+from .binding import Binder, get_from_path, binding_pretty_print, Unbound
 from hwtypes import AbstractBitVector
 from hwtypes import BitVector, SIntVector
 from hwtypes import is_adt_type
