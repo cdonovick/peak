@@ -1,16 +1,25 @@
 import typing as tp
 import itertools as it
-from hwtypes import SMTBit, SMTBitVector, SMTSIntVector, AbstractBitVector, AbstractBit
+from hwtypes import SMTBit, SMTBitVector, SMTSIntVector, AbstractBitVector, AbstractBit, BitVector
 from hwtypes import is_adt_type
 from hwtypes.adt import Product, Enum, Sum
 from .util import SubTypeDict
+import enum
+
+__ALL__ = ['Binder', 'get_from_path', 'set_from_path', 'binding_pretty_print', 'Unbound']
 
 
-__ALL__ = ['Binder', 'get_from_path', 'set_from_path', 'binding_pretty_print']
+class Unbound(enum.Enum):
+    Existential=0
+    Universal=1
 
-def copy_smt_value(val):
-    if isinstance(val,(SMTBit,SMTBitVector)):
-        return type(val)(val.value)
+def _to_bv(val):
+    if isinstance(val,SMTBit):
+        assert val.value.is_constant()
+        return Bit(val.value.constant_value())
+    elif isinstance(val,SMTBitVector):
+        assert val.value.is_constant()
+        return BitVector[val.size](val.value.constant_value())
     else:
         return val
 
@@ -20,14 +29,12 @@ def binding_pretty_print(binding,ts="  "):
             p0_str = ".".join(p0)
         elif isinstance(p0,Enum):
             p0_str = str(p0)
+        elif isinstance(p0,Unbound):
+            p0_str = str(p0)
         else:
             p0_str = str(p0.value)
         p1_str = ".".join(p1)
         print(f"{ts}{p0_str} -> {p1_str}")
-
-class Unbound(Enum):
-    Existential=0
-    Universal=1
 
 def _has_binding(arch_by_t, ir_by_t):
 #for each type, each input of the type in the IR needs to at least be able to bind to one other in the arch
@@ -247,5 +254,5 @@ class Binder:
 
             #Need to copy since this contains SMT objects.
             #Potentially could store binding value as a string or BitVector
-            binding_copy = [(path,copy_smt_value(val)) for path,val in binding_list]
+            binding_copy = [(_to_bv(ipath),_to_bv(apath)) for ipath,apath in binding_list]
             yield arch_instr, binding_copy
