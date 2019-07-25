@@ -3,13 +3,14 @@ from peak.irs import gen_CoreIR
 from peak.ir import IR
 from examples.alu import gen_ALU
 from examples.simple_sum import gen_simple_sum
-from peak.mapper import ArchMapper, binding_pretty_print
+from peak.mapper import ArchMapper, binding_pretty_print, Unbound
 from hwtypes import BitVector, SMTBitVector, Bit, SMTBit
 from hwtypes import AbstractBitVector as ABV
 from hwtypes import AbstractBit
-from hwtypes.adt import Product, Sum
+from hwtypes.adt import Product, Sum, Enum
 import itertools as it
 import pytest
+
 
 def test_add_peak_instruction():
     class Input(Product):
@@ -118,7 +119,14 @@ def test_simple_sum():
         num_mappings = len(mappings)
         assert num_mappings == gold_mappings.setdefault(name,0)
         #print(f"mappings found for {name} {{")
-        #for mi,mapping in enumerate(mappings):
+        for mi,mapping in enumerate(mappings):
+            for pi,pa in mapping['input_binding']:
+                for p in (pi,pa):
+                    assert isinstance(p,tuple) \
+                        or isinstance(p,Unbound) \
+                        or isinstance(p,Enum) \
+                        or isinstance(p,Bit) \
+                        or isinstance(p,BitVector), str(p)
         #    print(f"  Mapping {mi}")
         #    binding_pretty_print(mapping['input_binding'],ts="    ")
         #print("-------")
