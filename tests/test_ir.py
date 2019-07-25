@@ -1,5 +1,5 @@
 from examples.smallir import gen_SmallIR
-from peak.irs import gen_CoreIR
+from peak.examples.irs import gen_CoreIR
 from peak.ir import IR
 from examples.alu import gen_ALU
 from examples.simple_sum import gen_simple_sum
