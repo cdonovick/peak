@@ -1,6 +1,7 @@
 from hwtypes import BitVector, overflow
 from .isa import *
-from peak import Peak, gen_register, RAM, ROM
+from peak import Peak, gen_register, gen_RAM, gen_ROM
+import typing as tp
 
 LR = Reg4(15)
 ZERO = Bit(0)
@@ -66,19 +67,17 @@ def cond(code, Z, N, C, V):
 
 class Pico(Peak):
 
-    def __init__(self, mem):
-        family = Bit.get_family()
-        self.mem = ROM(Inst, 256, mem, Word(0))
-
-        self.reg = RAM(Word, 16, [Word(0) for i in range(16)])
-        self.PC = gen_register(family, Word, Word(0))()
-        self.Z = gen_register(family, Bit, ZERO)()
-        self.N = gen_register(family, Bit, ZERO)()
-        self.C = gen_register(family, Bit, ZERO)()
-        self.V = gen_register(family, Bit, ZERO)()
+    def __init__(self, mem : tp.List[Inst]):
+        self.mem = gen_ROM(Inst,depth=256)(mem,Word(0))
+        self.reg = gen_RAM(Word, depth=16)([], default_init=Word(0))
+        self.PC = gen_register(Word)(Word(0))
+        self.Z = gen_register(Bit)(ZERO)
+        self.N = gen_register(Bit)(ZERO)
+        self.C = gen_register(Bit)(ZERO)
+        self.V = gen_register(Bit)(ZERO)
 
     def __call__(self):
-        pc = self.PC(0, 0)
+        pc = self.PC(0, en=Bit(0))
         inst = self.mem(pc)
         type, inst = inst.match()
         if type == Logic or type == Arith:
@@ -92,8 +91,8 @@ class Pico(Peak):
 
     def alu(self, type, inst):
         subtype, inst = inst.match()
-        a = self.reg(inst.ra, 0, 0)
-        b = self.reg(inst.rb, 0, 0)
+        a = self.reg(inst.ra, 0, wen=Bit(0))
+        b = self.reg(inst.rb, 0, wen=Bit(0))
         if type == Logic:
             res = logic(subtype, a, b)
         else:
