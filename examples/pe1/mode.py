@@ -12,10 +12,10 @@ class Mode(Enum):
     DELAY = 3   # Register written with input value, previous value returned
 
 
-def gen_register_mode(family: TypeFamily, T, init=0):
+def gen_register_mode(T):
     class RegisterMode(Peak):
-        def __init__(self):
-            self.register: T = gen_register(family, T, init)()
+        def __init__(self, init=T(0)):
+            self.register: T = gen_register(T)(init)
 
         def reset(self):
             self.register.reset()

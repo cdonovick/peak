@@ -12,12 +12,12 @@ def gen_pe(num_inputs):
         def __init__(self):
             family = Data.get_family()
             # Data registers
-            self.data = [(gen_register_mode(family, Data)()) for i in range(num_inputs)]
+            self.data = [(gen_register_mode(Data)(Data(0))) for i in range(num_inputs)]
 
             # Bit Registers
-            self.bit0 = gen_register_mode(family, Bit)()
-            self.bit1 = gen_register_mode(family, Bit)()
-            self.bit2 = gen_register_mode(family, Bit)()
+            self.bit0 = gen_register_mode(Bit)(Bit(0))
+            self.bit1 = gen_register_mode(Bit)(Bit(0))
+            self.bit2 = gen_register_mode(Bit)(Bit(0))
 
         def __call__(self, inst: Inst, \
                         data, \
