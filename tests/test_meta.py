@@ -2,7 +2,7 @@ from peak import Peak, name_outputs, rebind_type
 from hwtypes import Bit, BitVector, SMTBit, SMTBitVector
 from hwtypes.adt import Sum, Product
 from examples.alu import gen_ALU, Inst, ALUOP
-
+import pytest
 
 def test_meta():
     x = 5
@@ -73,11 +73,6 @@ def test_alu():
     assert alu_smt(Inst(ALUOP.Add),Data(3),Data(5)) == Data(8)
     #Try to pass in original bitvector to smt
     Data = BitVector[16]
-    try:
+    with pytest.raises(TypeError):
         res = alu_smt(Inst(ALUOP.Add),Data(3),Data(5))
-        print(res,type(res))
-    except TypeError:
-        pass
-    else:
-        assert 0
-test_alu()
+
