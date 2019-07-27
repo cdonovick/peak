@@ -118,7 +118,6 @@ def test_simple_sum():
         mappings = list(SSMapper.map_ir_op(ir_fc,max_mappings=1000))
         num_mappings = len(mappings)
         assert num_mappings == gold_mappings.setdefault(name,0)
-        #print(f"mappings found for {name} {{")
         for mi,mapping in enumerate(mappings):
             for pi,pa in mapping['input_binding']:
                 for p in (pi,pa):
@@ -127,8 +126,4 @@ def test_simple_sum():
                         or isinstance(p,Enum) \
                         or isinstance(p,Bit) \
                         or isinstance(p,BitVector), str(p)
-        #    print(f"  Mapping {mi}")
-        #    binding_pretty_print(mapping['input_binding'],ts="    ")
-        #print("-------")
-        #print("}")
 
