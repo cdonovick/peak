@@ -31,10 +31,17 @@ def rebind_type(T,family):
     else: #a Non-ADT class
         return T
 
+
+RESERVED_SUNDERS = frozenset({'_env_', '_src_'})
+class ReservedNameError(Exception): pass
+
 #This will save the locals and globals in Class._env_
 peak_cache = {}
 class PeakMeta(type):
     def __new__(mcs,name,bases,attrs,**kwargs):
+        for rname in RESERVED_SUNDERS:
+            if rname in attrs:
+                raise ReservedNameError(f"Attribute {rname} is reserved")
         stack = inspect.stack()
         env = {}
         for i in reversed(range(1,len(stack))):
