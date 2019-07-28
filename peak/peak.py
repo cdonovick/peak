@@ -32,14 +32,14 @@ def rebind_type(T,family):
         return T
 
 
-RESERVED_SUNDERS = frozenset({'_env_', '_src_'})
+META_RESERVED_SUNDERS = frozenset({'_env_', '_src_'})
 class ReservedNameError(Exception): pass
 
 #This will save the locals and globals in Class._env_
 peak_cache = {}
 class PeakMeta(type):
     def __new__(mcs,name,bases,attrs,**kwargs):
-        for rname in RESERVED_SUNDERS:
+        for rname in META_RESERVED_SUNDERS:
             if rname in attrs:
                 raise ReservedNameError(f"Attribute {rname} is reserved")
         stack = inspect.stack()
@@ -98,8 +98,27 @@ class PeakMeta(type):
         assert hasattr(cls.__call__,'_peak_outputs_')
         return cls.__call__._peak_outputs_
 
+CLASS_RESERVED_SUNDERS = frozenset({'_state_'})
 class Peak(metaclass=PeakMeta):
-    pass
+
+    #Will verify that state is only set in __init__
+    #Will save the state in obj._state_
+    def __setattr__(self, name, value):
+        if name in CLASS_RESERVED_SUNDERS:
+            raise ReservedNameError(f"Attribute {name} is reserved")
+
+        if not hasattr(self,"_state_"):
+            super().__setattr__("_state_",{})
+
+        prev_frame = inspect.stack()[1]
+        #Would be better if I could check the actual function object
+        #and check type(self).__init__
+        if prev_frame.function != "__init__" and not (name in self._state_):
+            for i in range(3):
+                print(inspect.stack()[i])
+            raise SyntaxError("Can only define state in __init__")
+        self._state_[name] = value
+        super().__setattr__(name,value)
 
 def name_outputs(**output_dict):
     """Decorator meant to apply to any function to specify output types
