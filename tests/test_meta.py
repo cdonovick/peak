@@ -84,4 +84,22 @@ def test_reserved_name():
         class A(Peak):
             _src_ = int
 
+    with pytest.raises(ReservedNameError):
+        class A(Peak):
+            def __init__(self):
+                self._state_ = 5
+        a = A()
+
+def test_state():
+    class A(Peak):
+        def __init__(self,a,b,c):
+            self.a = a
+            self.b = b
+            self.c = c
+    init = dict(a=1, b=2, c=3)
+    a = A(**init)
+    assert hasattr(a,"_state_")
+    assert a._state_ == init
+
+
 
