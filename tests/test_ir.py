@@ -4,7 +4,7 @@ from peak.ir import IR
 from examples.alu import gen_ALU
 from examples.simple_sum import gen_simple_sum
 from peak.mapper import ArchMapper, binding_pretty_print, Unbound
-from hwtypes import BitVector, SMTBitVector, Bit, SMTBit
+from hwtypes import BitVector, Bit
 from hwtypes import AbstractBitVector as ABV
 from hwtypes import AbstractBit
 from hwtypes.adt import Product, Sum, Enum
