@@ -10,9 +10,10 @@ from hwtypes import new
 import pytest
 
 FooBV = new(BitVector, name='FooBV')
+BarBV = new(BitVector, name='BarBV')
 
 @pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa])
-@pytest.mark.parametrize("bv_type", [BitVector, FooBV])
+@pytest.mark.parametrize("bv_type", [BarBV, FooBV])
 def test_assembler_disassembler(isa, bv_type):
     assembler = Assembler(isa)
     for inst in isa.enumerate():

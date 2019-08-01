@@ -91,6 +91,7 @@ def _enum(isa : Enum) -> int:
 
     return assembler, disassembler, width, layout
 
+
 def _tuple(isa : Tuple) -> int:
     layout = {}
     base = 0
@@ -116,6 +117,7 @@ def _tuple(isa : Tuple) -> int:
         return isa(*args)
 
     return assembler, disassembler, width, layout
+
 
 def _sum(isa : Sum) -> int:
     tag_2_field = {}
@@ -148,6 +150,7 @@ def _sum(isa : Sum) -> int:
 
     return assembler, disassembler, width, layout
 
+
 def _field(isa : tp.Type[AbstractBitVector]):
     width = isa.size
     layout = {}
@@ -156,5 +159,3 @@ def _field(isa : tp.Type[AbstractBitVector]):
     def disassembler(opcode):
         return isa(opcode)
     return assembler, disassembler, width, layout
-
-
