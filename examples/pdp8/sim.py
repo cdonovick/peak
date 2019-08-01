@@ -17,20 +17,23 @@ class PDP8(Peak):
 
     def __call__(self):
         # phase 0
-        pc = self.pc(0, 0)
-        inst = self.mem(pc, 0, 0)
+        pc = self.pc(0,0)
+        inst = self.load(pc)
         pc = pc + 1
 
         type, inst = inst.match()
 
         if isinstance(inst, MRI):
-            addr = Word(inst.addr)
-            if inst.p:
-                addr += Word(pc & (0x1f << 7))
+            addr = inst.addr
+            if inst.p == ZERO:
+                page = BitVector[5](0)
+            else:
+                page = (pc-1)[7:]
+            addr = Word(addr) # concat
 
             # phase 1
             if inst.i == IA.INDIRECT:
-                addr = self.mem(addr,0,0)
+                addr = self.load(addr)
 
             # phase 2
             if   type == AND:
@@ -98,7 +101,7 @@ class PDP8(Peak):
     # testing interface to state
 
     def peak_pc(self):
-        return int(self.pc(0, 0))
+        return int(self.pc(0,0))
 
     def poke_pc(self, value):
         return int(self.pc(Word(value), 1))
@@ -110,13 +113,13 @@ class PDP8(Peak):
         return int(self.acc(Word(value),1))
 
     def peak_lnk(self):
-        return int(self.lnk(0, 0))
+        return int(self.lnk(0,0))
 
     def poke_lnk(self, value):
         return int(self.lnk(Word(value),1))
 
     def peak_mem(self, addr):
-        return int(self.mem(Word(addr),0,wen=0))
+        return int(self.mem(Word(addr),0,0))
 
     def poke_mem(self, addr, value):
         return int(self.mem(Word(addr),Word(value),wen=1))

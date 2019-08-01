@@ -1,4 +1,3 @@
-
 from .register import gen_register
 from .memory import Memory, RAM, ROM
 

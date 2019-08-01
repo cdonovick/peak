@@ -1,5 +1,5 @@
 import random
-from collections import namedtuple
+from peak.bitfield import encode
 from examples.pdp8 import PDP8, Word
 import examples.pdp8.isa as isa
 import examples.pdp8.asm as asm
@@ -14,6 +14,9 @@ testvectors2 = [(random12(), random12()) for i in range(NVALUES)]
 @pytest.mark.parametrize("ab", testvectors2)
 def test_and(ab):
     inst = asm.and_(1)
+    bits = encode(inst)
+    print('%08x' % bits)
+    #assert bits == 0x020
     pdp8 = PDP8([inst,Word(ab[0])])
     pdp8.poke_acc(ab[1])
     pdp8()
@@ -22,7 +25,10 @@ def test_and(ab):
 
 @pytest.mark.parametrize("ab", testvectors2)
 def test_tad(ab):
-    pdp8 = PDP8([asm.tad(1),Word(ab[0])])
+    inst = asm.tad(1)
+    bits = encode(inst)
+    print('%08x' % bits)
+    pdp8 = PDP8([inst,Word(ab[0])])
     pdp8.poke_acc(ab[1])
     pdp8()
     assert pdp8.peak_pc() == 1

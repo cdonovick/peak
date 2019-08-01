@@ -1,148 +1,85 @@
-from dataclasses import dataclass
-from peak import Bit, Bits, Enum, Sum, Product
+from hwtypes import BitVector, Bit
+from hwtypes.adt import Enum, Sum, Product
+from hwtypes.modifiers import new
 from peak.bitfield import bitfield
 
-Byte = Bits(8)
-Half = Bits(16)
-Word = Bits(32)
+WIDTH = 32
+Byte = new(BitVector, 8, name="Byte")
+Half = new(BitVector, 16, name="Half")
+Word = new(BitVector, 32, name="Word")
+Reg5 = BitVector[5]
 
-Imm = bitfield(0)(Bits(8))
-Rotate = bitfield(8)(Bits(4))
+RD = bitfield(7)(new(BitVector, 5, name="RD"))
+RS1 = bitfield(15)(new(BitVector, 5, name="RS1"))
+RS2 = bitfield(20)(new(BitVector, 5, name="RS2"))
+Immed20 = bitfield(12)(new(BitVector, 20, name="Immed20"))
+Immed12 = bitfield(20)(new(BitVector, 12, name="Immed12"))
+Size = bitfield(12)(new(BitVector, 2, name="Size"))
 
-@dataclass
-class ImmOperand(Product):
-    imm:Imm
-    rotate:Rotate
+class LD(Product):
+    rd = RD
+    rs1 = RS1
+    imm = Immed12
 
-RegC = bitfield(0)(Bits(4))
-Shift = bitfield(4)(Bits(8))
+class LW(LD): pass
 
-@dataclass
-class RegOperand(Product):
-    rc:RegC
-    shift:Shift
+class ST(Product):
+    rs1 = RS1
+    rs2 = RS2
+    imm = Immed12
 
-@bitfield(25)
-class Operand(Sum):
-    fields = (RegOperand, ImmOperand)
+class SW(ST): pass
 
-RegA = bitfield(16)(Bits(4))
-RegB = bitfield(12)(Bits(4))
-S = bitfield(20)(Bits(1))
-
-@dataclass
-class _Data(Product):
-    ra:RegA
-    rb:RegB
-    rc:Operand
-    s:S
-
-class AND(_Data):
-    pass
-
-class EOR(_Data):
-    pass
-
-class SUB(_Data):
-    pass
-
-class RSB(_Data):
-    pass
-
-class ADD(_Data):
-    pass
-
-class ADC(_Data):
-    pass
-
-class SBC(_Data):
-    pass
-
-class RSC(_Data):
-    pass
-
-class TST(_Data):
-    pass
-
-class TEQ(_Data):
-    pass
-
-class CMP(_Data):
-    pass
-
-class CMN(_Data):
-    pass
-
-class ORR(_Data):
-    pass
-
-class MOV(_Data):
-    pass
-
-class BIC(_Data):
-    pass
-
-class MVN(_Data):
-    pass
-
-@bitfield(21)
-class Data(Sum):
-    fields = (AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC, \
-              TST, TEQ, CMP, CMN, ORR, MOV, BIC, MVN)
-
-@dataclass
-class _LDST(Product):
-    ra:RegA
-    rb:RegB
-    rc:Operand 
-
-class LDR(_LDST):
-    pass
-
-class STR(_LDST):
-    pass
-
-@bitfield(20)
-class LDST(Sum):
-    fields = (STR, LDR)
+class Memory(Sum[LW, SW]): pass
 
 
-Offset = bitfield(0)(Bits(24))
-L = bitfield(24)(Bits(1))
-BI = bitfield(25)(Bits(1))
+class _Branch(Product):
+    rs1 = RS1
+    rs2 = RS2
+    imm = Immed12
 
-@dataclass
-class B(Product):
-    offset:Offset
-    l:L 
-    i:BI = BI(1)
+class BEQ(_Branch): pass
+class BNE(_Branch): pass
+class BLT(_Branch): pass
+class BGE(_Branch): pass
+class BLTU(_Branch): pass
+class BGEU(_Branch): pass
 
-@bitfield(28)
-class Cond(Enum):
-    Z = 0    # EQ
-    Z_n = 1  # NE
-    C = 2    # UGE
-    C_n = 3  # ULT
-    N = 4    # <  0
-    N_n = 5  # >= 0
-    V = 6    # Overflow
-    V_n = 7  # No overflow
-    UGE = 2
-    ULT = 3
-    UGT = 8
-    ULE = 9
-    SGE = 10
-    SLT = 11
-    SGT = 12
-    SLE = 13
-    Always = 14
+class Branch(Sum[BEQ, BNE, BLT, BGE, BLTU, BGEU]): pass
+    
 
-@bitfield(26)
-class BaseInst(Sum):
-    fields = (Data, LDST, B)
+class _ALUR(Product):
+    rd = RD
+    rs1 = RS1
+    rs2 = RS2
 
-@dataclass
-class Inst(Product):
-    inst:BaseInst
-    cond:Cond
+class And(_ALUR): pass
+class Or(_ALUR): pass
+class XOr(_ALUR): pass
+class Add(_ALUR): pass
+class Sub(_ALUR): pass
 
+class ALUR(Sum[And, Or, XOr, Add, Sub]): pass
+
+class _ALUI(Product):
+    rd = RD
+    rs1 = RS1
+    imm = Immed12
+
+class AndI(_ALUI): pass
+class OrI(_ALUI): pass
+class XOrI(_ALUI): pass
+class AddI(_ALUI): pass
+class SubI(_ALUI): pass
+
+class ALUI(Sum[AndI, OrI, XOrI, AddI, SubI]): pass
+
+class ALU(Sum[ALUR, ALUI]): pass
+
+class LUI(Product):
+    rd = RD
+    imm = Immed20
+
+class Inst(Sum[Memory, Branch, ALU, LUI]): pass
+
+# Missing shift and set instructions
