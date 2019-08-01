@@ -16,13 +16,12 @@ def rebind_type(T,family):
         return T
     elif not inspect.isclass(T):
         return T
+    elif issubclass(T,AbstractBitVector):
+        return rebind_bitvector(T,AbstractBitVector,family.BitVector)
+    elif issubclass(T,AbstractBit):
+        return family.Bit
     elif issubclass(T,(Product,Sum)):
         return _rebind_bv(T)
-    elif issubclass(T,(AbstractBitVector,AbstractBit)):
-        #Bit of a hack to reutilize rebind_bitvector
-        T_tmp = Product.from_fields("Tmp",dict(tmp=T))
-        T_tmp_rebound = _rebind_bv(T_tmp)
-        return T_tmp_rebound.tmp
     else:
         return T
 
