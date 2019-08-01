@@ -1,8 +1,13 @@
 from hwtypes.adt import Product, Sum, new_instruction, Enum
 from hwtypes import BitVector
+from hwtypes.modifiers import make_modifier
 
 #This is an isa to test products within sums within products
 #This causes a lot of complex bindings to occur
+
+def from_product(name, product):
+    return Product.from_fields(name,product.field_dict)
+
 def gen_isa(width):
     Data =BitVector[width]
 
@@ -10,17 +15,13 @@ def gen_isa(width):
         in0 = Data
         in1 = Data
 
-    class Add(BinaryOpKind):
-        pass
-
-    class Sub(BinaryOpKind):
-        pass
+    Add = from_product("Add",BinaryOpKind)
+    Sub = from_product("Sub",BinaryOpKind)
 
     class UnaryOpKind(Product):
         in0 = Data
 
-    class Add1(UnaryOpKind):
-        pass
+    Add1 = from_product("Add1",UnaryOpKind)
 
     #This will indicate whether to use inputs from the instruction
     #or inputs from the sim (creating lots of possible bindings)
