@@ -1,6 +1,7 @@
 from collections import OrderedDict, namedtuple
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, is_adt_type, SMTBitVector
 from hwtypes.adt import Product, Sum, Enum, Tuple
+from hwtypes.adt_util import rebind_bitvector
 import functools
 import inspect
 import textwrap
@@ -8,27 +9,21 @@ import textwrap
 Src = namedtuple("Src",["code","filename"])
 
 def rebind_type(T,family):
+    def _rebind_bv(T):
+        return rebind_bitvector(T,AbstractBitVector,family.BitVector).rebind(AbstractBit,family.Bit,True)
+
     if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum):
         return T
     elif not inspect.isclass(T):
         return T
-    elif issubclass(T,AbstractBitVector):
-        if T.size is None: #This is BitVector
-            return family.BitVector
-        else:
-            return family.BitVector[T.size]
-    elif issubclass(T,AbstractBit):
-        return family.Bit
-    elif issubclass(T,Product):
-        return Product.from_fields(T.__name__,{field:rebind_type(t,family) for field,t in T.field_dict.items()})
-    elif issubclass(T,Enum):
-        return T
-    elif issubclass(T,Sum):
-        if len(T.mro()) ==3: #This was constructed directly from Sum[]
-            return Sum[[rebind_type(t,family) for t in T.fields]]
-        else: #Construced by inhereting from Sum
-            raise NotImplementedError("NYI")
-    else: #a Non-ADT class
+    elif issubclass(T,(Product,Sum)):
+        return _rebind_bv(T)
+    elif issubclass(T,(AbstractBitVector,AbstractBit)):
+        #Bit of a hack to reutilize rebind_bitvector
+        T_tmp = Product.from_fields("Tmp",dict(tmp=T))
+        T_tmp_rebound = _rebind_bv(T_tmp)
+        return T_tmp_rebound.tmp
+    else:
         return T
 
 
