@@ -1,13 +1,15 @@
 from collections import OrderedDict, namedtuple
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, is_adt_type, SMTBitVector
 from hwtypes.adt import Product, Sum, Enum, Tuple
+from hwtypes.modifiers import make_modifier
 from hwtypes.adt_util import rebind_bitvector, rebind_keep_modifiers
-#from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
 import functools
 import inspect
 import textwrap
 
 Src = namedtuple("Src",["code","filename"])
+
+Const = make_modifier("Const")
 
 def rebind_type(T,family):
     def _rebind_bv(T):
