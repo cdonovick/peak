@@ -5,7 +5,7 @@ from hwtypes import AbstractBitVector
 
 def tag(tags: tp.Mapping[type, int]):
     def wrapper(sum: Sum):
-        if not isinstance(sum, Sum):
+        if not issubclass(sum, Sum):
             raise TypeError('tag can only be applied Sum')
         if tags.keys() != sum.fields:
             raise ValueError('tag must specificy an Option for each Sum option')
