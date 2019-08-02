@@ -1,8 +1,8 @@
 from collections import OrderedDict, namedtuple
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, is_adt_type, SMTBitVector
 from hwtypes.adt import Product, Sum, Enum, Tuple
-from hwtypes.adt_util import rebind_bitvector
-from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
+from hwtypes.adt_util import rebind_bitvector, rebind_keep_modifiers
+#from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
 import functools
 import inspect
 import textwrap
@@ -11,19 +11,15 @@ Src = namedtuple("Src",["code","filename"])
 
 def rebind_type(T,family):
     def _rebind_bv(T):
-        return rebind_bitvector(T,AbstractBitVector,family.BitVector).rebind(AbstractBit,family.Bit,True)
+        T_rb = rebind_bitvector(T,AbstractBitVector,family.BitVector,True)
+        T_rb = rebind_keep_modifiers(T_rb,AbstractBit,family.Bit)
+        return T_rb
 
     if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum):
         return T
     elif not inspect.isclass(T):
         return T
-    elif is_modified(T):
-        return get_modifier(T)(rebind_type(get_unmodified(T),family))
-    elif issubclass(T,AbstractBitVector):
-        return rebind_bitvector(T,AbstractBitVector,family.BitVector)
-    elif issubclass(T,AbstractBit):
-        return family.Bit
-    elif issubclass(T,(Product,Sum)):
+    elif issubclass(T, (AbstractBitVector,AbstractBit,Product,Sum)):
         return _rebind_bv(T)
     else:
         return T
