@@ -1,6 +1,7 @@
 from peak import Peak, name_outputs, rebind_type, ReservedNameError
 from hwtypes import Bit, BitVector, SMTBit, SMTBitVector
 from hwtypes.adt import Sum, Product
+from hwtypes.modifiers import make_modifier
 from examples.alu import gen_ALU, Inst, ALUOP
 import pytest
 
@@ -49,7 +50,7 @@ def test_rebind():
         def __init__(self):
             self.Data = Data
         @name_outputs(out=BV[16])
-        def __call__(self, instr : Instr, a : Data):
+        def __call__(self, instr: Instr, a: Data):
             return a + BitVector[16](5)
 
     assert Data(6) == B()(None,Data(1))
@@ -85,3 +86,15 @@ def test_reserved_name():
             _src_ = int
 
 
+def test_rebind_mod():
+    Mod = make_modifier("Mod")
+    ModData = Mod(Data)
+    class C(Peak):
+        def __init__(self):
+            self.Data = ModData
+        @name_outputs(out=BV[16])
+        def __call__(self, instr: Instr, a: Data):
+            return a + BitVector[16](5)
+
+    C_smt = C.rebind(SMTBitVector.get_family())
+    assert C_smt().Data == Mod(SMTBitVector[16])
