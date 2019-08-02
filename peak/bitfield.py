@@ -1,5 +1,21 @@
+import typing as tp
+
 from hwtypes.adt import Enum, Sum, Product
 from hwtypes import AbstractBitVector
+
+def tag(tags: tp.Mapping[type, int]):
+    def wrapper(sum: Sum):
+        if not isinstance(sum, Sum):
+            raise TypeError('tag can only be applied Sum')
+        if tags.keys() != sum.fields:
+            raise ValueError('tag must specificy an Option for each Sum option')
+        if not all(isinstance(t, int) for t in tags.values()):
+            raise TypeError('tags must be int')
+
+        setattr(sum, 'tags', tags)
+        return sum
+    return wrapper
+
 
 def bitfield(i):
     def wrap(klass):
