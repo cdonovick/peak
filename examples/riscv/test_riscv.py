@@ -1,6 +1,6 @@
 import random
 from collections import namedtuple
-from examples.riscv import RISCV
+from examples.riscv import R32I
 import examples.riscv.isa as isa
 import examples.riscv.asm as asm
 import pytest
@@ -34,7 +34,7 @@ testb20s = [random20() for i in range(NVALUES)]
 def test_alu_reg(op,a,b):
     rd, rs1, rs2 = 1, 2, 3
     inst = getattr(asm,op.name)(rd, rs1, rs2)
-    riscv = RISCV([inst])
+    riscv = R32I([inst])
     riscv.poke_reg(rs1,a)
     riscv.poke_reg(rs2,b)
     riscv()
@@ -53,7 +53,7 @@ def test_alu_reg(op,a,b):
 def test_alu_imm(op,a,b):
     rd, rs1 = 1, 2
     inst = getattr(asm,op.name)(rd, rs1, b)
-    riscv = RISCV([inst])
+    riscv = R32I([inst])
     riscv.poke_reg(rs1,a)
     riscv()
     assert riscv.peak_pc() == 1
@@ -63,7 +63,7 @@ def test_alu_imm(op,a,b):
 def test_lui(imm):
     rd = 1
     inst = asm.lui(rd,imm)
-    riscv = RISCV([inst])
+    riscv = R32I([inst])
     riscv()
     assert riscv.peak_pc() == 1
     assert riscv.peak_reg(rd) == imm << 12
@@ -73,7 +73,7 @@ def test_lw(data):
     addr = 1
     rd, rs1, offset = 1, 2, 0
     inst = asm.lw(rd,rs1,offset)
-    riscv = RISCV([inst])
+    riscv = R32I([inst])
     riscv.poke_reg(rs1,addr)
     riscv.poke_mem(addr+offset,data)
     riscv()
@@ -85,7 +85,7 @@ def test_sw(data):
     addr = 1
     rs1, rs2, offset = 1, 2, 0
     inst = asm.sw(rs1,rs2,offset)
-    riscv = RISCV([inst])
+    riscv = R32I([inst])
     riscv.poke_reg(rs1,addr)
     riscv.poke_reg(rs2,data)
     riscv()
@@ -107,7 +107,7 @@ def test_sw(data):
 def test_branch(op, a, b):
     rs1, rs2 = 1, 2
     inst = getattr(asm,op.name)(rs1, rs2, 2)
-    riscv = RISCV([inst])
+    riscv = R32I([inst])
     riscv.poke_reg(rs1,a)
     riscv.poke_reg(rs2,b)
     riscv()

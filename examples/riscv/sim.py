@@ -5,7 +5,7 @@ from peak import Peak, gen_register, RAM, ROM
 MAX_MEMORY = 256
 MAX_REGISTERS = 32
 
-class RISCV(Peak):
+class R32I(Peak):
 
     def __init__(self, mem):
         family = Bit.get_family()
