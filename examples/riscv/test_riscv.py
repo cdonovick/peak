@@ -92,15 +92,13 @@ def test_sw(data):
     assert riscv.peak_pc() == 1
     assert riscv.peak_mem(addr+offset) == data
 
-#@pytest.mark.skip(reason="no way of currently testing this")
 @pytest.mark.parametrize("op", [
     inst('beq', lambda x, y: x==y),
     inst('bne', lambda x, y: x!=y),
     inst('bltu',  lambda x, y: x<y),
     inst('bgeu',  lambda x, y: x>=y),
-    #signed comparisons NYI
-    #inst('blt',  lambda x, y: x<y),
-    #inst('bge',  lambda x, y: x>=y),
+    inst('blt',  lambda x, y: isa.SInt32(x)<isa.SInt32(y)),
+    inst('bge',  lambda x, y: isa.SInt32(x)>=isa.SInt32(y)),
 ])
 @pytest.mark.parametrize("a", testa32s)
 @pytest.mark.parametrize("b", testb32s)

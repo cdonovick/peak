@@ -77,9 +77,9 @@ class R32I(Peak):
             elif type == BNE:
                 res = rs1 != rs2
             elif type == BLT:
-                res = rs1 < rs2 # signed
+                res = SInt32(rs1) < SInt32(rs2) 
             elif type == BGE: 
-                res = rs1 >= rs2 # signed
+                res = SInt32(rs1) >= SInt32(rs2) 
             elif type == BLTU:
                 res = rs1 < rs2
             elif type == BGEU:

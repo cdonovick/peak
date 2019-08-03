@@ -1,4 +1,4 @@
-from hwtypes import BitVector, Bit
+from hwtypes import SIntVector, UIntVector, BitVector, Bit
 from hwtypes.adt import Enum, Sum, Product
 from hwtypes.modifiers import new
 from peak.bitfield import bitfield
@@ -7,8 +7,11 @@ WIDTH = 32
 Byte = new(BitVector, 8, name="Byte")
 Half = new(BitVector, 16, name="Half")
 Word = new(BitVector, 32, name="Word")
-Reg5 = BitVector[5]
 
+UInt32 = new(UIntVector, 32, name="UInt32")
+SInt32 = new(SIntVector, 32, name="SInt32")
+
+Reg5 = BitVector[5]
 RD = bitfield(7)(new(BitVector, 5, name="RD"))
 RS1 = bitfield(15)(new(BitVector, 5, name="RS1"))
 RS2 = bitfield(20)(new(BitVector, 5, name="RS2"))
