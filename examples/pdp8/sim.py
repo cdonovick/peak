@@ -1,19 +1,19 @@
 from .isa import *
-from peak import Peak, gen_register, RAM
+from peak import Peak, gen_register, gen_RAM
 
 ZERO = Bit(0)
 ONE = Bit(1)
 
+MAX_MEMORY = 4096
+
 class PDP8(Peak):
 
     def __init__(self, mem):
-        family = Bit.get_family()
-
-        self.pc = gen_register(family, Word, Word(0))()
         # 32 pages of 128 words
-        self.mem = RAM(Word, 4096, mem, Word(0)) #
-        self.acc = gen_register(family, Word, Word(0))()
-        self.lnk = gen_register(family, Bit, ZERO)()
+        self.mem = gen_RAM(Inst, depth=MAX_MEMORY)(mem, default_init=Word(0))
+        self.pc = gen_register(Word)(Word(0))
+        self.acc = gen_register(Word)(Word(0))
+        self.lnl = gen_register(Bit)(ZERO)
 
     def __call__(self):
         # phase 0

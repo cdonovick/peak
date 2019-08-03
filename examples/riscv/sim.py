@@ -1,6 +1,6 @@
 from hwtypes import BitVector, overflow
 from .isa import *
-from peak import Peak, gen_register, RAM, ROM
+from peak import Peak, gen_register, gen_RAM
 
 MAX_MEMORY = 256
 MAX_REGISTERS = 32
@@ -9,11 +9,10 @@ class R32I(Peak):
 
     def __init__(self, mem):
         family = Bit.get_family()
-        self.mem = RAM(Inst, MAX_MEMORY, mem, Word(0))
 
-        self.reg = RAM(Word, MAX_REGISTERS, [Word(0) for i in range(MAX_REGISTERS)])
-
-        self.pc = gen_register(family, Word, Word(0))()
+        self.mem = gen_RAM(Inst, depth=MAX_MEMORY)(mem, default_init=Word(0))
+        self.reg = gen_RAM(Word, depth=MAX_REGISTERS)([], default_init=Word(0))
+        self.pc = gen_register(Word)(Word(0))
 
     def __call__(self):
         pc = self.pc(0,0)
