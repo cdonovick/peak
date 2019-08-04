@@ -38,7 +38,7 @@ def test_alu_reg(op,a,b):
     riscv.poke_reg(rs1,a)
     riscv.poke_reg(rs2,b)
     riscv()
-    assert riscv.peak_pc() == 1
+    assert riscv.peak_pc() == 4
     assert riscv.peak_reg(rd) == op.func(a,b)
 
 @pytest.mark.parametrize("op", [
@@ -56,7 +56,7 @@ def test_alu_imm(op,a,b):
     riscv = R32I([inst])
     riscv.poke_reg(rs1,a)
     riscv()
-    assert riscv.peak_pc() == 1
+    assert riscv.peak_pc() == 4
     assert riscv.peak_reg(rd) == op.func(a,b)
 
 @pytest.mark.parametrize("imm", testb20s)
@@ -65,33 +65,34 @@ def test_lui(imm):
     inst = asm.lui(rd,imm)
     riscv = R32I([inst])
     riscv()
-    assert riscv.peak_pc() == 1
+    assert riscv.peak_pc() == 4
     assert riscv.peak_reg(rd) == imm << 12
 
 @pytest.mark.parametrize("data", testa32s)
 def test_lw(data):
-    addr = 1
+    addr = 4
     rd, rs1, offset = 1, 2, 0
     inst = asm.lw(rd,rs1,offset)
     riscv = R32I([inst])
     riscv.poke_reg(rs1,addr)
     riscv.poke_mem(addr+offset,data)
     riscv()
-    assert riscv.peak_pc() == 1
+    assert riscv.peak_pc() == 4
     assert riscv.peak_reg(rd) == data
 
 @pytest.mark.parametrize("data", testa32s)
 def test_sw(data):
-    addr = 1
+    addr = 4
     rs1, rs2, offset = 1, 2, 0
     inst = asm.sw(rs1,rs2,offset)
     riscv = R32I([inst])
     riscv.poke_reg(rs1,addr)
     riscv.poke_reg(rs2,data)
     riscv()
-    assert riscv.peak_pc() == 1
+    assert riscv.peak_pc() == 4
     assert riscv.peak_mem(addr+offset) == data
 
+#@pytest.mark.skip(reason = 'nyi')
 @pytest.mark.parametrize("op", [
     inst('beq', lambda x, y: x==y),
     inst('bne', lambda x, y: x!=y),
@@ -104,9 +105,9 @@ def test_sw(data):
 @pytest.mark.parametrize("b", testb32s)
 def test_branch(op, a, b):
     rs1, rs2 = 1, 2
-    inst = getattr(asm,op.name)(rs1, rs2, 2)
+    inst = getattr(asm,op.name)(rs1, rs2, 8)
     riscv = R32I([inst])
     riscv.poke_reg(rs1,a)
     riscv.poke_reg(rs2,b)
     riscv()
-    assert riscv.peak_pc() == 2 if op.func(a,b) else 1
+    assert riscv.peak_pc() == 8 if op.func(a,b) else 4

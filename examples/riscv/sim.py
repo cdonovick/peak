@@ -17,7 +17,7 @@ class R32I(Peak):
     def __call__(self):
         pc = self.pc(0,0)
         inst = self.read_mem(pc)
-        pc = pc + 1
+        pc = pc + 4
         type, inst = inst.match()
 
         if type == ALU:
@@ -84,9 +84,8 @@ class R32I(Peak):
             elif type == BGEU:
                 res = rs1 >= rs2
             if res:
-                #offset = inst.imm.sext(20) << 1
-                offset = inst.imm.sext(20) # memory not byte addressable
-                pc = pc - 1 + offset # -1 because pc = pc + 1, see above
+                offset = inst.imm.sext(20) << 1
+                pc = pc - 4 + offset # pc-4 because pc = pc + 4, see above
         self.pc(pc,1)
 
     # register interface
@@ -102,10 +101,12 @@ class R32I(Peak):
 
     # memory interface
     def read_mem(self, addr):
-        return self.mem(addr, 0, 0)
+        # word addressable
+        return self.mem(addr >> 2, 0, 0)
 
     def write_mem(self, addr, data):
-        return self.mem(addr, data, 1)
+        # word addressable
+        return self.mem(addr >> 2, data, 1)
 
 
     # testing interface

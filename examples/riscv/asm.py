@@ -107,7 +107,7 @@ def sw(rs1, rs2, imm):
 
 
 def b(cond, rs1, rs2, imm):
-    return Inst(Branch(cond(RS1(rs1), RS2(rs2), Immed12(int(imm)))))
+    return Inst(Branch(cond(RS1(rs1), RS2(rs2), Immed12(int(imm)>>1))))
 
 def beq(rs1, rs2, imm):
     return b(BEQ, rs1, rs2, imm)
