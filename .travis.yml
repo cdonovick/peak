@@ -18,12 +18,7 @@ before_install:
 - export CXX="g++-7"  # For coreir/verilogAST
 - git clone https://github.com/leonardt/verilogAST-cpp
 - cd verilogAST-cpp
-- mkdir build
-- cd build
-- cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr ..
-- cmake --build .
-- sudo make install
-- cd ..  # build
+- mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr .. && cmake --build . --target install --config Release && cd ..
 - cd ..  # verilogAST-cpp
 - pip install -U pip
 install:
