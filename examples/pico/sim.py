@@ -80,7 +80,8 @@ class Pico(Peak):
     def __call__(self):
         pc = self.PC(0, 0)
         inst = self.mem(pc)
-        type, inst = inst.match()
+#        type, inst = inst.match()
+        type, inst = inst._value_.__class__, inst._value_
         if type == Logic or type == Arith:
             self.alu(type, inst)
         elif type == Memory:
@@ -91,7 +92,8 @@ class Pico(Peak):
             raise NotImplemented(inst)
 
     def alu(self, type, inst):
-        subtype, inst = inst.match()
+#        subtype, inst = inst.match()
+        subtype, inst = inst._value_.__class__, inst._value_
         a = self.reg(inst.ra, 0, 0)
         b = self.reg(inst.rb, 0, 0)
         if type == Logic:
@@ -107,7 +109,8 @@ class Pico(Peak):
         self.PC(self.PC(0, 0)+1, 1)
 
     def memory(self, inst):
-        type, inst = inst.match()
+#        type, inst = inst.match()
+        type, inst = inst._value_.__class__, inst._value_
         if   type == LDLO:
             self.reg(inst.ra,Word(inst.imm), 1)
         elif type == LDHI:
@@ -120,7 +123,8 @@ class Pico(Peak):
         self.PC(self.PC(0, 0)+1, 1)
 
     def control(self, inst):
-        type, inst = inst.match()
+#        type, inst = inst.match()
+        type, inst = inst._value_.__class__, inst._value_
         if     type == Jump:
             if cond(inst.cond, self.Z(0, 0), self.N(0, 0), self.C(0, 0), self.V(0, 0)):
                 self.PC(Word(inst.imm), 1)
