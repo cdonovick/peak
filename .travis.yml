@@ -19,7 +19,7 @@ before_install:
 - git clone https://github.com/leonardt/verilogAST-cpp
 - cd verilogAST-cpp
 - export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-- mkdir build && cd build && cmake .. && sudo cmake --build . --target install && cd ..
+- mkdir build && cd build && cmake .. && cmake --build . && sudo make install && cd ..
 - cd ..  # verilogAST-cpp
 - pip install -U pip
 install:
