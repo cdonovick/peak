@@ -22,7 +22,7 @@ before_install:
 - cd build
 - cmake ..
 - cmake --build .
-- make install
+- sudo make install
 - cd ..  # build
 - cd ..  # verilogAST-cpp
 - pip install -U pip
