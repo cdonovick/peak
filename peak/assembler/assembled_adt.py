@@ -1,7 +1,9 @@
 import typing as tp
 from .assembler_abc import AssemblerMeta
-from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum
+from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum, Sum
 from hwtypes.adt_meta import BoundMeta
+
+from .assembler_util import _issubclass
 
 class _MISSING: pass
 
@@ -28,7 +30,8 @@ class AssembledADTMeta(BoundMeta):
             for name in RESERVED_NAMES:
                 if hasattr(adt_t, name):
                     raise TypeError()
-            return super().__getitem__(key)
+            T = super().__getitem__(key)
+            return T
 
     def __getattr__(cls, attr):
         val = getattr(cls.adt_t, attr, _MISSING)
@@ -36,6 +39,9 @@ class AssembledADTMeta(BoundMeta):
             return cls.unbound_t[val, cls.assembler_t, cls.bv_type]
         else:
             raise AttributeError(attr)
+
+    def __contains__(cls, T):
+        return T in cls.adt_t
 
     def __eq__(cls, other):
         mcs = type(cls)
@@ -76,38 +82,48 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
         if isinstance(adt, cls.adt_t):
             self._value_ = assembler.assemble(adt, cls.bv_type)
-        elif not isinstance(adt, cls.bv_type):
-            raise TypeError()
+        elif not isinstance(adt, cls.bv_type[assembler.width]):
+            raise TypeError(f'expected {cls.bv_type[assembler.width]} or {cls.adt_t} not {adt}')
         else:
             self._value_ = adt
 
     def __getitem__(self, key):
         cls = type(self)
-        asm = self._assembler_.sub.get(key, _MISSING)
-        if asm is not _MISSING:
-            return cls[key](self._value_[asm.idx])
+        sub = self._assembler_.sub.get(key, _MISSING)
+        if sub is not _MISSING:
+            return cls[key](self._value_[sub.idx])
         else:
             raise KeyError(key)
 
     def __getattr__(self, attr):
-        cls = type(self)
-        asm = self._assembler_.sub.get(attr, _MISSING)
-        if asm is not _MISSING:
-            return getattr(cls, attr)(self._value_[asm.idx])
-        else:
-            raise AttributeError(attr)
+        return self[attr]
 
     def __eq__(self, other):
         cls = type(self)
         if isinstance(other, cls):
             return self._value_ == other._value_
-        elif isinstance(other, cls.bv_type):
+        elif isinstance(other, cls.bv_type[self._assembler_.width]):
             return self._value_ == other
         elif isinstance(other, cls.adt_t):
             opcode = self._assembler_.assemble(other, cls.bv_type)
             return self._value_ == opcode
         else:
             return NotImplemented
+
+    def __contains__(self, T):
+        cls = type(self)
+        tag = self._value_[self._assembler_.sub.tag_idx]
+        # if T is an assembled adt class just grab the type from it
+        if _issubclass(T, tuple(cls[t] for t in cls.adt_t.fields)):
+            T = T.adt_t
+
+        if isinstance(T, cls.bv_type[self._assembler_.tag_width]):
+            return tag == T
+        elif T in cls.adt_t:
+            T = self._assembler_.assemble_tag(T, cls.bv_type)
+            return tag == T
+        else:
+            raise TypeError()
 
     def __ne__(self, other):
         return ~(self == other)
