@@ -5,66 +5,105 @@ import examples.pdp8.isa as isa
 import examples.pdp8.asm as asm
 import pytest
 
-NVALUES = 16
+NVALUES = 4
 def random12():
-    return random.randint(0,1<<12-1)
+    return Word(random.randint(0,1<<12-1))
 testvectors1 = [random12() for i in range(NVALUES)]
-testvectors2 = [(random12(), random12()) for i in range(NVALUES)]
+testvectors2 = [random12() for i in range(NVALUES)]
 
-@pytest.mark.parametrize("ab", testvectors2)
-def test_and(ab):
-    inst = asm.and_(1)
+@pytest.mark.parametrize("a", testvectors1)
+@pytest.mark.parametrize("b", testvectors2)
+def test_and(a,b):
+    addr = 1
+    inst = asm.and_(addr)
     bits = encode(inst)
-    print('%08x' % bits)
-    #assert bits == 0x020
-    pdp8 = PDP8([inst,Word(ab[0])])
-    pdp8.poke_acc(ab[1])
+    assert bits == 0x020
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,a)
+    pdp8.poke_acc(b)
     pdp8()
     assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == ab[0]&ab[1]
+    assert pdp8.peak_acc() == a&b
 
-@pytest.mark.parametrize("ab", testvectors2)
-def test_tad(ab):
-    inst = asm.tad(1)
+@pytest.mark.parametrize("a", testvectors1)
+@pytest.mark.parametrize("b", testvectors2)
+def test_tad(a,b):
+    addr = 1
+    inst = asm.tad(addr)
     bits = encode(inst)
-    print('%08x' % bits)
-    pdp8 = PDP8([inst,Word(ab[0])])
-    pdp8.poke_acc(ab[1])
+    assert bits == 0x21
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,a)
+    pdp8.poke_acc(b)
     pdp8()
     assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == ab[0]+ab[1]
-
-def test_dca():
-    pdp8 = PDP8([asm.dca(1)])
-    pdp8.poke_mem(1,0)
-    pdp8.poke_acc(1)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 0
-    assert pdp8.peak_mem(1) == 1
+    assert pdp8.peak_acc() == a+b
 
 def test_isz():
-    pdp8 = PDP8([asm.isz(1)])
-    pdp8.poke_mem(1,0)
+    addr = 1
+    inst = asm.isz(addr)
+    bits = encode(inst)
+    assert bits == 0x22
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,0)
     pdp8()
     assert pdp8.peak_pc() == 1
     assert pdp8.peak_acc() == 0
-    assert pdp8.peak_mem(1) == 1
+    assert pdp8.peak_mem(addr) == 1
 
+@pytest.mark.parametrize("a", testvectors1)
+def test_dca(a):
+    addr = 1
+    inst = asm.dca(addr)
+    bits = encode(inst)
+    assert bits == 0x23
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,0)
+    pdp8.poke_acc(a)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 0
+    assert pdp8.peak_mem(addr) == a
+
+
+def test_jms():
+    addr = 2
+    inst = asm.jms(addr)
+    bits = encode(inst)
+    assert bits == 0x44
+    pdp8 = PDP8([inst])
+    pdp8()
+    assert pdp8.peak_pc() == 3
+    assert pdp8.peak_acc() == 0
+    assert pdp8.peak_mem(addr) == 1
 
 def test_jmp():
-    pdp8 = PDP8([asm.jmp(2)])
+    addr = 2
+    inst = asm.jmp(addr)
+    bits = encode(inst)
+    assert bits == 0x45
+    pdp8 = PDP8([inst])
     pdp8()
-    assert pdp8.peak_pc() == 2
+    assert pdp8.peak_pc() == addr
+
+@pytest.mark.skip(reason='nyi')
+def test_iot():
+    pass
 
 def test_cla():
-    pdp8 = PDP8([asm.cla()])
+    inst = asm.cla()
+    bits = encode(inst)
+    assert bits == 0x17
+    pdp8 = PDP8([inst])
     pdp8.poke_acc(1)
     pdp8()
     assert pdp8.peak_acc() == 0
 
 def test_sna():
-    pdp8 = PDP8([asm.sna()])
+    inst = asm.sna()
+    bits = encode(inst)
+    assert bits == 0x14f
+    pdp8 = PDP8([inst])
     pdp8.poke_acc(1)
     pdp8()
     assert pdp8.peak_pc() == 2
