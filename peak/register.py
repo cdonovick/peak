@@ -1,6 +1,8 @@
 from .peak import Peak
 from hwtypes import BitVector, Bit
+import functools
 
+@functools.lru_cache(maxsize=None)
 def gen_register(T):
     class Register(Peak):
         def __init__(self, init : T):
@@ -15,5 +17,4 @@ def gen_register(T):
                 # explicitly set it for now
                 self.value = self.value
             return retvalue
-
     return Register
