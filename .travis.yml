@@ -20,7 +20,7 @@ before_install:
 - cd verilogAST-cpp
 - mkdir build
 - cd build
-- cmake ..
+- cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr ..
 - cmake --build .
 - sudo make install
 - cd ..  # build
