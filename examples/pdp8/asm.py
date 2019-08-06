@@ -1,22 +1,26 @@
 from .isa import *
 
+
+def mri(tag, i, p, addr):
+    return MRI(tag, Payload(i, p, addr))
+
 def and_(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(AND(i, p, Addr(addr)))
+    return Inst(mri(AND, i, p, Addr(addr)))
 
 def tad(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(TAD(i, p, Addr(addr)))
+    return Inst(mri(TAD, i, p, Addr(addr)))
 
 def dca(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(DCA(i, p, Addr(addr)))
+    return Inst(mri(DCA, i, p, Addr(addr)))
 
 def isz(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(ISZ(i, p, Addr(addr)))
+    return Inst(mri(ISZ, i, p, Addr(addr)))
 
 def jmp(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(JMP(i, p, Addr(addr)))
+    return Inst(mri(JMP, i, p, Addr(addr)))
 
 def jms(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(JMS(i, p, Addr(addr)))
+    return Inst(mri(JMS, i, p, Addr(addr)))
 
 def iot():
     pass

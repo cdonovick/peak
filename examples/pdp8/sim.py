@@ -21,9 +21,9 @@ class PDP8(Peak):
         inst = self.load(pc)
         pc = pc + 1
 
-        type, inst = inst.match()
-
-        if isinstance(inst, MRI):
+        if MRI in inst:
+            type = inst[MRI].Tag
+            inst = inst[MRI].Payload
             addr = inst.addr
             if inst.p == ZERO:
                 page = BitVector[5](0)
@@ -57,9 +57,10 @@ class PDP8(Peak):
                 self.store(addr,pc)
                 pc = addr + 1
 
-        elif type == OPR:
-            type, inst = inst.match()
-            if type == OPR1:
+        elif OPR in inst:
+            inst = inst[OPR]
+            if OPR1 in inst:
+                inst = inst[OPR1]
                 if inst.cla:
                     self.acc(0,1)
                 if inst.cma:
@@ -70,7 +71,8 @@ class PDP8(Peak):
                     pass
                 if inst.rar:
                     pass
-            elif type == OPR2:
+            elif OPR2 in inst:
+                inst = inst[OPR2]
                 skip = ZERO
                 if   inst.sma == ONE:
                     if inst.skip == ZERO:

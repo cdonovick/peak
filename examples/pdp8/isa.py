@@ -8,29 +8,40 @@ Word = BitVector[WIDTH]
 
 # Direct vs indirect addressing
 @bitfield(3)
-class IA(Enum): 
+class IA(Enum):
     DIRECT = 0
     INDIRECT = 1
 
 # Page
 @bitfield(4)
-class MP(Enum): 
+class MP(Enum):
     PAGE_ZERO = 0
     CURRENT_PAGE = 1
 
 Addr= bitfield(5)(new(BitVector, 7, name='Addr'))
 
 class MRI(Product):
-    i = IA
-    p = MP
-    addr = Addr
+    class Tag(Enum):
+        AND = 0
+        TAD = 1
+        ISZ = 2
+        DCA = 3
+        JMS = 4
+        JMP = 5
 
-class AND(MRI): pass
-class TAD(MRI): pass
-class ISZ(MRI): pass
-class DCA(MRI): pass
-class JMS(MRI): pass
-class JMP(MRI): pass
+    class Payload(Product):
+        i = IA
+        p = MP
+        addr = Addr
+
+Payload = MRI.Payload
+AND = MRI.Tag.AND
+TAD = MRI.Tag.TAD
+ISZ = MRI.Tag.ISZ
+DCA = MRI.Tag.DCA
+JMS = MRI.Tag.JMS
+JMP = MRI.Tag.JMP
+
 
 @bitfield(3)
 class IOT(Product):
@@ -63,5 +74,4 @@ class OPR2(Product):
 class OPR(Sum[OPR1, OPR2]): pass
 
 @bitfield(0)
-@tag({AND:0, TAD:1, ISZ:2, DCA:3, JMS:4, JMP:5, IOT:6, OPR:7})
-class Inst(Sum[AND, TAD, ISZ, DCA, JMS, JMP, IOT, OPR]): pass
+class Inst(Sum[MRI, IOT, OPR]): pass
