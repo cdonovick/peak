@@ -32,7 +32,7 @@ def encode(inst, bitfield=0):
     if isinstance(inst, (AbstractBit, AbstractBitVector)):
         word = int(inst) << bitfield
     elif isinstance(inst,Enum):
-        word = inst.value << bitfield
+        word = inst._value_ << bitfield
     elif isinstance(inst,Product):
         word = 0
         for key in type(inst).field_dict.keys():
@@ -48,10 +48,10 @@ def encode(inst, bitfield=0):
     elif isinstance(inst,Sum):
         t = type(inst)
         if hasattr(t, 'tags'):
-            i = t.tags[type(inst.value)]
+            i = t.tags[type(inst._value_)]
         else:
-            i = list(t.fields).index(type(inst.value))
-        word = (i << bitfield) | encode(inst.value)
+            i = list(t.fields).index(type(inst._value_))
+        word = (i << bitfield) | encode(inst._value_)
     else:
         raise ValueError(inst)
     return word

@@ -26,10 +26,11 @@ before_install:
 - cd coreir_release && sudo make install && cd ..
 - pip install -U pip
 install:
+- pip install -I git+https://github.com/leonardt/hwtypes.git@new-sum
 - pip install pytest-cov fault mantle
 - pip install python-coveralls
 - pip install -e .
 script:
-- py.test --cov=peak tests/
+- py.test --cov=peak
 after_success:
 - coveralls
