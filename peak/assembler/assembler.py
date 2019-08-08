@@ -1,5 +1,5 @@
 from .assembler_abc import AbstractAssembler
-from hwtypes import AbstractBitVector, BitVector, Bit
+from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
 from hwtypes.adt import Enum, Product, Sum, Tuple
 from hwtypes.adt_meta import BoundMeta, EnumMeta
 
@@ -26,7 +26,7 @@ class Assembler(AbstractAssembler):
             self._tag_dsm = tag_args[1]
             self._tag_width = tag_args[2]
             self._tag_layout = tag_args[3]
-        elif _issubclass(isa, (Bit, BitVector)):
+        elif _issubclass(isa, (AbstractBit, AbstractBitVector)):
             asm, dsm, width, layout = _field(isa)
         else:
             raise TypeError(f'isa: {isa}')
@@ -188,7 +188,12 @@ def _sum(isa : Sum) -> int:
 
 
 def _field(isa : tp.Type[AbstractBitVector]):
-    width = isa.size
+    if _issubclass(isa, AbstractBitVector):
+        width = isa.size
+    elif _issubclass(isa, AbstractBit):
+        width = 1
+    else:
+        raise TypeError()
     layout = {}
     def assembler(inst):
         return int(inst)

@@ -6,7 +6,7 @@ from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
 import examples.pico.asm as pico_asm
 
-from hwtypes import BitVector
+from hwtypes import BitVector, Bit
 from hwtypes import make_modifier
 from hwtypes.adt import Product, Tuple, Sum, Enum
 import pytest
@@ -29,10 +29,14 @@ def test_assembled_adt(isa, bv_type):
             assert issubclass(type(asm_adt(opcode)._value_), bv_type)
 
             assert asm_adt(inst) == inst
+            assert type(asm_adt(inst) == inst) is Bit
             assert asm_adt(inst) == opcode
+            assert type(asm_adt(inst) == opcode) is Bit
 
             assert asm_adt(opcode) == inst
+            assert type(asm_adt(opcode) == inst) is Bit
             assert asm_adt(opcode) == opcode
+            assert type(asm_adt(opcode) == opcode) is Bit
 
         if _issubclass(isa, Sum):
             for field in isa.fields:
@@ -72,15 +76,19 @@ def test_match():
     asm_adt = AssembledADT[S, Assembler, BitVector]
 
     s = asm_adt(S(I0.a))
-    assert I0 in s
-    assert I1 not in s
+    assert s.match(I0)
+    assert type(s.match(I0)) is Bit
+    assert ~s.match(I1)
+    assert type(~s.match(I1)) is Bit
     assert s[I0] == I0.a
+    assert type(s[I0] == I0.a) is Bit
     assert s[I0] != I0.b
+    assert type(s[I0] != I0.b) is Bit
 
 
     class Foo: pass
     with pytest.raises(TypeError):
-        Foo in s
+        s.match(Foo)
 
     # The following rely on implementation details of Assembler
     # But the point is that S[I1] will return garbage

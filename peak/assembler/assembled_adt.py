@@ -1,6 +1,7 @@
 import typing as tp
 from .assembler_abc import AssemblerMeta
 from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum, Sum
+from hwtypes import AbstractBitVector, AbstractBit
 from hwtypes.adt_meta import BoundMeta
 
 from .assembler_util import _issubclass
@@ -27,6 +28,11 @@ class AssembledADTMeta(BoundMeta):
             raise TypeError('AssembledADTs must be bound to a BoundMeta, AssemblerMeta, BitVector')
         else:
             adt_t = key[0]
+            if (_issubclass(adt_t, AbstractBitVector)
+                or _issubclass(adt_t, AbstractBit)):
+                # Bit of a hack but don't bother wrapping Bits/Bitvectors
+                # Removes the issue of adding __operators__
+                return adt_t
             for name in RESERVED_NAMES:
                 if hasattr(adt_t, name):
                     raise TypeError()
@@ -91,12 +97,38 @@ class AssembledADT(metaclass=AssembledADTMeta):
         cls = type(self)
         sub = self._assembler_.sub.get(key, _MISSING)
         if sub is not _MISSING:
-            return cls[key](self._value_[sub.idx])
+            if issubclass(cls[key], AbstractBit):
+                return self._value_[sub.idx][0]
+            else:
+                return cls[key](self._value_[sub.idx])
         else:
             raise KeyError(key)
 
     def __getattr__(self, attr):
         return self[attr]
+
+    def match(self, T):
+        cls = type(self)
+        if not _issubclass(cls.adt_t, Sum):
+            return super().match(T)
+        tag = self._value_[self._assembler_.sub.tag_idx]
+        # if T is an assembled adt class just grab the type from it
+        if _issubclass(T, AssembledADT):
+            T = T.adt_t
+
+        if isinstance(T, cls.bv_type[self._assembler_.tag_width]):
+            return tag == T
+        elif T in cls.adt_t:
+            T = self._assembler_.assemble_tag(T, cls.bv_type)
+            return tag == T
+        else:
+            raise TypeError()
+
+    def __hash__(self):
+        return hash(self._value_)
+
+    def __repr__(self):
+        return f'{type(self).__name__}({self._value_})'
 
     def __eq__(self, other):
         cls = type(self)
@@ -110,26 +142,5 @@ class AssembledADT(metaclass=AssembledADTMeta):
         else:
             return NotImplemented
 
-    def __contains__(self, T):
-        cls = type(self)
-        tag = self._value_[self._assembler_.sub.tag_idx]
-        # if T is an assembled adt class just grab the type from it
-        if _issubclass(T, tuple(cls[t] for t in cls.adt_t.fields)):
-            T = T.adt_t
-
-        if isinstance(T, cls.bv_type[self._assembler_.tag_width]):
-            return tag == T
-        elif T in cls.adt_t:
-            T = self._assembler_.assemble_tag(T, cls.bv_type)
-            return tag == T
-        else:
-            raise TypeError()
-
-    def __ne__(self, other):
-        return ~(self == other)
-
-    def __hash__(self):
-        return hash(self._value_)
-
-    def __repr__(self):
-        return f'{type(self).__name__}({self._value_})'
+    def __ne__(cls, other):
+        return ~(cls == other)

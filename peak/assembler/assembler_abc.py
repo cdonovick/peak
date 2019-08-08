@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from hwtypes import AbstractBitVector, BitVector
+from hwtypes import AbstractBit, AbstractBitVector, BitVector
 from hwtypes.adt import Enum, Product, Sum, Tuple
 from hwtypes.adt_meta import BoundMeta
 
@@ -103,7 +103,7 @@ class Sub(tp.Mapping):
                 if name in isa.field_dict:
                     warnings.warn(f'field {name} is used by the assembler '
                                    'machinery gettattr access will not work')
-        elif not _issubclass(isa, (Tuple, AbstractBitVector)):
+        elif not _issubclass(isa, (Tuple, AbstractBit, AbstractBitVector)):
             raise TypeError(f'Unsported type {isa}')
 
         self._asm = assembler

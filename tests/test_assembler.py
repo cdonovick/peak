@@ -30,13 +30,13 @@ def test_assembler_disassembler(isa, bv_type):
             if issubclass(isa, Product):
                 assert getattr(assembler.sub, name).asm is sub_assembler
 
-            if issubclass(field, (Product, Tuple)):
+            if issubclass(isa, (Product, Tuple)):
                 sub_opcode = opcode[assembler.sub[name].idx]
                 assert isinstance(sub_opcode, bv_type[sub_assembler.width])
                 sub_inst = sub_assembler.disassemble(sub_opcode)
                 assert isinstance(sub_inst, field)
                 assert sub_inst == inst.value_dict[name]
-            if issubclass(field, Sum) and field in inst:
+            if issubclass(isa, Sum) and inst.match(field):
                 sub_opcode = opcode[assembler.sub[field].idx]
                 assert isinstance(sub_opcode, bv_type[sub_assembler.width])
                 sub_inst = sub_assembler.disassemble(sub_opcode)
