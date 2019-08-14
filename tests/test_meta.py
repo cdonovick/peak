@@ -85,10 +85,11 @@ def test_reserved_name():
         class A(Peak):
             _src_ = int
 
-
 def test_rebind_mod():
     Mod = make_modifier("Mod")
     ModData = Mod(Data)
+    class Instr(Product):
+        a = Mod(Bit)
     class C(Peak):
         def __init__(self):
             self.Data = ModData
@@ -98,3 +99,4 @@ def test_rebind_mod():
 
     C_smt = C.rebind(SMTBitVector.get_family())
     assert C_smt().Data == Mod(SMTBitVector[16])
+    assert C_smt.get_inputs().instr.a == Mod(SMTBit)
