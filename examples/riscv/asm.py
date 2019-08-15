@@ -79,9 +79,6 @@ def alui(op, rd, rs1, imm):
 def addi(rd, rs1, imm):
     return alui(AddI, rd, rs1, imm)
 
-def subi(rd, rs1, imm):
-    return alui(SubI, rd, rs1, imm)
-
 def andi(rd, rs1, imm):
     return alui(AndI, rd, rs1, imm)
 

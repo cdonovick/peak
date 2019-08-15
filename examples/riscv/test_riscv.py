@@ -46,7 +46,6 @@ def test_alu_reg(op,a,b):
     inst('ori',  lambda x, y: x|y),
     inst('xori',  lambda x, y: x^y),
     inst('addi',  lambda x, y: x+y),
-    inst('subi',  lambda x, y: x-y),
 ])
 @pytest.mark.parametrize("a", testa32s)
 @pytest.mark.parametrize("b", testb12s)

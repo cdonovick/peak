@@ -1,7 +1,7 @@
 from hwtypes import SIntVector, UIntVector, BitVector, Bit
 from hwtypes.adt import Enum, Sum, Product
 from hwtypes.modifiers import new
-from peak.bitfield import bitfield
+from peak.bitfield import bitfield, tag
 
 WIDTH = 32
 Byte = new(BitVector, 8, name="Byte")
@@ -33,6 +33,7 @@ class ST(Product):
 
 class SW(ST): pass
 
+@tag({LW: 0, SW:1})
 class Memory(Sum[LW, SW]): pass
 
 
@@ -48,6 +49,7 @@ class BGE(_Branch): pass
 class BLTU(_Branch): pass
 class BGEU(_Branch): pass
 
+@tag({BEQ: 0, BNE:1, BLT:2, BGE:3, BLTU:4, BGEU:5})
 class Branch(Sum[BEQ, BNE, BLT, BGE, BLTU, BGEU]): pass
     
 
@@ -62,6 +64,7 @@ class XOr(_ALUR): pass
 class Add(_ALUR): pass
 class Sub(_ALUR): pass
 
+@tag({And: 0, Or:1, XOr:2, Add:3, Sub:4})
 class ALUR(Sum[And, Or, XOr, Add, Sub]): pass
 
 class _ALUI(Product):
@@ -73,16 +76,18 @@ class AndI(_ALUI): pass
 class OrI(_ALUI): pass
 class XOrI(_ALUI): pass
 class AddI(_ALUI): pass
-class SubI(_ALUI): pass
 
-class ALUI(Sum[AndI, OrI, XOrI, AddI, SubI]): pass
+@tag({AndI: 0, OrI:1, XOrI:2, AddI:3})
+class ALUI(Sum[AndI, OrI, XOrI, AddI]): pass
 
+@tag({ALUR: 0, ALUI:1})
 class ALU(Sum[ALUR, ALUI]): pass
 
 class LUI(Product):
     rd = RD
     imm = Immed20
 
+@tag({Memory: 0, Branch:1, ALU:2, LUI:3})
 class Inst(Sum[Memory, Branch, ALU, LUI]): pass
 
 # Missing shift and set instructions

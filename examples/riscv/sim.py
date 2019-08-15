@@ -43,8 +43,6 @@ class R32I(Peak):
                 imm = inst.imm.sext(20)
                 if   type == AddI:
                     rd = rs1 + imm
-                elif type == SubI:
-                    rd = rs1 - imm
                 elif type == AndI:
                     rd = rs1 & imm
                 elif type == OrI:
