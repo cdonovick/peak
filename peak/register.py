@@ -1,15 +1,15 @@
 from .peak import Peak
-from hwtypes import BitVector, Bit
+from hwtypes import BitVector
+import magma as m
 
-_cache_ = {}
-def gen_register(T):
-    if T in _cache_:
-        return _cache_[T]
+
+def gen_register(family, T, init=0):
     class Register(Peak):
-        def __init__(self, init : T):
+        def __init__(self):
             self.value: T = init
 
-        def __call__(self, value: T, en: Bit) -> T:
+        def __call__(self, value: T, en: family.Bit) -> T:
+            assert value is not None
             retvalue = self.value
             if en:
                 self.value = value
@@ -18,5 +18,7 @@ def gen_register(T):
                 # explicitly set it for now
                 self.value = self.value
             return retvalue
-    _cache_[T] = Register
+
+    if family.Bit is m.Bit:
+        Register = m.circuit.sequential(Register)
     return Register
