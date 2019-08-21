@@ -16,7 +16,7 @@ class MP(Enum):
     PAGE_ZERO = 0
     CURRENT_PAGE = 1
 
-Addr= new(BitVector, 7, name='Addr')
+Addr= BitVector[7]
 
 class MRI(Product):
     i = IA

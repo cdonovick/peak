@@ -13,9 +13,12 @@ class PDP8(Peak):
         self.mem = gen_RAM(Inst, depth=MAX_MEMORY)(mem, default_init=Word(0))
         self.pc = gen_register(Word)(Word(0))
         self.acc = gen_register(Word)(Word(0))
-        self.lnl = gen_register(Bit)(ZERO)
+        self.lnk = gen_register(Bit)(ZERO)
+        self.running = gen_register(Bit)(ONE)
 
     def __call__(self):
+        if not self.is_running():
+            return
         # phase 0
         pc = self.pc(0,0)
         inst = self.load(pc)
@@ -29,7 +32,7 @@ class PDP8(Peak):
                 page = BitVector[5](0)
             else:
                 page = (pc-1)[7:]
-            addr = Word(addr) # concat
+            addr = Word(addr).concat(page) 
 
             # phase 1
             if inst.i == IA.INDIRECT:
@@ -40,9 +43,11 @@ class PDP8(Peak):
                 data = self.load(addr)
                 self.acc(self.acc(0,0) & data, 1)
             elif type == TAD:
-                # add link
-                data = self.load(addr)
-                self.acc(self.acc(0,0) + data, 1)
+                data = self.load(addr).concat(BitVector[1](0))
+                acc = self.acc(0,0).concat(BitVector[1](self.lnk(0,0)))
+                res = acc + data
+                self.acc(res[0:WIDTH], 1)
+                self.lnk(res[WIDTH], 1)
             elif type == ISZ:
                 data = self.load(addr) + 1
                 self.store(addr, data)
@@ -60,36 +65,62 @@ class PDP8(Peak):
         elif type == OPR:
             type, inst = inst.match()
             if type == OPR1:
-                if inst.cla:
-                    self.acc(0,1)
-                if inst.cma:
+                # Note that the order of these operations is specified
+                if inst.cla: # clear accumulator
+                    self.acc(Word(0),1)
+                if inst.cma: # complement accumulator
                     self.acc(~self.acc(0,0),1)
-                if inst.iac:
+                if inst.cll: # clear link
+                    self.lnk(ZERO,1)
+                if inst.cml: # complement link
+                    self.lnk(~self.lnk(0,0),1)
+                if inst.iac: # increment accumulator
                     self.acc(self.acc(0,0)+1,1)
-                if inst.ral:
-                    pass
-                if inst.rar:
-                    pass
+                if inst.ral: # rotate left
+                    acc = self.acc(0,0).concat(BitVector[1](self.lnk(0,0)))
+                    res = acc.bvrol(2 if inst.twice else 1)
+                    self.acc(res[0:WIDTH], 1)
+                    self.lnk(res[WIDTH], 1)
+                if inst.rar: # rotate right
+                    acc = self.acc(0,0).concat(BitVector[1](self.lnk(0,0)))
+                    res = acc.bvror(2 if inst.twice else 1)
+                    print('rar', res)
+                    self.acc(res[0:WIDTH], 1)
+                    self.lnk(res[WIDTH], 1)
             elif type == OPR2:
-                skip = ZERO
-                if   inst.sma == ONE:
+                # Note that the order of these operations is specified
+                if inst.sma == ONE or inst.sza == ONE or inst.snl == ONE:
                     if inst.skip == ZERO:
-                        skip |= self.acc(0,0)[-1] == ONE
+                        skip = ZERO
+                        if inst.sma == ONE: 
+                            skip |= self.acc(0,0)[-1] == ONE
+                        if inst.sza == ONE:
+                            skip |= self.acc(0,0) == Word(0)
+                        if inst.snl == ONE:
+                            pass
                     else:
-                        skip |= self.acc(0,0)[-1] == ZERO
-                elif inst.sza == ONE:
-                    if inst.skip == ZERO:
-                        skip |= self.acc(0,0) == Word(0)
-                    else:
-                        skip |= self.acc(0,0) != Word(0)
-                elif inst.snl == ONE:
-                    pass
-                else:
-                    skip = inst.skip == ONE
-                if skip == ONE:
-                    pc = pc + 1
+                        skip = ONE
+                        if inst.sma == ONE: # smp
+                            skip &= self.acc(0,0)[-1] == ZERO
+                        if inst.sza == ONE: # sna
+                            skip &= self.acc(0,0) != Word(0)
+                        if inst.snl == ONE: # szl
+                            pass
+                    if skip == ONE:
+                        pc = pc + 1
+                if inst.cla:
+                    self.acc(Word(0),1)
+                if inst.hlt:
+                    self.running(ZERO, 1)
 
         self.pc(pc, 1)
+
+    def is_running(self):
+        return self.running(0,0) == ONE
+
+    def run(self):
+        while self.is_running():
+            self()
 
     def load(self, addr):
         return self.mem(addr, 0, 0)
