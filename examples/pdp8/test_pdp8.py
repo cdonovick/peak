@@ -1,5 +1,5 @@
 import random
-from peak.bitfield import encode
+from peak.bitfield import encode, size
 from examples.pdp8 import PDP8, Word
 import examples.pdp8.isa as isa
 import examples.pdp8.asm as asm
@@ -16,6 +16,7 @@ testvectors2 = [random12() for i in range(NVALUES)]
 def test_and(a,b):
     addr = 1
     inst = asm.and_(addr)
+    assert size(type(inst)) == 12
     bits = encode(inst)
     assert bits == 0x020
     pdp8 = PDP8([inst])
