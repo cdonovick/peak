@@ -50,6 +50,9 @@ def ral():
 def rtl():
     return opr1(ral=1, twice=1)
 
+def nop():
+    return opr1()
+
 
 
 # the left column cannot be combined with the right colum
@@ -89,5 +92,3 @@ def snl():
 def hlt():
     return opr2(hlt=1)
 
-def nop():
-    return opr2()

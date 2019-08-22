@@ -54,22 +54,37 @@ def bitfield(i):
         return klass
     return wrap
 
-def encode(inst, bitfield=0):
-    bitfield = getattr(inst, 'bitfield', bitfield)
-    if isinstance(inst, (AbstractBit, AbstractBitVector)):
-        word = int(inst) << bitfield
-    elif isinstance(inst,Enum):
-        word = inst.value << bitfield
-    elif isinstance(inst,Product):
-        word = 0
-        for key in type(inst).field_dict.keys():
-            field = getattr(inst, key)
-            word |= encode(field, bitfield)
-            bitfield += size(type(field))
-    elif isinstance(inst,Sum):
-        i = instkey(inst)
-        t = type(inst)
-        word = (i | (encode(inst.value, sumsize(t)))) << bitfield
+# left vs right justify
+def encode(inst, reverse=False):
+    bitfield = getattr(inst, 'bitfield', 0)
+    if isinstance(inst, (AbstractBit, AbstractBitVector, Enum)):
+        word = inst.value if isinstance(inst,Enum) else int(inst)
     else:
-        raise ValueError(inst)
-    return word
+        typeinst = type(inst)
+        if isinstance(inst,Product):
+            word = 0
+            if reverse: # layout fields from right to left
+                pos = size(typeinst)
+                for key in typeinst.field_dict.keys():
+                    field = getattr(inst, key)
+                    len = size(type(field))
+                    word |= encode(field, reverse) << (pos - len)
+                    pos -= len
+            else: # layout fields from left to right
+                pos = 0
+                for key in typeinst.field_dict.keys():
+                    field = getattr(inst, key)
+                    len = size(type(field))
+                    word |= encode(field, reverse) << pos
+                    pos += len
+        elif isinstance(inst,Sum):
+            tag = instkey(inst)
+            if reverse: # tag is on the left, value is on the right
+                pos = size(typeinst) - sumsize(typeinst)
+                word = (tag << pos) | encode(inst.value, reverse)
+            else: # tag is on the right, value is on the left
+                pos = sumsize(typeinst)
+                word = (encode(inst.value) << pos) | tag
+        else:
+            raise ValueError(inst)
+    return word << bitfield

@@ -147,7 +147,7 @@ class PDP8(Peak):
         return int(self.lnk(0,0))
 
     def poke_lnk(self, value):
-        return int(self.lnk(Word(value),1))
+        return int(self.lnk(Bit(value),1))
 
     def peak_mem(self, addr):
         return int(self.mem(Word(addr),0,0))

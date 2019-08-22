@@ -1,24 +1,61 @@
 import random
+from hwtypes import int2seq, seq2int
 from peak.bitfield import encode, size
-from examples.pdp8 import PDP8, Word
+from examples.pdp8 import PDP8, Word, WIDTH
 import examples.pdp8.isa as isa
 import examples.pdp8.asm as asm
 import pytest
 
+def assemble(inst):
+    # by convention, on the pdp8 bit=0 is the most-significant bit
+    return encode(inst, reverse=True)
+
 NVALUES = 4
 def random12():
     return Word(random.randint(0,1<<12-1))
+
 testvectors1 = [random12() for i in range(NVALUES)]
 testvectors2 = [random12() for i in range(NVALUES)]
+
+def test_size():
+    inst = asm.and_(0)
+    assert size(type(inst)) == WIDTH
+
+# compare palbart to encoder
+def test_assembler():
+    addr = 1
+    assert assemble(asm.and_(addr)) == 0o0000 + addr
+    assert assemble(asm.tad(addr))  == 0o1000 + addr
+    assert assemble(asm.isz(addr))  == 0o2000 + addr
+    assert assemble(asm.dca(addr))  == 0o3000 + addr
+    assert assemble(asm.jms(addr))  == 0o4000 + addr
+    assert assemble(asm.jmp(addr))  == 0o5000 + addr
+
+    # opr1
+    assert assemble(asm.nop())  == 0o7000 
+    assert assemble(asm.cla())  == 0o7200 
+    assert assemble(asm.cma())  == 0o7040 
+    assert assemble(asm.cll())  == 0o7100 
+    assert assemble(asm.cml())  == 0o7020 
+    assert assemble(asm.ral())  == 0o7004 
+    assert assemble(asm.rtl())  == 0o7006 
+    assert assemble(asm.rar())  == 0o7010 
+    assert assemble(asm.rtr())  == 0o7012 
+
+    # opr2
+    assert assemble(asm.sma())  == 0o7500 
+    assert assemble(asm.spa())  == 0o7510 
+    assert assemble(asm.sza())  == 0o7440 
+    assert assemble(asm.sna())  == 0o7450 
+    assert assemble(asm.szl())  == 0o7430 
+    assert assemble(asm.snl())  == 0o7420 
+    assert assemble(asm.hlt())  == 0o7402 
 
 @pytest.mark.parametrize("a", testvectors1)
 @pytest.mark.parametrize("b", testvectors2)
 def test_and(a,b):
     addr = 1
     inst = asm.and_(addr)
-    assert size(type(inst)) == 12
-    bits = encode(inst)
-    assert bits == 0x020
     pdp8 = PDP8([inst])
     pdp8.poke_mem(addr,a)
     pdp8.poke_acc(b)
@@ -31,14 +68,138 @@ def test_and(a,b):
 def test_tad(a,b):
     addr = 1
     inst = asm.tad(addr)
-    bits = encode(inst)
-    assert bits == 0x21
     pdp8 = PDP8([inst])
     pdp8.poke_mem(addr,a)
     pdp8.poke_acc(b)
     pdp8()
     assert pdp8.peak_pc() == 1
     assert pdp8.peak_acc() == a+b
+
+
+def test_isz():
+    addr = 1
+    inst = asm.isz(addr)
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,0)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 0
+    assert pdp8.peak_mem(addr) == 1
+
+@pytest.mark.parametrize("a", testvectors1)
+def test_dca(a):
+    addr = 1
+    inst = asm.dca(addr)
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,0)
+    pdp8.poke_acc(a)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 0
+    assert pdp8.peak_mem(addr) == a
+
+
+def test_jms():
+    addr = 2
+    inst = asm.jms(addr)
+    pdp8 = PDP8([inst])
+    pdp8()
+    assert pdp8.peak_pc() == 3
+    assert pdp8.peak_acc() == 0
+    assert pdp8.peak_mem(addr) == 1
+
+def test_jmp():
+    addr = 2
+    inst = asm.jmp(addr)
+    pdp8 = PDP8([inst])
+    pdp8()
+    assert pdp8.peak_pc() == addr
+
+def test_cla():
+    pdp8 = PDP8([asm.cla()])
+    pdp8.poke_acc(1)
+    pdp8()
+    assert pdp8.peak_acc() == 0
+
+def test_cma():
+    pdp8 = PDP8([asm.cma()])
+    pdp8.poke_acc(0o7777)
+    pdp8()
+    assert pdp8.peak_acc() == 0
+
+def test_cll():
+    pdp8 = PDP8([asm.cll()])
+    pdp8.poke_lnk(1)
+    pdp8()
+    assert pdp8.peak_lnk() == 0
+
+def test_cml():
+    pdp8 = PDP8([asm.cml()])
+    pdp8.poke_lnk(1)
+    pdp8()
+    assert pdp8.peak_lnk() == 0
+
+def test_sza():
+    pdp8 = PDP8([asm.sza()])
+    pdp8.poke_acc(0)
+    pdp8()
+    assert pdp8.peak_pc() == 2
+
+def test_sna():
+    pdp8 = PDP8([asm.sna()])
+    pdp8.poke_acc(1)
+    pdp8()
+    assert pdp8.peak_pc() == 2
+
+def test_ral():
+    pdp8 = PDP8([asm.ral()])
+    pdp8.poke_acc(1)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 2
+
+def test_rtl():
+    pdp8 = PDP8([asm.rtl()])
+    pdp8.poke_acc(1)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 4
+
+def test_rar():
+    pdp8 = PDP8([asm.rar()])
+    pdp8.poke_acc(4)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 2
+
+def test_rtr():
+    pdp8 = PDP8([asm.rtr()])
+    pdp8.poke_acc(4)
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == 1
+
+def test_page():
+    addr = 1
+    value = 0o7777
+    inst = asm.tad(addr,p=asm.MP.CURRENT_PAGE)
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,Word(value))
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == value
+
+def test_indirect():
+    addr = 1
+    data = 2
+    value = 0o7777
+    inst = asm.tad(addr,i=asm.IA.INDIRECT)
+    pdp8 = PDP8([inst])
+    pdp8.poke_mem(addr,Word(data))
+    pdp8.poke_mem(data,Word(value))
+    pdp8()
+    assert pdp8.peak_pc() == 1
+    assert pdp8.peak_acc() == value
 
 def test_lnk():
     addr = 4
@@ -54,121 +215,6 @@ def test_lnk():
     assert pdp8.peak_lnk() == 0
     pdp8()
     assert pdp8.peak_lnk() == 1
-
-def test_isz():
-    addr = 1
-    inst = asm.isz(addr)
-    bits = encode(inst)
-    assert bits == 0x22
-    pdp8 = PDP8([inst])
-    pdp8.poke_mem(addr,0)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 0
-    assert pdp8.peak_mem(addr) == 1
-
-@pytest.mark.parametrize("a", testvectors1)
-def test_dca(a):
-    addr = 1
-    inst = asm.dca(addr)
-    bits = encode(inst)
-    assert bits == 0x23
-    pdp8 = PDP8([inst])
-    pdp8.poke_mem(addr,0)
-    pdp8.poke_acc(a)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 0
-    assert pdp8.peak_mem(addr) == a
-
-
-def test_jms():
-    addr = 2
-    inst = asm.jms(addr)
-    bits = encode(inst)
-    assert bits == 0x44
-    pdp8 = PDP8([inst])
-    pdp8()
-    assert pdp8.peak_pc() == 3
-    assert pdp8.peak_acc() == 0
-    assert pdp8.peak_mem(addr) == 1
-
-def test_jmp():
-    addr = 2
-    inst = asm.jmp(addr)
-    bits = encode(inst)
-    assert bits == 0x45
-    pdp8 = PDP8([inst])
-    pdp8()
-    assert pdp8.peak_pc() == addr
-
-def test_cla():
-    inst = asm.cla()
-    bits = encode(inst)
-    assert bits == 0x17
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(1)
-    pdp8()
-    assert pdp8.peak_acc() == 0
-
-def test_cma():
-    inst = asm.cma()
-    #bits = encode(inst)
-    #assert bits == 0x17
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(0o7777)
-    pdp8()
-    assert pdp8.peak_acc() == 0
-
-def test_sza():
-    inst = asm.sza()
-    bits = encode(inst)
-    assert bits == 0x4f
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(0)
-    pdp8()
-    assert pdp8.peak_pc() == 2
-
-def test_sna():
-    inst = asm.sna()
-    bits = encode(inst)
-    assert bits == 0x14f
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(1)
-    pdp8()
-    assert pdp8.peak_pc() == 2
-
-def test_ral():
-    inst = asm.ral()
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(1)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 2
-
-def test_rtl():
-    inst = asm.rtl()
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(1)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 4
-
-def test_rar():
-    inst = asm.rar()
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(4)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 2
-
-def test_rtr():
-    inst = asm.rtr()
-    pdp8 = PDP8([inst])
-    pdp8.poke_acc(4)
-    pdp8()
-    assert pdp8.peak_pc() == 1
-    assert pdp8.peak_acc() == 1
 
 # From https://bigdanzblog.wordpress.com/2014/05/27/creating-a-very-simple-pdp-8-assembler-pal8-program/
 # Add 2 numbers

@@ -19,8 +19,8 @@ def test_bit():
     assert encode(Bit(0)) == 0
     assert encode(Bit(1)) == 1
 
-    #bitfield(2)(Bit)
-    #assert encode(Bit(1)) == 4
+    bitfield(2)(Bit)
+    assert encode(Bit(1)) == 4
 
 def test_byte():
     Byte = BitVector[8]
@@ -59,6 +59,11 @@ def test_product():
     assert encode(Pr(En1.a, En2.d)) == 2
     assert encode(Pr(En1.b, En2.d)) == 3
 
+    assert encode(Pr(En1.a, En2.c), reverse=True) == 0
+    assert encode(Pr(En1.b, En2.c), reverse=True) == 2
+    assert encode(Pr(En1.a, En2.d), reverse=True) == 1
+    assert encode(Pr(En1.b, En2.d), reverse=True) == 3
+
 def test_sum():
     Su = Sum[En1, En2]
     tag({En1:0, En2:1})(Su)
@@ -68,6 +73,11 @@ def test_sum():
     assert encode(Su(En1.b)) == 2
     assert encode(Su(En2.c)) == 1
     assert encode(Su(En2.d)) == 3
+
+    assert encode(Su(En1.a), reverse=True) == 0
+    assert encode(Su(En1.b), reverse=True) == 1
+    assert encode(Su(En2.c), reverse=True) == 2
+    assert encode(Su(En2.d), reverse=True) == 3
 
     Su2 = Sum[En1, Pr]
     tag({En1:0, Pr:1})(Su2)
