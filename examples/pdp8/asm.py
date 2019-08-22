@@ -38,11 +38,22 @@ def cll():
 def cml():
     return opr1(cml=1)
 
+# lnk=1
+def stl():
+    return opr1(cll=1, cml=1)
+
+
+def iac():
+    return opr1(iac=1)
+
 def rar():
     return opr1(rar=1)
 
 def rtr():
     return opr1(rar=1, twice=1)
+
+def lsr():
+    return opr1(cll=1, rar=1)
 
 def ral():
     return opr1(ral=1)
@@ -50,8 +61,15 @@ def ral():
 def rtl():
     return opr1(ral=1, twice=1)
 
+def lsl():
+    return opr1(cll=1, ral=1)
+
 def nop():
     return opr1()
+
+# pseudo instruction - complement accumulator and add 1 = negate
+def cia():
+    return opr1(cma=1,iac=1)
 
 
 

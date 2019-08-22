@@ -37,10 +37,15 @@ def test_assembler():
     assert assemble(asm.cma())  == 0o7040 
     assert assemble(asm.cll())  == 0o7100 
     assert assemble(asm.cml())  == 0o7020 
+    assert assemble(asm.stl())  == 0o7120 
+    assert assemble(asm.iac())  == 0o7001 
+    assert assemble(asm.cia())  == 0o7041 
     assert assemble(asm.ral())  == 0o7004 
     assert assemble(asm.rtl())  == 0o7006 
+    assert assemble(asm.lsl())  == 0o7104 
     assert assemble(asm.rar())  == 0o7010 
     assert assemble(asm.rtr())  == 0o7012 
+    assert assemble(asm.lsr())  == 0o7110 
 
     # opr2
     assert assemble(asm.sma())  == 0o7500 
@@ -138,6 +143,23 @@ def test_cml():
     pdp8.poke_lnk(1)
     pdp8()
     assert pdp8.peak_lnk() == 0
+
+def test_stl():
+    pdp8 = PDP8([asm.stl()])
+    pdp8.poke_lnk(0)
+    pdp8()
+    assert pdp8.peak_lnk() == 1
+
+def test_iac():
+    pdp8 = PDP8([asm.iac()])
+    pdp8()
+    assert pdp8.peak_acc() == 1
+
+def test_cia():
+    pdp8 = PDP8([asm.cia()])
+    pdp8.poke_acc(0o7777)
+    pdp8()
+    assert pdp8.peak_acc() == 1
 
 def test_sza():
     pdp8 = PDP8([asm.sza()])
@@ -278,4 +300,12 @@ def test_prog():
 #TAD   ArgTwo   / and add the second argument as well
 #               / the accumulator now contains the XOR of ArgOne & ArgTwo
 
-
+# From https://en.wikipedia.org/wiki/PDP-8
+#/Compare numbers in memory at OPD1 and OPD2
+#            CLA CLL     /Must start with 0 in AC and link
+#            TAD OPD1    /Load first operand into AC (by adding it to 0); link is still clear
+#            CIA         /Complement, then increment AC, negating it
+#            TAD OPD2    /AC now has OPD2-OPD1; if OPD2≥OPD1, sum overflows and link is set
+#            SZL         /Skip if link is clear
+#            JMP OP2GT   /Jump somewhere in the case that OPD2≥OPD1;
+#                        /Otherwise, fall through to code below.

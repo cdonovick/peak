@@ -9,10 +9,15 @@ nop
 cla
 cma
 cll
+stl
 cml
+iac
+cia
 ral
+cll ral
 rtl
 rar
+cll rar
 rtr
 sza
 sna

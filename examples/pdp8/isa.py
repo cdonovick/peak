@@ -42,7 +42,7 @@ class OPR1(Product):
     cml = Bit # complelemnt link 2
     rar = Bit # rotate right 4
     ral = Bit # rotate left 4
-    twice = Bit # rotate twice
+    twice = Bit # rotate twice / byte swap if ral==rar=0
     iac = Bit # increment accumulator 3
 
 class OPR2(Product):
@@ -53,7 +53,7 @@ class OPR2(Product):
     skip = Bit # reverse skip 1
     osr = Bit # or switch register with accumulator 2
     hlt = Bit # halt 3
-    NOP = Bit
+    NOP = Bit # 0 if ORP2, 1 if OPR2
 
 @tag({OPR1:0, OPR2:1})
 class OPR(Sum[OPR1, OPR2]): pass
