@@ -1,6 +1,6 @@
 from hwtypes.adt import Product, Sum, Enum
 from hwtypes import Bit, BitVector
-from peak.bitfield import encode, size, tag, bitfield
+from peak.bitfield import encode, sumsize, size, tag, bitfield
 import pytest
 
 class En1(Enum):
@@ -54,30 +54,34 @@ def test_product():
             Pr(En1.b, En2.c),
             Pr(En1.b, En2.d),
     }
-    assert encode(Pr(En1.a, En2.c)) == 0
-    assert encode(Pr(En1.b, En2.c)) == 1
-    assert encode(Pr(En1.a, En2.d)) == 2
-    assert encode(Pr(En1.b, En2.d)) == 3
+    s = size(En1)
+    assert encode(Pr(En1.a, En2.c)) == (encode(En2.c) << s) | encode(En1.a)
+    assert encode(Pr(En1.b, En2.c)) == (encode(En2.c) << s) | encode(En1.b)
+    assert encode(Pr(En1.a, En2.d)) == (encode(En2.d) << s) | encode(En1.a)
+    assert encode(Pr(En1.b, En2.d)) == (encode(En2.d) << s) | encode(En1.b)
 
-    assert encode(Pr(En1.a, En2.c), reverse=True) == 0
-    assert encode(Pr(En1.b, En2.c), reverse=True) == 2
-    assert encode(Pr(En1.a, En2.d), reverse=True) == 1
-    assert encode(Pr(En1.b, En2.d), reverse=True) == 3
+    s = size(En2)
+    assert encode(Pr(En1.a, En2.c), reverse=True) == (encode(En1.a) << s) | encode(En2.c)
+    assert encode(Pr(En1.b, En2.c), reverse=True) == (encode(En1.b) << s) | encode(En2.c)
+    assert encode(Pr(En1.a, En2.d), reverse=True) == (encode(En1.a) << s) | encode(En2.d)
+    assert encode(Pr(En1.b, En2.d), reverse=True) == (encode(En1.b) << s) | encode(En2.d)
 
 def test_sum():
     Su = Sum[En1, En2]
     tag({En1:0, En2:1})(Su)
 
     assert size(Su) == 2
-    assert encode(Su(En1.a)) == 0
-    assert encode(Su(En1.b)) == 2
-    assert encode(Su(En2.c)) == 1
-    assert encode(Su(En2.d)) == 3
+    s = sumsize(Su)
+    assert encode(Su(En1.a)) == Su.tags[En1] | (encode(En1.a) << s)
+    assert encode(Su(En1.b)) == Su.tags[En1] | (encode(En1.b) << s)
+    assert encode(Su(En2.c)) == Su.tags[En2] | (encode(En2.c) << s)
+    assert encode(Su(En2.d)) == Su.tags[En2] | (encode(En2.d) << s)
 
-    assert encode(Su(En1.a), reverse=True) == 0
-    assert encode(Su(En1.b), reverse=True) == 1
-    assert encode(Su(En2.c), reverse=True) == 2
-    assert encode(Su(En2.d), reverse=True) == 3
+    s = size(Su) - sumsize(Su)
+    assert encode(Su(En1.a), reverse=True) == encode(En1.a) | (Su.tags[En1] << s)
+    assert encode(Su(En1.b), reverse=True) == encode(En1.b) | (Su.tags[En1] << s)
+    assert encode(Su(En2.c), reverse=True) == encode(En2.c) | (Su.tags[En2] << s)
+    assert encode(Su(En2.d), reverse=True) == encode(En2.d) | (Su.tags[En2] << s)
 
     Su2 = Sum[En1, Pr]
     tag({En1:0, Pr:1})(Su2)
