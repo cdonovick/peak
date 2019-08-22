@@ -89,7 +89,10 @@ class PDP8(Peak):
                     self.lnk(res[WIDTH], 1)
             elif type == OPR2:
                 # Note that the order of these operations is specified
-                if inst.sma == ONE or inst.sza == ONE or inst.snl == ONE:
+                if inst.sma == ONE \
+                or inst.sza == ONE \
+                or inst.snl == ONE \
+                or inst.skip == ONE:
                     if inst.skip == ZERO:
                         skip = ZERO
                         if inst.sma == ONE: 
@@ -97,15 +100,18 @@ class PDP8(Peak):
                         if inst.sza == ONE:
                             skip |= self.acc(0,0) == Word(0)
                         if inst.snl == ONE:
-                            pass
+                            skip |= self.lnk(0,0) == ZERO
                     else:
                         skip = ONE
-                        if inst.sma == ONE: # smp
-                            skip &= self.acc(0,0)[-1] == ZERO
-                        if inst.sza == ONE: # sna
-                            skip &= self.acc(0,0) != Word(0)
-                        if inst.snl == ONE: # szl
-                            pass
+                        if inst.sma == ONE \
+                        or inst.sza == ONE \
+                        or inst.snl == ONE:
+                            if inst.sma == ONE: # smp
+                                skip &= self.acc(0,0)[-1] == ZERO
+                            if inst.sza == ONE: # sna
+                                skip &= self.acc(0,0) != Word(0)
+                            if inst.snl == ONE: # szl
+                                skip &= self.lnk(0,0) == ONE
                     if skip == ONE:
                         pc = pc + 1
                 if inst.cla:

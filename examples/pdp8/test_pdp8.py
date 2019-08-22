@@ -54,6 +54,7 @@ def test_assembler():
     assert assemble(asm.sna())  == 0o7450 
     assert assemble(asm.szl())  == 0o7430 
     assert assemble(asm.snl())  == 0o7420 
+    assert assemble(asm.skp())  == 0o7410 
     assert assemble(asm.hlt())  == 0o7402 
 
 @pytest.mark.parametrize("a", testvectors1)
@@ -309,3 +310,8 @@ def test_prog():
 #            SZL         /Skip if link is clear
 #            JMP OP2GT   /Jump somewhere in the case that OPD2≥OPD1;
 #                        /Otherwise, fall through to code below.
+
+# write out
+#  eq ne
+#  uge ugt ule ult
+#  sge sgt sle slt

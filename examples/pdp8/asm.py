@@ -32,6 +32,14 @@ def cla():
 def cma():
     return opr1(cma=1)
 
+# acc=-1
+def sta():
+    return opr1(cla=1, cma=1)
+
+# acc=1
+#   return opr1(cla=1, iac=1)
+
+
 def cll():
     return opr1(cll=1)
 
@@ -41,6 +49,11 @@ def cml():
 # lnk=1
 def stl():
     return opr1(cll=1, cml=1)
+
+# acc[11] = lnk
+def glk():
+    return opr1(cla=1, rol=1)
+
 
 
 def iac():
@@ -81,12 +94,13 @@ def cia():
 #   skip = spa & sna & szl
 # else
 #   skip = sma | sza | znl
-def opr2(cla=0, sma=0, sza=0, snl=0, spa=0, sna=0, szl=0, osr=0, hlt=0):
+def opr2(cla=0, sma=0, sza=0, snl=0, spa=0, sna=0, szl=0, skip=0, osr=0, hlt=0):
     flags1 = sma or sza or snl 
     flags2 = spa or sna or szl 
     if flags1 and flags2:
         print("opr2: sma|sza|snl and spa|sna|szl can't both be set")
-    skip = 1 if flags2 else 0
+    if flags2:
+        skip = 1
     return Inst(OPR(OPR2(Bit(cla), Bit(sma|spa), Bit(sza|sna), Bit(snl|szl), Bit(skip), Bit(osr), Bit(hlt), Bit(0))))
 
 def sza():
@@ -106,6 +120,9 @@ def szl():
 
 def snl():
     return opr2(snl=1)
+
+def skp():
+    return opr2(skip=1)
 
 def hlt():
     return opr2(hlt=1)
