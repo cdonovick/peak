@@ -30,30 +30,62 @@ operand_1_asm = assembler.sub.operand_1.asm
 opcode_bv = SMTBitVector[opcode_asm.width](name='opcode')
 tag_bv = SMTBitVector[operand_1_asm.tag_width](name='tag')
 
+#Should be determined automatically
+binding = SMTBitVector[4](name='binding')
+
 x = Word(name='x')
 y = Word(name='y')
 b = Bit(name='b')
+free_bit = Bit(name='free_bit')
 
-# abusing some knowledge of the layout
+
+# abusing knowledge of the layout
 # there should be some way to generate this automatically
-# especially the conditional part
-inst_bv = opcode_bv.concat(x).concat(tag_bv).concat(
-        (tag_bv == operand_1_asm.assemble_tag(T, SMTBitVector)).ite(
-            y.concat(b),
-            y.concat(Bit(0))
+# like some sort assemble from leaves
+inst_bv = (
+    (binding == 1).ite(
+        # x~operand_0, y~operand_1[T][0]
+        opcode_bv.concat(x).concat(tag_bv).concat(y).concat(b),
+        (binding == 2).ite(
+            # x~operand_0, y~operand_1[Word]
+            opcode_bv.concat(x).concat(tag_bv).concat(y).concat(free_bit),
+            (binding == 4).ite(
+                # y~operand_0, x~operand_1[T][0]
+                opcode_bv.concat(y).concat(tag_bv).concat(x).concat(b),
+                # x~operand_0, y~operand_1[Word]
+                opcode_bv.concat(y).concat(tag_bv).concat(x).concat(free_bit),
+            )
         )
     )
+)
+
 inst = SMTInst(inst_bv)
+precondition = (
+    (binding == 1).ite(
+        inst.operand_1.match(T),
+        (binding == 2).ite(
+            inst.operand_1.match(Word),
+            (binding == 4).ite(
+                inst.operand_1.match(T),
+                (binding == 8) & inst.operand_1.match(Word)
+            )
+        )
+    )
+)
+
 sim_expr = sim(inst)
 nand_expr = nand(x, y)
 
 with smt.Solver('cvc4', logic=BV) as solver:
-    constraints = smt.ForAll([x.value, y.value], (sim_expr == nand_expr).value)
-    solver.add_assertion(constraints)
+    solver.add_assertion(precondition.value)
+    constraint = smt.ForAll([x.value, y.value, free_bit.value], (sim_expr == nand_expr).value)
+    solver.add_assertion(constraint)
     if solver.solve():
         opcode_val = solver.get_value(opcode_bv.value).constant_value()
         b_val = solver.get_value(b.value).constant_value()
         tag_val = solver.get_value(tag_bv.value).constant_value()
+        binding_val = solver.get_value(binding.value).constant_value()
+        print(f'bindng: {binding_val}')
         print(f'opcode: {opcode_asm.disassemble(opcode_val)}')
         print(f'tag: {operand_1_asm.disassemble_tag(tag_val)}')
         print(f'b: {b_val}')
