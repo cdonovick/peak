@@ -19,19 +19,21 @@ def gen_sim(family):
         op = inst.Opcode
 
         if inst.operand_1.match(Word):
+            # arith op
             o1 = inst.operand_1[Word]
             if inst.Opcode == Inst.Opcode.A:
-                return o0 ^ o1
+                return o0 + o1
             else:
                 return o0 - o1
         else:
+            # bit op
             ox = inst.operand_1[T]
             o1 = ox[0]
             b  = ox[1]
             if inst.Opcode == Inst.Opcode.A:
                 res = o0 & o1
-                return b.ite(~res, res)
             else:
-                return o0.adc(o1, b)[0]
+                res = o0 | o1
+            return b.ite(~res, res)
 
     return Word, Bit, Inst, sim

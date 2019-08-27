@@ -13,9 +13,26 @@ import operator
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
 
-
-def nand(x, y):
-    return ~(x & y)
+def add(a, b):  return a + b
+def sub(a, b):  return b - a
+def and_(a, b): return a & b
+def nand(a, b): return ~(a & b)
+def or_(a, b):  return a | b
+def nor(a, b):  return ~(b | a)
+def mul(a, b):  return a * b
+def shftr(a, b): return a >> b
+def shftl(a, b): return a << b
+targets = (
+    add,
+    sub,
+    and_,
+    nand,
+    or_,
+    nor,
+    mul,
+    shftr,
+    shftl,
+)
 
 Word, Bit, Inst, sim = gen_sim(SMTBitVector.get_family())
 
@@ -52,7 +69,7 @@ inst_bv = (
             (binding == 4).ite(
                 # y~operand_0, x~operand_1[T][0]
                 opcode_bv.concat(y).concat(tag_bv).concat(x).concat(b),
-                # x~operand_0, y~operand_1[Word]
+                # y~operand_0, x~operand_1[Word]
                 opcode_bv.concat(y).concat(tag_bv).concat(x).concat(free_bit),
             )
         )
@@ -74,21 +91,27 @@ precondition = (
 )
 
 sim_expr = sim(inst)
-nand_expr = nand(x, y)
+for target in targets:
+    target_expr = target(x, y)
+    with smt.Solver('cvc4', logic=BV) as solver:
+        solver.add_assertion(precondition.value)
+        constraint = smt.ForAll([x.value, y.value, free_bit.value], (sim_expr == target_expr).value)
+        solver.add_assertion(constraint)
+        if solver.solve():
+            opcode_val = solver.get_value(opcode_bv.value).constant_value()
+            b_val = solver.get_value(b.value).constant_value()
+            tag_val = solver.get_value(tag_bv.value).constant_value()
+            binding_val = solver.get_value(binding.value).constant_value()
+            print(f'mapping found for {target.__name__}')
+            print(f'binding: {binding_val}')
+            print(f'opcode: {opcode_asm.disassemble(opcode_val)}')
+            print(f'tag: {operand_1_asm.disassemble_tag(tag_val)}')
+            print(f'b: {b_val}')
+            print()
+        else:
+            print(f'no mapping found for {target.__name__}')
+            print()
 
-with smt.Solver('cvc4', logic=BV) as solver:
-    solver.add_assertion(precondition.value)
-    constraint = smt.ForAll([x.value, y.value, free_bit.value], (sim_expr == nand_expr).value)
-    solver.add_assertion(constraint)
-    if solver.solve():
-        opcode_val = solver.get_value(opcode_bv.value).constant_value()
-        b_val = solver.get_value(b.value).constant_value()
-        tag_val = solver.get_value(tag_bv.value).constant_value()
-        binding_val = solver.get_value(binding.value).constant_value()
-        print(f'bindng: {binding_val}')
-        print(f'opcode: {opcode_asm.disassemble(opcode_val)}')
-        print(f'tag: {operand_1_asm.disassemble_tag(tag_val)}')
-        print(f'b: {b_val}')
 
 
 # I would like to do things this way
