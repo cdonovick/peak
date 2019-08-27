@@ -1,5 +1,7 @@
 from isa import gen_isa
 from hwtypes import Product, Sum, Enum, Tuple
+from ast_tools.passes import begin_rewrite, end_rewrite
+from ast_tools.passes import ssa, bool_to_bit, if_to_phi
 
 
 def gen_sim(family):
@@ -7,6 +9,11 @@ def gen_sim(family):
     T = Tuple[Word, Bit]
     S = Sum[Word, T]
 
+    @end_rewrite()
+    @if_to_phi(family.Bit.ite)
+    @bool_to_bit()
+    @ssa()
+    @begin_rewrite()
     def sim(inst: Inst):
         o0 = inst.operand_0
         op = inst.Opcode
@@ -25,6 +32,6 @@ def gen_sim(family):
                 res = o0 & o1
                 return b.ite(~res, res)
             else:
-                return o0.adc(o1, b)
+                return o0.adc(o1, b)[0]
 
     return Word, Bit, Inst, sim

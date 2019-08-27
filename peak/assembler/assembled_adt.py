@@ -122,7 +122,7 @@ class AssembledADT(metaclass=AssembledADTMeta):
             T = self._assembler_.assemble_tag(T, cls.bv_type)
             return tag == T
         else:
-            raise TypeError()
+            raise TypeError(type(T), T, cls.adt_t)
 
     def __hash__(self):
         return hash(self._value_)

@@ -181,7 +181,7 @@ def _sum(isa : Sum) -> int:
         return field_2_tag[T]
 
     def tag_dissambler(tag):
-        return tag_2_field[tag.as_uint()]
+        return tag_2_field[tag]
 
     return (assembler, disassembler, width, layout,
             tag_assembler, tag_dissambler, tag_width, (0, tag_width))

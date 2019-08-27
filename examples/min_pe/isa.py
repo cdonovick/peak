@@ -1,10 +1,9 @@
 from hwtypes import Product, Sum, Enum, Tuple
 from hwtypes import new_instruction
 
-
 def gen_isa(family):
     Word = family.BitVector[8]
-    Bit  = family.Bit
+    Bit  = family.BitVector[1]
 
     class Inst(Product):
         class Opcode(Enum):
