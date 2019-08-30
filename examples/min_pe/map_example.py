@@ -93,7 +93,7 @@ precondition = (
 sim_expr = sim(inst)
 for target in targets:
     target_expr = target(x, y)
-    with smt.Solver('cvc4', logic=BV) as solver:
+    with smt.Solver('z3', logic=BV) as solver:
         solver.add_assertion(precondition.value)
         constraint = smt.ForAll([x.value, y.value, free_bit.value], (sim_expr == target_expr).value)
         solver.add_assertion(constraint)
