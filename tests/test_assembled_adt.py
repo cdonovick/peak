@@ -14,6 +14,84 @@ import pytest
 FooBV = make_modifier('Foo')(BitVector)
 BarBV = make_modifier('Bar')(BitVector)
 
+def test_from_subfields():
+    BV = BitVector[3]
+    class E(Enum):
+        a=1
+        b=4
+
+    e = E.b
+
+    class A(Product):
+        a = Bit
+        b = BV
+        e = E
+
+    a = A(
+        a=Bit(0),
+        b=BV(3),
+        e=e
+    )
+
+    class B(Product):
+        a = A
+        b = Bit
+
+    b = B(
+        a=a,
+        b=Bit(1)
+    )
+
+    T = Tuple[A, E]
+    t = T(a, e)
+
+    S = Sum[B, T]
+    s_b = S(b)
+    s_t = S(t)
+
+    AA = AssembledADT[A, Assembler, BitVector]
+    assert hasattr(AA, "from_subfields")
+    AB = AssembledADT[B, Assembler, BitVector]
+    assert hasattr(AB, "from_subfields")
+    AT = AssembledADT[T, Assembler, BitVector]
+    assert hasattr(AT, "from_subfields")
+    AS = AssembledADT[S, Assembler, BitVector]
+    assert hasattr(AS, "from_subfields")
+
+    #This is really what I want to do. 
+    aa = AA.from_subfields(
+        a=Bit(0),
+        b=BV(3),
+        e=E.b
+    )
+    assert aa == AA(a)
+    assert aa.a == Bit(0)
+    assert aa.b == BV(3)
+    assert aa.e == E.b
+
+    ab = AB.from_subfields(
+        a=aa,
+        b=Bit(1)
+    )
+    assert ab == AB(b)
+    assert ab.a == aa
+    assert ab.b == Bit(1)
+
+    at = AT.from_subfields(aa, e)
+    assert at == AT(t)
+    assert at[0] == aa
+    assert at[1] == e
+
+    as_b = AS.from_subfields(ab)
+    as_t = AS.from_subfields(t)
+    assert as_b == AS(s_b)
+    assert as_t == AS(s_t)
+    assert as_b.match(B)
+    assert not as_b.match(T)
+    assert as_b[B] == ab
+    assert as_t.match(T)
+    assert not as_t.match(B)
+    assert as_t[T] == at
 
 @pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa])
 @pytest.mark.parametrize("bv_type", [BarBV, FooBV])
