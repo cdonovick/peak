@@ -15,6 +15,7 @@ RESERVED_NAMES = frozenset({
     'adt_t',
     'assembler_t',
     'bv_type',
+    'from_subfields'
 })
 
 #Given a layout specification and subfield values, construct a bitvector using concatenation
@@ -144,35 +145,35 @@ class AssembledADTMeta(BoundMeta):
             return
         if issubclass(cls.adt_t, Product):
             type_sig = ', '.join(f'{k}: {v.__name__!r}' for k, v in cls.adt_t.field_dict.items())
-            # build from_fields
+            # build from_subfields
             _product = _create_from_product(cls)
             _call_product = ', '.join(f'{k}={k}' for k in cls.adt_t.field_dict)
-            from_fields = f'''
-def from_fields({type_sig}):
+            from_subfields = f'''
+def from_subfields({type_sig}):
     return _product({_call_product})
 '''
             gs = dict(
                 _product=_product
             )
             ls = {}
-            exec(from_fields, gs, ls)
-            cls.from_fields = ls['from_fields']
+            exec(from_subfields, gs, ls)
+            cls.from_subfields = ls['from_subfields']
         elif issubclass(cls.adt_t, Tuple):
             type_sig = ", ".join(f'_{k}: {v.__name__!r}' for k, v in cls.adt_t.field_dict.items())
             _tuple = _create_from_tuple(cls)
             _call_tuple = ', '.join(f'_{k}' for k in cls.adt_t.field_dict)
-            from_fields = f'''
-def from_fields({type_sig}):
+            from_subfields = f'''
+def from_subfields({type_sig}):
     return _tuple({_call_tuple})
 '''
             gs = dict(
                 _tuple=_tuple
             )
             ls = {}
-            exec(from_fields, gs, ls)
-            cls.from_fields = ls['from_fields']
+            exec(from_subfields, gs, ls)
+            cls.from_subfields = ls['from_subfields']
         elif issubclass(cls.adt_t, Sum):
-            cls.from_fields = _create_from_sum(cls)
+            cls.from_subfields = _create_from_sum(cls)
 
     def _name_cb(cls, idx):
         return f'{cls.__name__}[{", ".join(map(repr, idx))}]'

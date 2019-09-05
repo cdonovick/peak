@@ -14,7 +14,7 @@ import pytest
 FooBV = make_modifier('Foo')(BitVector)
 BarBV = make_modifier('Bar')(BitVector)
 
-def test_from_fields():
+def test_from_subfields():
     BV = BitVector[3]
     class E(Enum):
         a=1
@@ -50,16 +50,16 @@ def test_from_fields():
     s_t = S(t)
 
     AA = AssembledADT[A, Assembler, BitVector]
-    assert hasattr(AA, "from_fields")
+    assert hasattr(AA, "from_subfields")
     AB = AssembledADT[B, Assembler, BitVector]
-    assert hasattr(AB, "from_fields")
+    assert hasattr(AB, "from_subfields")
     AT = AssembledADT[T, Assembler, BitVector]
-    assert hasattr(AT, "from_fields")
+    assert hasattr(AT, "from_subfields")
     AS = AssembledADT[S, Assembler, BitVector]
-    assert hasattr(AS, "from_fields")
+    assert hasattr(AS, "from_subfields")
 
     #This is really what I want to do. 
-    aa = AA.from_fields(
+    aa = AA.from_subfields(
         a=Bit(0),
         b=BV(3),
         e=E.b
@@ -69,7 +69,7 @@ def test_from_fields():
     assert aa.b == BV(3)
     assert aa.e == E.b
 
-    ab = AB.from_fields(
+    ab = AB.from_subfields(
         a=aa,
         b=Bit(1)
     )
@@ -77,13 +77,13 @@ def test_from_fields():
     assert ab.a == aa
     assert ab.b == Bit(1)
 
-    at = AT.from_fields(aa, e)
+    at = AT.from_subfields(aa, e)
     assert at == AT(t)
     assert at[0] == aa
     assert at[1] == e
 
-    as_b = AS.from_fields(ab)
-    as_t = AS.from_fields(t)
+    as_b = AS.from_subfields(ab)
+    as_t = AS.from_subfields(t)
     assert as_b == AS(s_b)
     assert as_t == AS(s_t)
     assert as_b.match(B)
