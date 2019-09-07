@@ -99,14 +99,14 @@ def get_from_path(instr, path):
     if path is ():
         return instr
     elif isinstance(instr,(Product,Sum)):
-        return get_from_path(getattr(instr, path[0]), path[1:])
+        return get_from_path(instr.value_dict[path[0]], path[1:])
     else:
         raise RuntimeError()
 
 #Given an adt object and a tree path to a node in that adt, sets that node
 def set_from_path(instr, path, val):
     instr = get_from_path(instr, path[:-1])
-    assert type(getattr(instr, path[-1])) == type(val)
+    assert type(instr.value_dict[path[-1]]) == type(val)
     setattr(instr, path[-1], val)
 
 def _default_adt_scheme(t):
