@@ -11,6 +11,8 @@ def test_and():
     assert res_p==0
     assert irq==0
 
+test_and()
+
 def test_or():
     pe = PE()
     inst = asm.or_()
