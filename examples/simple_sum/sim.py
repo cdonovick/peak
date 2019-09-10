@@ -7,23 +7,28 @@ def gen_simple_sum(width=16):
     Data = BitVector[width]
     Instr = gen_isa(width)
     Op = Instr.op
+    Add = Op.field_dict["Add"]
+    Sub = Op.field_dict["Sub"]
+    Add1 = Op.field_dict["Add1"]
     class SimpleSum(Peak):
         @name_outputs(out=Data)
         def __call__(self,instr : Instr, a : Data, b : Data):
             op = instr.op
             which_inputs = instr.which_inputs
-            subtype, op = op.match()
-            if subtype is Op.Add:
+            if op.match(Add):
+                op = op[Add]
                 if which_inputs is type(which_inputs).Sim:
                     res = a + b
                 else :
                     res = op.in0 + op.in1
-            elif subtype is Op.Sub:
+            elif op.match(Sub):
+                op = op[Sub]
                 if which_inputs is type(which_inputs).Sim:
                     res = a - b
                 else :
                     res = op.in0 - op.in1
-            elif subtype is Op.Add1:
+            elif op.match(Add1):
+                op = op[Add1]
                 if which_inputs is type(which_inputs).Sim:
                     res = a + Data(1)
                 else :
