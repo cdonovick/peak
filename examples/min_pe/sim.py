@@ -1,4 +1,4 @@
-from isa import gen_isa
+from .isa import gen_isa
 from hwtypes import Product, Sum, Enum, Tuple
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
