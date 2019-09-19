@@ -115,7 +115,11 @@ class Sub(tp.Mapping):
 
 
     def __getattr__(self, attr):
-        return self[attr]
+        try:
+            return self[attr]
+        except KeyError as e:
+            args = e.args
+        raise AttributeError(*args)
 
     def __getitem__(self, path):
         if not isinstance(path, tuple):
@@ -130,19 +134,19 @@ class Sub(tp.Mapping):
             try:
                 field = isa.field_dict[attr]
             except KeyError:
-                raise AttributeError(f'Bad path {attr} for {isa}')
+                raise KeyError(f'Bad path {attr} for {isa}')
         elif isinstance(attr, int) and _issubclass(isa, (Tuple, Product)):
             try:
                 field = isa[attr]
             except (KeyError, IndexError):
-                raise AttributeError(f'Bad path {attr} for {isa}')
+                raise KeyError(f'Bad path {attr} for {isa}')
         elif isinstance(attr, type) and _issubclass(isa, Sum):
             try:
                 field = isa[attr]
             except KeyError:
-                raise AttributeError(f'Bad path {attr} for {isa}')
+                raise KeyError(f'Bad path {attr} for {isa}')
         else:
-            raise AttributeError(f'Bad path {attr} for {isa}')
+            raise KeyError(f'Bad path {attr} for {isa}')
 
         sub_asm = type(self.asm)(field)
         offset = self._offset + self.asm.layout[attr][0]
