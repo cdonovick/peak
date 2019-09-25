@@ -248,12 +248,13 @@ def test_lnk():
 #A,  0003           /Define A as %3
 #B,  0004           /Define B as %4
 
-def test_prog():
+def test_prog_add():
     A, B = 4, 5
-    pdp8 = PDP8([asm.cla(),
-                 asm.tad(A),
-                 asm.tad(B),
-                 asm.hlt()])
+    code = [asm.cla(),
+            asm.tad(A),
+            asm.tad(B),
+            asm.hlt()]
+    pdp8 = PDP8(code)
     pdp8.poke_mem(A,3)
     pdp8.poke_mem(B,4)
     pdp8.run()
@@ -273,6 +274,24 @@ def test_prog():
 #CMA            / compliment the result of the AND to get the final result
 #               / the accumulator is left with the boolean 'OR' of the args
 
+def test_prog_or():
+    data = 10
+    A, B, C = data, data+1, data+2
+    code = [asm.cla(),
+            asm.tad(A),
+            asm.cma(),
+            asm.dca(C),
+            asm.tad(B),
+            asm.cma(),
+            asm.and_(C),
+            asm.cma(),
+            asm.hlt()]
+    pdp8 = PDP8(code)
+    pdp8.poke_mem(A,3)
+    pdp8.poke_mem(B,4)
+    pdp8.run()
+    assert pdp8.peak_acc() == 7
+
 # Xor1
 #CLA            / clear accumulator (AC) since all we have is add!
 #TAD   ArgOne   / add (TAD) the first argument to the just-zeroed AC
@@ -291,6 +310,29 @@ def test_prog():
 #AND   Temp     / and finally, AND the result of the OR with this second half
                #/ the accumulator now contains the XOR of ArgOne and ArgTwo
 
+def test_prog_xor1():
+    data = 14
+    A, B, C = data, data+1, data+2
+    code = [asm.cla(),
+            asm.tad(A),
+            asm.cma(),
+            asm.dca(C),
+            asm.tad(B),
+            asm.cma(),
+            asm.and_(C),
+            asm.cma(),
+            asm.dca(C),
+            asm.tad(A),
+            asm.and_(B),
+            asm.cma(),
+            asm.and_(C),
+            asm.hlt()]
+    pdp8 = PDP8(code)
+    pdp8.poke_mem(A,3)
+    pdp8.poke_mem(B,4)
+    pdp8.run()
+    assert pdp8.peak_acc() == 7
+
 # Xor2
 #CLA            / clear accumulator (AC) since all we have is add!
 #TAD   ArgOne   / add (TAD) ArgOne to the just-zeroed AC
@@ -300,6 +342,23 @@ def test_prog():
 #TAD   ArgOne   / add the first argument to the negated accumulator
 #TAD   ArgTwo   / and add the second argument as well
 #               / the accumulator now contains the XOR of ArgOne & ArgTwo
+
+def test_prog_xor2():
+    data = 14
+    A, B, C = data, data+1, data+2
+    code = [asm.cla(),
+            asm.tad(A),
+            asm.and_(B),
+            asm.opr1(cll=1, ral=1),
+            asm.opr1(cma=1, iac=1),
+            asm.tad(A),
+            asm.tad(B),
+            asm.hlt()]
+    pdp8 = PDP8(code)
+    pdp8.poke_mem(A,3)
+    pdp8.poke_mem(B,4)
+    pdp8.run()
+    assert pdp8.peak_acc() == 7
 
 # From https://en.wikipedia.org/wiki/PDP-8
 #/Compare numbers in memory at OPD1 and OPD2
@@ -311,7 +370,16 @@ def test_prog():
 #            JMP OP2GT   /Jump somewhere in the case that OPD2≥OPD1;
 #                        /Otherwise, fall through to code below.
 
-# write out
-#  eq ne
-#  uge ugt ule ult
-#  sge sgt sle slt
+def test_prog_cmp():
+    data = 14
+    A, B = data, data+1
+    code = [asm.cla(cll=1),
+            asm.tad(A),
+            asm.cia(),
+            asm.tad(B),
+            asm.hlt()]
+    pdp8 = PDP8(code)
+    pdp8.poke_mem(A,3)
+    pdp8.poke_mem(B,4)
+    pdp8.run()
+    assert pdp8.peak_lnk() == 1

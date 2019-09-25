@@ -26,11 +26,11 @@ def opr1(cla=0, cll=0, cma=0, cml=0, rar=0, ral=0, twice=0, iac=0):
         print("opr1: ral and rar can't both be set")
     return Inst(OPR(OPR1(Bit(cla), Bit(cll), Bit(cma), Bit(cml), Bit(rar), Bit(ral), Bit(twice), Bit(iac))))
 
-def cla():
-    return opr1(cla=1)
+def cla(**kwargs):
+    return opr1(cla=1, **kwargs)
 
-def cma():
-    return opr1(cma=1)
+def cma(**kwargs):
+    return opr1(cma=1, **kwargs)
 
 # acc=-1
 def sta():
@@ -40,11 +40,11 @@ def sta():
 #   return opr1(cla=1, iac=1)
 
 
-def cll():
-    return opr1(cll=1)
+def cll(**kwargs):
+    return opr1(cll=1, **kwargs)
 
-def cml():
-    return opr1(cml=1)
+def cml(**kwargs):
+    return opr1(cml=1, **kwargs)
 
 # lnk=1
 def stl():
@@ -56,23 +56,23 @@ def glk():
 
 
 
-def iac():
-    return opr1(iac=1)
+def iac(**kwargs):
+    return opr1(iac=1, **kwargs)
 
-def rar():
-    return opr1(rar=1)
+def rar(**kwargs):
+    return opr1(rar=1, **kwargs)
 
-def rtr():
-    return opr1(rar=1, twice=1)
+def rtr(**kwargs):
+    return opr1(rar=1, twice=1, **kwargs)
 
 def lsr():
     return opr1(cll=1, rar=1)
 
-def ral():
-    return opr1(ral=1)
+def ral(**kwargs):
+    return opr1(ral=1, **kwargs)
 
-def rtl():
-    return opr1(ral=1, twice=1)
+def rtl(**kwargs):
+    return opr1(ral=1, twice=1, **kwargs)
 
 def lsl():
     return opr1(cll=1, ral=1)
@@ -81,8 +81,8 @@ def nop():
     return opr1()
 
 # pseudo instruction - complement accumulator and add 1 = negate
-def cia():
-    return opr1(cma=1,iac=1)
+def cia(**kwargs):
+    return opr1(cma=1,iac=1,**kwargs)
 
 
 
@@ -103,23 +103,23 @@ def opr2(cla=0, sma=0, sza=0, snl=0, spa=0, sna=0, szl=0, skip=0, osr=0, hlt=0):
         skip = 1
     return Inst(OPR(OPR2(Bit(cla), Bit(sma|spa), Bit(sza|sna), Bit(snl|szl), Bit(skip), Bit(osr), Bit(hlt), Bit(0))))
 
-def sza():
-    return opr2(sza=1)
+def sza(**kwargs):
+    return opr2(sza=1, **kwargs)
 
-def sna():
-    return opr2(sna=1)
+def sna(**kwargs):
+    return opr2(sna=1, **kwargs)
 
-def sma():
-    return opr2(sma=1)
+def sma(**kwargs):
+    return opr2(sma=1, **kwargs)
 
-def spa():
-    return opr2(spa=1)
+def spa(**kwargs):
+    return opr2(spa=1, **kwargs)
 
-def szl():
-    return opr2(szl=1)
+def szl(**kwargs):
+    return opr2(szl=1, **kwargs)
 
-def snl():
-    return opr2(snl=1)
+def snl(**kwargs):
+    return opr2(snl=1, **kwargs)
 
 def skp():
     return opr2(skip=1)

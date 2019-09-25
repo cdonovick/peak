@@ -55,7 +55,7 @@ class PDP8(Peak):
                     pc = pc + 1
             elif type == DCA:
                 self.store(addr, self.acc(0,0))
-                self.acc(0,1)
+                self.acc(Word(0),1)
             elif type == JMP:
                 pc = addr
             elif type == JMS:
