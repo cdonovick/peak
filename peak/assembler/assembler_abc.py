@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from hwtypes import AbstractBitVector, BitVector
+from hwtypes import AbstractBit, AbstractBitVector, BitVector
 from hwtypes.adt import Enum, Product, Sum, Tuple
 from hwtypes.adt_meta import BoundMeta
 
@@ -75,8 +75,26 @@ class AbstractAssembler(metaclass=AssemblerMeta):
     def disassemble(self, opcode: BitVector) -> 'isa':
         pass
 
+    @abstractmethod
+    def assemble_tag(self, T: type, bv_type: tp.Type[AbstractBitVector]) -> AbstractBitVector:
+        pass
+
+    @abstractmethod
+    def disassemble_tag(self, opcode: BitVector) -> 'T':
+        pass
+
+    @property
+    @abstractmethod
+    def tag_width(self) -> int:
+        pass
+
+    @property
+    @abstractmethod
+    def tag_layout(self) -> tp.Tuple[int, int]:
+        pass
+
 class Sub(tp.Mapping):
-    _reserved_names = ('asm', 'idx', '_asm', '_offset', '_path')
+    _reserved_names = ('asm', 'idx', 'tag_idx', '_asm', '_offset', '_path')
 
     def __init__(self, assembler, offset=0, path=None):
         isa = assembler.isa
@@ -85,7 +103,7 @@ class Sub(tp.Mapping):
                 if name in isa.field_dict:
                     warnings.warn(f'field {name} is used by the assembler '
                                    'machinery gettattr access will not work')
-        elif not _issubclass(isa, (Tuple, AbstractBitVector)):
+        elif not _issubclass(isa, (Tuple, AbstractBit, AbstractBitVector)):
             raise TypeError(f'Unsported type {isa}')
 
         self._asm = assembler
@@ -97,7 +115,11 @@ class Sub(tp.Mapping):
 
 
     def __getattr__(self, attr):
-        return self[attr]
+        try:
+            return self[attr]
+        except KeyError as e:
+            args = e.args
+        raise AttributeError(*args)
 
     def __getitem__(self, path):
         if not isinstance(path, tuple):
@@ -112,14 +134,19 @@ class Sub(tp.Mapping):
             try:
                 field = isa.field_dict[attr]
             except KeyError:
-                raise AttributeError(f'Bad path {attr} for {self.asm.isa}')
+                raise KeyError(f'Bad path {attr} for {isa}')
         elif isinstance(attr, int) and _issubclass(isa, (Tuple, Product)):
             try:
                 field = isa[attr]
             except (KeyError, IndexError):
-                raise AttributeError(f'Bad path {attr} for {self.asm.isa}')
+                raise KeyError(f'Bad path {attr} for {isa}')
+        elif isinstance(attr, type) and _issubclass(isa, Sum):
+            try:
+                field = isa[attr]
+            except KeyError:
+                raise KeyError(f'Bad path {attr} for {isa}')
         else:
-            raise AttributeError(f'Bad path {attr} for {self.asm.isa}')
+            raise KeyError(f'Bad path {attr} for {isa}')
 
         sub_asm = type(self.asm)(field)
         offset = self._offset + self.asm.layout[attr][0]
@@ -128,8 +155,10 @@ class Sub(tp.Mapping):
 
     def __iter__(self):
         isa = self.asm.isa
-        if _issubclass(isa, (Enum, Product, Sum)):
+        if _issubclass(isa, (Enum, Product)):
             yield from isa.field_dict
+        elif _issubclass(isa, Sum):
+            yield from isa.fields
         elif _issubclass(isa, Tuple):
             yield from range(len(isa.fields))
         else:
@@ -151,3 +180,8 @@ class Sub(tp.Mapping):
     def idx(self):
         o = self._offset
         return slice(o, o + self.asm.width)
+
+    @property
+    def tag_idx(self):
+        o = self._offset
+        return slice(o + self.asm.tag_layout[0], o + self.asm.tag_layout[1])

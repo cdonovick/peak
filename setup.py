@@ -13,11 +13,12 @@ setup(
         "peak",
     ],
     install_requires=[
-        "hwtypes >= 1.0.1",
+        "hwtypes >= 1.1.6",
         "astor",
         "pysmt",
         "magma-lang",
         "coreir",
+        "ast-tools",
     ],
     python_requires='>=3.7'
 )

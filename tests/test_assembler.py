@@ -2,6 +2,7 @@ from peak.assembler.assembler import Assembler
 from examples.demo_pes.pe5.isa import INST as pe5_isa
 from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
+from examples.min_pe.isa import gen_isa as gen_min_isa
 from hwtypes import AbstractBitVector
 from hwtypes.adt import Enum, Product, Tuple, Sum
 from hwtypes.adt import new_instruction
@@ -10,9 +11,13 @@ from hwtypes import new
 import pytest
 
 FooBV = new(BitVector, name='FooBV')
+BarBV = new(BitVector, name='BarBV')
 
-@pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa])
-@pytest.mark.parametrize("bv_type", [BitVector, FooBV])
+_, _, min_isa = gen_min_isa(BitVector.get_family())
+assert issubclass(min_isa, Product)
+
+@pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa, min_isa])
+@pytest.mark.parametrize("bv_type", [BarBV, FooBV])
 def test_assembler_disassembler(isa, bv_type):
     assembler = Assembler(isa)
     for inst in isa.enumerate():
@@ -22,13 +27,21 @@ def test_assembler_disassembler(isa, bv_type):
 
         for name,field in isa.field_dict.items():
             sub_assembler = Assembler(field)
-            assert getattr(assembler.sub, name).asm is sub_assembler
-            assert assembler.sub[name].asm is sub_assembler
+            if issubclass(isa, Sum):
+                assert assembler.sub[field].asm is sub_assembler
+            if issubclass(isa, Tuple):
+                assert assembler.sub[name].asm is sub_assembler
+            if issubclass(isa, Product):
+                assert getattr(assembler.sub, name).asm is sub_assembler
 
-            if issubclass(field, (Product, Tuple)) \
-                    or (issubclass(field, Sum)
-                        and inst.value_dict[name] is not None):
+            if issubclass(isa, (Product, Tuple)):
                 sub_opcode = opcode[assembler.sub[name].idx]
+                assert isinstance(sub_opcode, bv_type[sub_assembler.width])
+                sub_inst = sub_assembler.disassemble(sub_opcode)
+                assert isinstance(sub_inst, field)
+                assert sub_inst == inst.value_dict[name]
+            if issubclass(isa, Sum) and inst[field].match:
+                sub_opcode = opcode[assembler.sub[field].idx]
                 assert isinstance(sub_opcode, bv_type[sub_assembler.width])
                 sub_inst = sub_assembler.disassemble(sub_opcode)
                 assert isinstance(sub_inst, field)

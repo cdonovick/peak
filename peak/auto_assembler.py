@@ -12,6 +12,10 @@ import ast
 import magma as m
 import tempfile
 import logging
+import warnings
+
+warnings.warn("auto_assembler.py is deprecated please move to assembler",
+        DeprecationWarning, 2)
 
 
 def _issubclass(sub , parent : type) -> bool:

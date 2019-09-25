@@ -37,7 +37,8 @@ def gen_pe(num_inputs):
             lut_res = lut(lutinst.table, bit0, bit1, bit2)
 
             # ALU part of the instruction
-            _, aluinst = inst.alu.match()
+            #_, aluinst = inst.alu.match()
+            aluinst = inst.alu._value_
             data = [self.data[i](aluinst.data_modes[i],
                                  aluinst.data_consts[i], data[i],
                                  clk_en) for i in range(num_inputs)]
