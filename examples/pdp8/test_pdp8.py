@@ -6,14 +6,11 @@ import examples.pdp8.isa as isa
 import examples.pdp8.asm as asm
 import pytest
 
-def assemble(inst):
-    # by convention, on the pdp8 bit=0 is the most-significant bit
-    return encode(inst, reverse=True)
 
-NVALUES = 4
 def random12():
     return Word(random.randint(0,1<<12-1))
 
+NVALUES = 4
 testvectors1 = [random12() for i in range(NVALUES)]
 testvectors2 = [random12() for i in range(NVALUES)]
 
@@ -22,7 +19,16 @@ def test_size():
     assert size(type(inst)) == WIDTH
 
 # compare palbart to encoder
+#
+# palbart inst.pal
+# 
+# see inst.lst for machine code
+#
 def test_assembler():
+    def assemble(inst):
+        # by convention, on the pdp8 bit=0 is the most-significant bit
+        return encode(inst, reverse=True)
+
     addr = 1
     assert assemble(asm.and_(addr)) == 0o0000 + addr
     assert assemble(asm.tad(addr))  == 0o1000 + addr
