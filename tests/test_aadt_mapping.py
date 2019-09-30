@@ -10,6 +10,8 @@ import pysmt.shortcuts as smt
 from pysmt.logics import BV
 import typing as tp
 import math
+import operator
+from functools import partial
 
 SBV = SMTBitVector
 
@@ -124,20 +126,12 @@ binding_SBV = SBV[max_bindings]
 form_var = form_SBV()
 binding_var = binding_SBV()
 
-#arbitrary precision accuract log2 function
-#math.log is not accurate for large powers of 2
 def log2(x):
     #verify it is a power of 2
     assert x & (x-1) == 0
-    p=0
-    while 2**p <=x:
-        p+=1
-    p -= 1
-    assert 2**(p) == x
-    return p
+    return x.bit_length() - 1
 
-def or_reduce(expr_list : tp.List):
-    return reduce(lambda a, b: a|b, expr_list)
+or_reduce = partial(operator.or_, reduce)
 
 def test_min_pe_mapping():
 
