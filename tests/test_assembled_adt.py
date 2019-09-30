@@ -4,6 +4,7 @@ from peak.assembler.assembler_util import _issubclass
 from examples.demo_pes.pe5.isa import INST as pe5_isa
 from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
+from examples.min_pe.isa import gen_isa as gen_min_isa
 import examples.pico.asm as pico_asm
 
 from hwtypes import BitVector, Bit
@@ -14,86 +15,9 @@ import pytest
 FooBV = make_modifier('Foo')(BitVector)
 BarBV = make_modifier('Bar')(BitVector)
 
-def test_from_subfields():
-    BV = BitVector[3]
-    class E(Enum):
-        a=1
-        b=4
+_, _, min_isa = gen_min_isa(BitVector.get_family())
 
-    e = E.b
-
-    class A(Product):
-        a = Bit
-        b = BV
-        e = E
-
-    a = A(
-        a=Bit(0),
-        b=BV(3),
-        e=e
-    )
-
-    class B(Product):
-        a = A
-        b = Bit
-
-    b = B(
-        a=a,
-        b=Bit(1)
-    )
-
-    T = Tuple[A, E]
-    t = T(a, e)
-
-    S = Sum[B, T]
-    s_b = S(b)
-    s_t = S(t)
-
-    AA = AssembledADT[A, Assembler, BitVector]
-    assert hasattr(AA, "from_subfields")
-    AB = AssembledADT[B, Assembler, BitVector]
-    assert hasattr(AB, "from_subfields")
-    AT = AssembledADT[T, Assembler, BitVector]
-    assert hasattr(AT, "from_subfields")
-    AS = AssembledADT[S, Assembler, BitVector]
-    assert hasattr(AS, "from_subfields")
-
-    #This is really what I want to do. 
-    aa = AA.from_subfields(
-        a=Bit(0),
-        b=BV(3),
-        e=E.b
-    )
-    assert aa == AA(a)
-    assert aa.a == Bit(0)
-    assert aa.b == BV(3)
-    assert aa.e == E.b
-
-    ab = AB.from_subfields(
-        a=aa,
-        b=Bit(1)
-    )
-    assert ab == AB(b)
-    assert ab.a == aa
-    assert ab.b == Bit(1)
-
-    at = AT.from_subfields(aa, e)
-    assert at == AT(t)
-    assert at[0] == aa
-    assert at[1] == e
-
-    as_b = AS.from_subfields(ab)
-    as_t = AS.from_subfields(t)
-    assert as_b == AS(s_b)
-    assert as_t == AS(s_t)
-    assert as_b.match(B)
-    assert not as_b.match(T)
-    assert as_b[B] == ab
-    assert as_t.match(T)
-    assert not as_t.match(B)
-    assert as_t[T] == at
-
-@pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa])
+@pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa, min_isa])
 @pytest.mark.parametrize("bv_type", [BarBV, FooBV])
 def test_assembled_adt(isa, bv_type):
     def _check_recursive(isa, bv_type):
@@ -154,23 +78,103 @@ def test_match():
     asm_adt = AssembledADT[S, Assembler, BitVector]
 
     s = asm_adt(S(I0.a))
-    assert s.match(I0)
-    assert type(s.match(I0)) is Bit
-    assert ~s.match(I1)
-    assert type(~s.match(I1)) is Bit
-    assert s[I0] == I0.a
-    assert type(s[I0] == I0.a) is Bit
-    assert s[I0] != I0.b
-    assert type(s[I0] != I0.b) is Bit
+    assert s[I0].match
+    assert type(s[I0].match) is Bit
+    assert ~s[I1].match
+    assert type(~s[I1].match) is Bit
+    assert s[I0].value == I0.a
+    assert type(s[I0].value == I0.a) is Bit
+    assert s[I0].value != I0.b
+    assert type(s[I0].value != I0.b) is Bit
 
 
     class Foo: pass
-    with pytest.raises(TypeError):
-        s.match(Foo)
+    with pytest.raises(KeyError):
+        s[Foo]
 
     # The following rely on implementation details of Assembler
     # But the point is that S[I1] will return garbage
     # specificall I0.a extended to the size of I1
-    assert s[I1] == BitVector[2](0)
-    assert s[I1] != I1.c
-    assert s[I1] != I1.d
+    assert s[I1].value == BitVector[2](0)
+    assert s[I1].value != I1.c
+    assert s[I1].value != I1.d
+
+def test_from_subfields():
+    BV = BitVector[3]
+    class E(Enum):
+        a=1
+        b=4
+
+    e = E.b
+
+    class A(Product):
+        a = Bit
+        b = BV
+        e = E
+
+    a = A(
+        a=Bit(0),
+        b=BV(3),
+        e=e
+    )
+
+    class B(Product):
+        a = A
+        b = Bit
+
+    b = B(
+        a=a,
+        b=Bit(1)
+    )
+
+    T = Tuple[A, E]
+    t = T(a, e)
+
+    S = Sum[B, T]
+    s_b = S(b)
+    s_t = S(t)
+
+    AA = AssembledADT[A, Assembler, BitVector]
+    assert hasattr(AA, "from_fields")
+    AB = AssembledADT[B, Assembler, BitVector]
+    assert hasattr(AB, "from_fields")
+    AT = AssembledADT[T, Assembler, BitVector]
+    assert hasattr(AT, "from_fields")
+    AS = AssembledADT[S, Assembler, BitVector]
+    assert hasattr(AS, "from_fields")
+
+    #This is really what I want to do.
+    aa = AA.from_fields(
+        a=Bit(0),
+        b=BV(3),
+        e=E.b
+    )
+    assert aa == AA(a)
+    assert aa.a == Bit(0)
+    assert aa.b == BV(3)
+    assert aa.e == E.b
+
+    ab = AB.from_fields(
+        a=aa,
+        b=Bit(1)
+    )
+    assert ab == AB(b)
+    assert ab.a == aa
+    assert ab.b == Bit(1)
+
+    at = AT.from_fields(aa, e)
+    assert at == AT(t)
+    assert at[0] == aa
+    assert at[1] == e
+
+    as_b = AS.from_fields(B, ab)
+    as_t = AS.from_fields(T, t)
+    assert as_b == AS(s_b)
+    assert as_t == AS(s_t)
+    assert as_b[B].match
+    assert not as_b[T].match
+    assert as_b[B].value == ab
+    assert as_t[T].match
+    assert not as_t[B].match
+    assert as_t[T].value == at
+
