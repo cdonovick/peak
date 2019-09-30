@@ -18,16 +18,16 @@ def gen_sim(family):
         o0 = inst.operand_0
         op = inst.Opcode
 
-        if inst.operand_1.match(Word):
+        if inst.operand_1[Word].match:
             # arith op
-            o1 = inst.operand_1[Word]
+            o1 = inst.operand_1[Word].value
             if inst.Opcode == Inst.Opcode.A:
                 return o0 + o1
             else:
                 return o0 - o1
         else:
             # bit op
-            ox = inst.operand_1[T]
+            ox = inst.operand_1[T].value
             o1 = ox[0]
             b  = ox[1]
             if inst.Opcode == Inst.Opcode.A:

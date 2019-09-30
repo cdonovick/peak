@@ -13,7 +13,7 @@ def sum_all_subfields(aadt_t, subfields : tp.Mapping) -> (AssembledADT, tp.Mappi
     assert bv_t is SMTBitVector
     assert len(adt_t.fields) == len(subfields)
 
-    sum_values = {field: aadt_t.from_subfields(value) for field, value in subfields.items()}
+    sum_values = {field: aadt_t.from_fields(field, value) for field, value in subfields.items()}
 
     #Create Tag
     tag_t = SMTBitVector[assembler.tag_width]
@@ -24,7 +24,7 @@ def sum_all_subfields(aadt_t, subfields : tp.Mapping) -> (AssembledADT, tp.Mappi
         tag_val = assembler._tag_asm(field)
         bv_val = (tag==tag_t(tag_val)).ite(sum_value._value_, bv_val)
     aadt_val = aadt_t(bv_val)
-    matches = {field: aadt_val.match(field) for field in adt_t.fields}
+    matches = {field: aadt_val[field].match for field in adt_t.fields}
     return aadt_val, matches, tag
 
 class Tag: pass
@@ -63,7 +63,7 @@ def generic_aadt_smt(aadt_t, path=()):
             sub_aadt_value, sub_varmap = generic_aadt_smt(sub_aadt_t, path + (field_name,))
             value_dict[field_name] = sub_aadt_value
             varmap.update(sub_varmap)
-        prod_value = aadt_t.from_subfields(**value_dict)
+        prod_value = aadt_t.from_fields(**value_dict)
         return prod_value, varmap
     elif issubclass(adt_t, Tuple):
         varmap = {}
@@ -74,7 +74,7 @@ def generic_aadt_smt(aadt_t, path=()):
             sub_aadt_value, sub_varmap = generic_aadt_smt(sub_aadt_t, path + (idx,))
             values.append(sub_aadt_value)
             varmap.update(sub_varmap)
-        tup_value = aadt_t.from_subfields(*values)
+        tup_value = aadt_t.from_fields(*values)
         return tup_value, varmap
     elif issubclass(adt_t, Enum):
         #Leaf node

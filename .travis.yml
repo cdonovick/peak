@@ -11,6 +11,8 @@ addons:
     - libmpfr-dev
     - libmpc-dev
     - verilator
+env:
+  - PYTHONHASHSEED=0
 before_install:
 - curl -s -L https://github.com/rdaly525/coreir/releases/latest | grep "href.*coreir-${TRAVIS_OS_NAME}.tar.gz" | cut -d \" -f 2 | xargs -I {} wget https://github.com"{}"
 - mkdir coreir_release;
@@ -23,6 +25,7 @@ install:
 - pip install python-coveralls
 - pip install -e .
 script:
+- setenv 
 - py.test --cov=peak tests/
 after_success:
 - coveralls
