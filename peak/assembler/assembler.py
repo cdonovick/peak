@@ -72,7 +72,7 @@ class Assembler(AbstractAssembler):
         return self._tag_width
 
     @property
-    def tag_layout(self) -> tp.Mapping[str, tp.Tuple[int, int]]:
+    def tag_layout(self) -> tp.Tuple[int, int]:
         if not _issubclass(self.isa, Sum):
             raise TypeError('tag_layout only for Sum')
         return self._tag_layout
@@ -152,7 +152,7 @@ def _sum(isa : Sum) -> int:
     tag_2_field = {}
     field_2_tag = {}
     layout = {}
-    tag_width = len(isa.fields).bit_length()
+    tag_width = (len(isa.fields)-1).bit_length()
 
     width = 0
     for tag, field in enumerate(sorted(isa.fields, key=lambda field: (field.__name__, field.__module__))):
