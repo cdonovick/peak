@@ -1,4 +1,4 @@
-from hwtypes.adt import Enum, Product, Sum
+from hwtypes.adt import Enum, Product, Sum, TaggedUnion
 from hwtypes.modifiers import new
 from peak.bitfield import tag
 from hwtypes import BitVector, Bit
@@ -56,7 +56,17 @@ class OPR2(Product):
     NOP = Bit # 0 if ORP2, 1 if OPR2
 
 @tag({OPR1:0, OPR2:1})
-class OPR(Sum[OPR1, OPR2]): pass
+class OPR(TaggedUnion):
+    opr1 = OPR1
+    opr2 = OPR2
 
 @tag({AND:0, TAD:1, ISZ:2, DCA:3, JMS:4, JMP:5, IOT:6, OPR:7})
-class Inst(Sum[AND, TAD, ISZ, DCA, JMS, JMP, IOT, OPR]): pass
+class Inst(TaggedUnion):
+    and_ = AND
+    tad = TAD
+    isz = ISZ
+    dca = DCA
+    jms = JMS
+    jmp = JMP
+    iot = IOT
+    opr = OPR

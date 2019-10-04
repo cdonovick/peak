@@ -2,27 +2,27 @@ from .isa import *
 
 # acc &= mem[addr]
 def and_(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(AND(i, p, Addr(addr)))
+    return Inst(and_=AND(i, p, Addr(addr)))
 
 # acc += mem[addr]
 def tad(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(TAD(i, p, Addr(addr)))
+    return Inst(tad=TAD(i, p, Addr(addr)))
 
 # mem[addr] = acc and  then set acc=0
 def dca(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(DCA(i, p, Addr(addr)))
+    return Inst(dca=DCA(i, p, Addr(addr)))
 
 # mem[addr]++ and skip next inst if mem[addr] == 0
 def isz(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(ISZ(i, p, Addr(addr)))
+    return Inst(isz=ISZ(i, p, Addr(addr)))
 
 # jmp to addr
 def jmp(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(JMP(i, p, Addr(addr)))
+    return Inst(jmp=JMP(i, p, Addr(addr)))
 
 # mem[addr] = pc and then jmp to addr+1
 def jms(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
-    return Inst(JMS(i, p, Addr(addr)))
+    return Inst(jms=JMS(i, p, Addr(addr)))
 
 # io instruction - not implemented
 #def iot():
@@ -31,7 +31,7 @@ def jms(addr, i=IA.DIRECT, p=MP.PAGE_ZERO):
 def opr1(cla=0, cll=0, cma=0, cml=0, rar=0, ral=0, twice=0, iac=0):
     if ral and rar:
         print("opr1: ral and rar can't both be set")
-    return Inst(OPR(OPR1(Bit(cla), Bit(cll), Bit(cma), Bit(cml), Bit(rar), Bit(ral), Bit(twice), Bit(iac))))
+    return Inst(opr=OPR(opr1=OPR1(Bit(cla), Bit(cll), Bit(cma), Bit(cml), Bit(rar), Bit(ral), Bit(twice), Bit(iac))))
 
 # clear accumulator
 def cla(**kwargs):
@@ -120,7 +120,7 @@ def opr2(cla=0, sma=0, sza=0, snl=0, spa=0, sna=0, szl=0, skip=0, osr=0, hlt=0):
         print("opr2: sma|sza|snl and spa|sna|szl can't both be set")
     if flags2:
         skip = 1
-    return Inst(OPR(OPR2(Bit(cla), Bit(sma|spa), Bit(sza|sna), Bit(snl|szl), Bit(skip), Bit(osr), Bit(hlt), Bit(0))))
+    return Inst(opr=OPR(opr2=OPR2(Bit(cla), Bit(sma|spa), Bit(sza|sna), Bit(snl|szl), Bit(skip), Bit(osr), Bit(hlt), Bit(0))))
 
 # skip if acc zero
 def sza(**kwargs):

@@ -43,6 +43,7 @@ def sumsize(type):
 def instkey(inst):
     t = type(inst)
     if hasattr(t, 'tags'):
+        # depreciated
         i = t.tags[type(inst.value)]
     else:
         i = list(t.fields).index(type(inst.value))
@@ -58,6 +59,7 @@ def bitfield(i):
 def encode(inst, reverse=False):
     bitfield = getattr(inst, 'bitfield', 0)
     if isinstance(inst, (AbstractBit, AbstractBitVector, Enum)):
+        # depreciated
         word = inst.value if isinstance(inst,Enum) else int(inst)
     else:
         typeinst = type(inst)
@@ -81,6 +83,7 @@ def encode(inst, reverse=False):
             tag = instkey(inst)
             if reverse: # tag is on the left, value is on the right
                 pos = size(typeinst) - sumsize(typeinst)
+                # depreciated
                 word = (tag << pos) | encode(inst.value, reverse)
             else: # tag is on the right, value is on the left
                 pos = sumsize(typeinst)
