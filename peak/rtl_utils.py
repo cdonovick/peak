@@ -1,5 +1,6 @@
 import magma as m
-
+import mantle
+from collections import namedtuple
 
 @m.cache_definition
 def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
@@ -43,3 +44,29 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
                 else:
                     getattr(io, key) <= getattr(pe, key)
     return WrappedPE
+
+
+
+
+ExtendedTypeFamily = namedtuple('ExtendedTypeFamily', ['Bit', 'BitVector',
+                                                       'Unsigned', 'Signed',
+                                                       'Product', 'Enum',
+                                                       'overflow', 'BFloat16'])
+
+#This will call a custom version of rebind where it will apply m.circuit.sequential
+def rebind_magma(PE):
+    #upate magma family
+    family = m.get_family()
+    from mantle.common.operator import overflow
+    BFloat16 = m.BFloat[16]
+
+    #TODO hack since magma bfloat does not inheret from abstract FPVector
+    def reinterpret_from_bv(bv):
+        return BFloat16(bv)
+    def reinterpret_as_bv(bv):
+        return m.Bits[16](bv)
+    BFloat16.reinterpret_from_bv = reinterpret_from_bv
+    BFloat16.reinterpret_as_bv = reinterpret_as_bv
+    m.BitVector.concat = m.concat
+    family = ExtendedTypeFamily(*family, m.Product, m.Enum, overflow, BFloat16)
+    return PE.rebind(family)

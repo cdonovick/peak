@@ -7,7 +7,7 @@ def gen_ALU(width=16):
     Data = BitVector[width]
     class ALU(Peak):
         def __init__(self):
-            pass
+            self.bit1 = gen_register()
 
         @name_outputs(alu_res=Data)
         def __call__(self,inst : Inst, a : Data, b : Data):

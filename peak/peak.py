@@ -6,6 +6,8 @@ from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
 import functools
 import inspect
 import textwrap
+from ast_tools.stack import get_symbol_table, SymbolTable
+import magma as m
 
 Src = namedtuple("Src",["code","filename"])
 
@@ -39,15 +41,8 @@ class PeakMeta(type):
         for rname in RESERVED_SUNDERS:
             if rname in attrs:
                 raise ReservedNameError(f"Attribute {rname} is reserved")
-        stack = inspect.stack()
-        env = {}
-        for i in reversed(range(1,len(stack))):
-            for key, value in stack[i].frame.f_globals.items():
-                env[key] = value
-        for i in reversed(range(1,len(stack))):
-            for key, value in stack[i].frame.f_locals.items():
-                env[key] = value
         cls = super().__new__(mcs,name,bases,attrs,**kwargs)
+        env = get_symbol_table()
         cls._env_ = env
         return cls
 
@@ -74,10 +69,13 @@ class PeakMeta(type):
         #re-exec the source code
         #but with a new environment which replaced all references
         #to a particular BitVector with the passed in family's bitvector
-        env = {k:rebind_type(t,family) for k,t in cls._env_.items()}
-        env.update({"__file__":cls._src_.filename})
+        env = {k:rebind_type(t, family) for k,t in cls._env_.items()}
+        _locals = {k:rebind_type(t, family) for k,t in cls._env_.locals.items()}
+        _globals = {k:rebind_type(t, family) for k,t in cls._env_.globals.items()}
+        env = SymbolTable(locals=_locals, globals=_globals)
+
         exec_ls = {}
-        exec(compile(cls._src_.code,cls._src_.filename,'exec'),env,exec_ls)
+        exec(compile(cls._src_.code,cls._src_.filename,'exec'),dict(env),exec_ls)
         rebound_cls = exec_ls[cls.__name__]
         rebound_cls._src_ = cls._src_
 
@@ -122,7 +120,7 @@ def name_outputs(**output_dict):
         #Set all the outputs
         outputs = OrderedDict()
         for oname,otype in output_dict.items():
-            if not issubclass(otype, (AbstractBitVector, AbstractBit)):
+            if not issubclass(otype, (AbstractBitVector, AbstractBit, m.Bit, m.BitVector)):
                 raise TypeError(f"{oname} is not a Bitvector class")
             outputs[oname] = otype
         call_wrapper._peak_outputs_ = Product.from_fields("PeakOutputs",outputs)
