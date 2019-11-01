@@ -1,12 +1,14 @@
-from peak.register import gen_register
+from peak import gen_register, rebind_magma
+from hwtypes import BitVector
 import magma as m
 import fault
 
 
 def test_register():
-    Reg = gen_register(m.get_family(), m.Bits[2], 1)
-    tester = fault.Tester(Reg, Reg.CLK)
-
+    Reg2 = gen_register(BitVector[2],  1)
+    print(Reg2)
+    Reg_magma = rebind_magma(Reg2)
+    tester = fault.Tester(Reg_magma, Reg_magma.CLK)
     tester.circuit.ASYNCRESET = 0
     tester.eval()
     tester.circuit.ASYNCRESET = 1
@@ -25,4 +27,4 @@ def test_register():
     tester.circuit.value = 3
     tester.step(2)
     tester.circuit.O.expect(2)
-    tester.compile_and_run("verilator")
+    tester.compile_and_run("verilator", directory="tests/test_magma/build")

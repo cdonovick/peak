@@ -69,4 +69,4 @@ def rebind_magma(PE):
     BFloat16.reinterpret_as_bv = reinterpret_as_bv
     m.BitVector.concat = m.concat
     family = ExtendedTypeFamily(*family, m.Product, m.Enum, overflow, BFloat16)
-    return PE.rebind(family)
+    return PE.rebind(family, is_magma=True)

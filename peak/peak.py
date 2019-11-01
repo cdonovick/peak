@@ -11,16 +11,18 @@ import magma as m
 
 Src = namedtuple("Src",["code","filename"])
 
-def rebind_type(T,family):
+def rebind_type(T,family, is_magma=False):
     def _rebind_bv(T):
         return rebind_bitvector(T,AbstractBitVector,family.BitVector).rebind(AbstractBit,family.Bit,True)
 
-    if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum):
+    if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum,Peak):
         return T
     elif not inspect.isclass(T):
         return T
     elif is_modified(T):
         return get_modifier(T)(rebind_type(get_unmodified(T),family))
+    elif issubclass(T, Peak):
+        return T.rebind(family)
     elif issubclass(T,AbstractBitVector):
         return rebind_bitvector(T,AbstractBitVector,family.BitVector)
     elif issubclass(T,AbstractBit):
@@ -47,7 +49,7 @@ class PeakMeta(type):
         return cls
 
     #This will rebind the class to a specific family
-    def rebind(cls,family):
+    def rebind(cls, family, is_magma=False):
         assert hasattr(cls,"_env_")
         #try to get the soruce code if it does not have it
         if not hasattr(cls,'_src_'):
@@ -69,15 +71,16 @@ class PeakMeta(type):
         #re-exec the source code
         #but with a new environment which replaced all references
         #to a particular BitVector with the passed in family's bitvector
-        env = {k:rebind_type(t, family) for k,t in cls._env_.items()}
-        _locals = {k:rebind_type(t, family) for k,t in cls._env_.locals.items()}
-        _globals = {k:rebind_type(t, family) for k,t in cls._env_.globals.items()}
+        _locals = {k:rebind_type(t, family) for k,t in cls._env_.locals.items() if cls is not t}
+        _globals = {k:rebind_type(t, family) for k,t in cls._env_.globals.items() if cls is not t}
         env = SymbolTable(locals=_locals, globals=_globals)
 
         exec_ls = {}
         exec(compile(cls._src_.code,cls._src_.filename,'exec'),dict(env),exec_ls)
         rebound_cls = exec_ls[cls.__name__]
         rebound_cls._src_ = cls._src_
+        if is_magma:
+            rebound_cls = m.circuit.sequential(rebound_cls, env=env)
 
         #Add back to cache
         peak_cache[(family,cls._src_)] = rebound_cls
@@ -94,7 +97,8 @@ class PeakMeta(type):
         return cls.__call__._peak_outputs_
 
 class Peak(metaclass=PeakMeta):
-    pass
+    def __init__(self):
+        pass
 
 def name_outputs(**output_dict):
     """Decorator meant to apply to any function to specify output types
