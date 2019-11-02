@@ -92,20 +92,22 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
 
     return res, res_p, Z, N, C, V
 
-class PE(Peak):
+RegData = gen_register_mode(Data, Data(0))
+RegBit = gen_register_mode(Bit, Bit(0))
 
+class PE(Peak):
     def __init__(self):
         # Declare PE state
 
         family = Data.get_family()
         # Data registers
-        self.rega = gen_register_mode(family, Data)()
-        self.regb = gen_register_mode(family, Data)()
+        self.rega: RegData = RegData()
+        self.regb: RegData = RegData()
 
         # Bit Registers
-        self.regd = gen_register_mode(family, Bit)()
-        self.rege = gen_register_mode(family, Bit)()
-        self.regf = gen_register_mode(family, Bit)()
+        self.regd: RegBit = RegBit()
+        self.rege: RegBit = RegBit()
+        self.regf: RegBit = RegBit()
 
     @name_outputs(alu_res=Data,res_p=Bit,irq=Bit)
     def __call__(self, inst: Inst, \

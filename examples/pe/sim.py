@@ -6,18 +6,19 @@ from .lut import lut
 from .isa import *
 
 def gen_pe(num_inputs):
-
+    RegModeData = gen_register_mode(Data, Data(0))
+    RegModeBit = gen_register_mode(Bit, Bit(0))
     class PE(Peak):
 
         def __init__(self):
             family = Data.get_family()
             # Data registers
-            self.data = [(gen_register_mode(family, Data)()) for i in range(num_inputs)]
+            self.data = [RegModeData() for i in range(num_inputs)]
 
             # Bit Registers
-            self.bit0 = gen_register_mode(family, Bit)()
-            self.bit1 = gen_register_mode(family, Bit)()
-            self.bit2 = gen_register_mode(family, Bit)()
+            self.bit0: RegModeBit = RegModeBit() 
+            self.bit1: RegModeBit = RegModeBit() 
+            self.bit2: RegModeBit = RegModeBit() 
 
         def __call__(self, inst: Inst, \
                         data, \
@@ -37,8 +38,7 @@ def gen_pe(num_inputs):
             lut_res = lut(lutinst.table, bit0, bit1, bit2)
 
             # ALU part of the instruction
-            #_, aluinst = inst.alu.match()
-            aluinst = inst.alu._value_
+            _, aluinst = inst.alu.match()
             data = [self.data[i](aluinst.data_modes[i],
                                  aluinst.data_consts[i], data[i],
                                  clk_en) for i in range(num_inputs)]
