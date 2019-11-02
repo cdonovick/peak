@@ -1,6 +1,7 @@
 from hwtypes import BitVector, overflow
 from .isa import *
-from peak import Peak, gen_register, RAM, ROM
+from peak import Peak, gen_register2, gen_RAM, gen_ROM
+import typing as tp
 
 LR = Reg4(15)
 ZERO = Bit(0)
@@ -66,22 +67,19 @@ def cond(code, Z, N, C, V):
 
 class Pico(Peak):
 
-    def __init__(self, mem):
-        family = Bit.get_family()
-        self.mem = ROM(Inst, 256, mem, Word(0))
-
-        self.reg = RAM(Word, 16, [Word(0) for i in range(16)])
-        self.PC = gen_register(family, Word, Word(0))()
-        self.Z = gen_register(family, Bit, ZERO)()
-        self.N = gen_register(family, Bit, ZERO)()
-        self.C = gen_register(family, Bit, ZERO)()
-        self.V = gen_register(family, Bit, ZERO)()
+    def __init__(self, mem : tp.List[Inst]):
+        self.mem = gen_ROM(Inst,depth=256)(mem,Word(0))
+        self.reg = gen_RAM(Word, depth=16)([], default_init=Word(0))
+        self.PC = gen_register2(Word)(Word(0))
+        self.Z = gen_register2(Bit)(ZERO)
+        self.N = gen_register2(Bit)(ZERO)
+        self.C = gen_register2(Bit)(ZERO)
+        self.V = gen_register2(Bit)(ZERO)
 
     def __call__(self):
-        pc = self.PC(0, 0)
+        pc = self.PC(0, en=Bit(0))
         inst = self.mem(pc)
-#        type, inst = inst.match()
-        type, inst = inst._value_.__class__, inst._value_
+        type, inst = inst.match()
         if type == Logic or type == Arith:
             self.alu(type, inst)
         elif type == Memory:
@@ -92,10 +90,9 @@ class Pico(Peak):
             raise NotImplemented(inst)
 
     def alu(self, type, inst):
-#        subtype, inst = inst.match()
-        subtype, inst = inst._value_.__class__, inst._value_
-        a = self.reg(inst.ra, 0, 0)
-        b = self.reg(inst.rb, 0, 0)
+        subtype, inst = inst.match()
+        a = self.reg(inst.ra, 0, wen=Bit(0))
+        b = self.reg(inst.rb, 0, wen=Bit(0))
         if type == Logic:
             res = logic(subtype, a, b)
         else:
@@ -109,8 +106,7 @@ class Pico(Peak):
         self.PC(self.PC(0, 0)+1, 1)
 
     def memory(self, inst):
-#        type, inst = inst.match()
-        type, inst = inst._value_.__class__, inst._value_
+        type, inst = inst.match()
         if   type == LDLO:
             self.reg(inst.ra,Word(inst.imm), 1)
         elif type == LDHI:
@@ -123,8 +119,7 @@ class Pico(Peak):
         self.PC(self.PC(0, 0)+1, 1)
 
     def control(self, inst):
-#        type, inst = inst.match()
-        type, inst = inst._value_.__class__, inst._value_
+        type, inst = inst.match()
         if     type == Jump:
             if cond(inst.cond, self.Z(0, 0), self.N(0, 0), self.C(0, 0), self.V(0, 0)):
                 self.PC(Word(inst.imm), 1)
