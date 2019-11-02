@@ -11,18 +11,20 @@ import magma as m
 
 Src = namedtuple("Src",["code","filename"])
 
-def rebind_type(T,family, is_magma=False):
+def rebind_type(T,family, dont_rebind=(), is_magma=False):
     def _rebind_bv(T):
         return rebind_bitvector(T,AbstractBitVector,family.BitVector).rebind(AbstractBit,family.Bit,True)
-
-    if T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum,Peak):
+    if T in dont_rebind:
+        return T
+    elif T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum,Peak):
         return T
     elif not inspect.isclass(T):
         return T
     elif is_modified(T):
-        return get_modifier(T)(rebind_type(get_unmodified(T),family))
+        return get_modifier(T)(rebind_type(get_unmodified(T),family,dont_rebind,is_magma))
     elif issubclass(T, Peak):
-        return T.rebind(family)
+        return T.rebind(family, dont_rebind, is_magma)
+
     elif issubclass(T,AbstractBitVector):
         return rebind_bitvector(T,AbstractBitVector,family.BitVector)
     elif issubclass(T,AbstractBit):
@@ -49,7 +51,7 @@ class PeakMeta(type):
         return cls
 
     #This will rebind the class to a specific family
-    def rebind(cls, family, is_magma=False):
+    def rebind(cls, family, dont_rebind=(), is_magma=False):
         assert hasattr(cls,"_env_")
         #try to get the soruce code if it does not have it
         if not hasattr(cls,'_src_'):
@@ -64,15 +66,25 @@ class PeakMeta(type):
             cls._src_ = Src(code=program_txt, filename=filename)
 
         #check cache
-        rebound_cls = peak_cache.get((family,cls._src_))
-        if rebound_cls is not None:
-            return rebound_cls
+        #print(cls, cls.uniquify())
+        #rebound_cls = peak_cache.get((family,cls._src_,cls.uniquify()))
+        #if rebound_cls is not None:
+        #    print("FOUND")
+        #    for f,src,u in peak_cache.keys():
+        #        print(u)
+        #    print("\FOUND")
+        #    return rebound_cls
 
         #re-exec the source code
         #but with a new environment which replaced all references
         #to a particular BitVector with the passed in family's bitvector
-        _locals = {k:rebind_type(t, family) for k,t in cls._env_.locals.items() if cls is not t}
-        _globals = {k:rebind_type(t, family) for k,t in cls._env_.globals.items() if cls is not t}
+        dont_rebind += (cls,)
+        _locals = {k:rebind_type(t, family, dont_rebind, is_magma) for k,t in cls._env_.locals.items()}
+        _globals = {k:rebind_type(t, family, dont_rebind, is_magma) for k,t in cls._env_.globals.items()}
+
+        #for k,v in cls.__en
+
+
         env = SymbolTable(locals=_locals, globals=_globals)
 
         exec_ls = {}
@@ -83,7 +95,7 @@ class PeakMeta(type):
             rebound_cls = m.circuit.sequential(rebound_cls, env=env)
 
         #Add back to cache
-        peak_cache[(family,cls._src_)] = rebound_cls
+        #peak_cache[(family, cls._src_, cls.uniquify())] = rebound_cls
         return rebound_cls
 
     #Returns the input interface as a product type
@@ -99,6 +111,10 @@ class PeakMeta(type):
 class Peak(metaclass=PeakMeta):
     def __init__(self):
         pass
+
+    @classmethod
+    def uniquify(cls):
+        return 0
 
 def name_outputs(**output_dict):
     """Decorator meant to apply to any function to specify output types

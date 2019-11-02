@@ -1,16 +1,17 @@
-from peak import Peak, name_outputs, PeakNotImplementedError
+from peak import Peak, name_outputs, PeakNotImplementedError, gen_register
 import typing as  tp
 from .isa import *
 from hwtypes import BitVector
 
-def gen_ALU(width=16):
+def gen_seq(width=16):
     Data = BitVector[width]
+    Reg = gen_register(Data, 0)
     class ALU(Peak):
         def __init__(self):
-            self.bit1 = gen_register()
+            self.reg: Data = Reg()
 
         @name_outputs(alu_res=Data)
-        def __call__(self,inst : Inst, a : Data, b : Data):
+        def __call__(self, inst : Inst, a : Data, b : Data):
             op = inst.alu_op
             if op == ALUOP.Add:
                 res = a + b
@@ -24,5 +25,6 @@ def gen_ALU(width=16):
                 res = a ^ b
             else:
                 raise PeakNotImplementedError(op)
+            self.reg(self.reg+res)
             return res
     return ALU

@@ -85,7 +85,6 @@ def test_reserved_name():
         class A(Peak):
             _src_ = int
 
-
 def test_rebind_mod():
     Mod = make_modifier("Mod")
     ModData = Mod(Data)

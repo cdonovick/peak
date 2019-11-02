@@ -1,0 +1,77 @@
+{"top":"global.Register",
+"namespaces":{
+  "global":{
+    "modules":{
+      "Mux2xOutBits5":{
+        "type":["Record",[
+          ["I0",["Array",5,"BitIn"]],
+          ["I1",["Array",5,"BitIn"]],
+          ["S","BitIn"],
+          ["O",["Array",5,"Bit"]]
+        ]],
+        "instances":{
+          "coreir_commonlib_mux2x5_inst0":{
+            "genref":"commonlib.muxn",
+            "genargs":{"N":["Int",2], "width":["Int",5]}
+          }
+        },
+        "connections":[
+          ["self.I0","coreir_commonlib_mux2x5_inst0.in.data.0"],
+          ["self.I1","coreir_commonlib_mux2x5_inst0.in.data.1"],
+          ["self.S","coreir_commonlib_mux2x5_inst0.in.sel.0"],
+          ["self.O","coreir_commonlib_mux2x5_inst0.out"]
+        ]
+      },
+      "Register":{
+        "type":["Record",[
+          ["value",["Array",5,"BitIn"]],
+          ["en","BitIn"],
+          ["CLK",["Named","coreir.clkIn"]],
+          ["ASYNCRESET",["Named","coreir.arstIn"]],
+          ["O",["Array",5,"Bit"]]
+        ]],
+        "instances":{
+          "Register_comb_inst0":{
+            "modref":"global.Register_comb"
+          },
+          "reg_PR_inst0":{
+            "genref":"coreir.reg_arst",
+            "genargs":{"width":["Int",5]},
+            "modargs":{"arst_posedge":["Bool",true], "clk_posedge":["Bool",true], "init":[["BitVector",5],"5'h07"]}
+          }
+        },
+        "connections":[
+          ["reg_PR_inst0.in","Register_comb_inst0.O0"],
+          ["self.O","Register_comb_inst0.O1"],
+          ["self.en","Register_comb_inst0.en"],
+          ["reg_PR_inst0.out","Register_comb_inst0.self_value_O"],
+          ["self.value","Register_comb_inst0.value"],
+          ["self.ASYNCRESET","reg_PR_inst0.arst"],
+          ["self.CLK","reg_PR_inst0.clk"]
+        ]
+      },
+      "Register_comb":{
+        "type":["Record",[
+          ["value",["Array",5,"BitIn"]],
+          ["en","BitIn"],
+          ["self_value_O",["Array",5,"BitIn"]],
+          ["O0",["Array",5,"Bit"]],
+          ["O1",["Array",5,"Bit"]]
+        ]],
+        "instances":{
+          "Mux2xOutBits5_inst0":{
+            "modref":"global.Mux2xOutBits5"
+          }
+        },
+        "connections":[
+          ["self.self_value_O","Mux2xOutBits5_inst0.I0"],
+          ["self.value","Mux2xOutBits5_inst0.I1"],
+          ["self.O0","Mux2xOutBits5_inst0.O"],
+          ["self.en","Mux2xOutBits5_inst0.S"],
+          ["self.self_value_O","self.O1"]
+        ]
+      }
+    }
+  }
+}
+}
