@@ -67,13 +67,9 @@ class PeakMeta(type):
 
         #check cache
         #print(cls, cls.uniquify())
-        #rebound_cls = peak_cache.get((family,cls._src_,cls.uniquify()))
-        #if rebound_cls is not None:
-        #    print("FOUND")
-        #    for f,src,u in peak_cache.keys():
-        #        print(u)
-        #    print("\FOUND")
-        #    return rebound_cls
+        rebound_cls = peak_cache.get((family,cls._src_,cls.uniquify()))
+        if rebound_cls is not None:
+            return rebound_cls
 
         #re-exec the source code
         #but with a new environment which replaced all references
@@ -95,7 +91,7 @@ class PeakMeta(type):
             rebound_cls = m.circuit.sequential(rebound_cls, env=env)
 
         #Add back to cache
-        #peak_cache[(family, cls._src_, cls.uniquify())] = rebound_cls
+        peak_cache[(family, cls._src_, cls.uniquify())] = rebound_cls
         return rebound_cls
 
     #Returns the input interface as a product type
