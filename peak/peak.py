@@ -11,19 +11,24 @@ import magma as m
 
 Src = namedtuple("Src",["code","filename"])
 
-def rebind_type(T,family, dont_rebind=(), is_magma=False):
+def rebind_type(T,family, dont_rebind=(), do_rebind={}, is_magma=False):
     def _rebind_bv(T):
         return rebind_bitvector(T,AbstractBitVector,family.BitVector).rebind(AbstractBit,family.Bit,True)
     if T in dont_rebind:
         return T
-    elif T in (AbstractBitVector,AbstractBit,Product,Sum,Tuple,Enum,Peak):
+    #This is a hack since magma does not adhere to adt types yet
+    elif is_magma and T in (Product,Enum):
+        p = getattr(family, T.__name__)
+        print(p,type(p))
+        return p
+    elif T in (AbstractBitVector,AbstractBit,Sum,Tuple,Product,Enum,Peak):
         return T
     elif not inspect.isclass(T):
         return T
     elif is_modified(T):
-        return get_modifier(T)(rebind_type(get_unmodified(T),family,dont_rebind,is_magma))
+        return get_modifier(T)(rebind_type(get_unmodified(T),family,dont_rebind,do_rebind,is_magma))
     elif issubclass(T, Peak):
-        return T.rebind(family, dont_rebind, is_magma)
+        return T.rebind(family, dont_rebind, do_rebind, is_magma)
 
     elif issubclass(T,AbstractBitVector):
         return rebind_bitvector(T,AbstractBitVector,family.BitVector)
@@ -51,7 +56,7 @@ class PeakMeta(type):
         return cls
 
     #This will rebind the class to a specific family
-    def rebind(cls, family, dont_rebind=(), is_magma=False):
+    def rebind(cls, family, dont_rebind=(), do_rebind={}, is_magma=False):
         assert hasattr(cls,"_env_")
         #try to get the soruce code if it does not have it
         if not hasattr(cls,'_src_'):
@@ -75,14 +80,18 @@ class PeakMeta(type):
         #but with a new environment which replaced all references
         #to a particular BitVector with the passed in family's bitvector
         dont_rebind += (cls,)
-        _locals = {k:rebind_type(t, family, dont_rebind, is_magma) for k,t in cls._env_.locals.items()}
-        _globals = {k:rebind_type(t, family, dont_rebind, is_magma) for k,t in cls._env_.globals.items()}
-
-        #for k,v in cls.__en
-
+        def _rebind(env):
+            _locals = {}
+            for k,t in env.items():
+                if k in do_rebind:
+                    _locals[k] = do_rebind[k]
+                else:
+                    _locals[k] = rebind_type(t, family, dont_rebind, do_rebind, is_magma)
+            return _locals
+        _locals = _rebind(cls._env_.locals)
+        _globals = _rebind(cls._env_.globals)
 
         env = SymbolTable(locals=_locals, globals=_globals)
-
         exec_ls = {}
         exec(compile(cls._src_.code,cls._src_.filename,'exec'),dict(env),exec_ls)
         rebound_cls = exec_ls[cls.__name__]

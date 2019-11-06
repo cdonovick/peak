@@ -1,4 +1,4 @@
-from peak import gen_register, rebind_magma
+from peak import gen_register, compile_magma
 from hwtypes import BitVector
 import magma as m
 import fault
@@ -9,7 +9,7 @@ def test_register():
     m.backend.coreir_.CoreIRContextSingleton().reset_instance()
     print("Starting testreg")
     Reg2 = gen_register(BitVector[2],  1)
-    Reg2_magma = rebind_magma(Reg2)
+    Reg2_magma = compile_magma(Reg2)
     assert len(type(Reg2_magma.value))
     print(Reg2_magma)
     tester = fault.Tester(Reg2_magma, Reg2_magma.CLK)

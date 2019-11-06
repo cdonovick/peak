@@ -54,13 +54,11 @@ ExtendedTypeFamily = namedtuple('ExtendedTypeFamily', ['Bit', 'BitVector',
                                                        'overflow', 'BFloat16'])
 
 #This will call a custom version of rebind where it will apply m.circuit.sequential
-def rebind_magma(PE):
+def compile_magma(PE, magma_adt_dict = {}):
     #upate magma family
     family = m.get_family()
     from mantle.common.operator import overflow
     BFloat16 = m.BFloat[16]
-
-    #TODO hack since magma bfloat does not inheret from abstract FPVector
     def reinterpret_from_bv(bv):
         return BFloat16(bv)
     def reinterpret_as_bv(bv):
@@ -69,4 +67,4 @@ def rebind_magma(PE):
     BFloat16.reinterpret_as_bv = reinterpret_as_bv
     m.BitVector.concat = m.concat
     family = ExtendedTypeFamily(*family, m.Product, m.Enum, overflow, BFloat16)
-    return PE.rebind(family, is_magma=True)
+    return PE.rebind(family, is_magma=True, do_rebind=magma_adt_dict)
