@@ -178,10 +178,13 @@ def test_min_pe_mapping():
             solver.add_assertion(precondition.value)
             constraint = smt.ForAll(forall_vars, (ir_out == arch_out).value)
             solver.add_assertion(constraint)
+            print("Solving", target)
             if not solver.solve():
                 assert target in (mul, shftr, shftl)
+                print("Successfully did not find", target)
                 continue
             assert target in (add, sub, and_, nand, or_, nor)
+            print("Successfully found", target)
             form_val = solver.get_value(form_var.value).constant_value()
             binding_val = solver.get_value(binding_var.value).constant_value()
             form_val = log2(form_val)

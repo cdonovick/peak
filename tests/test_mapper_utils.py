@@ -1,4 +1,4 @@
-from peak.mapper.utils import Tag, generic_aadt_smt
+from peak.mapper.utils import Tag, Match, generic_aadt_smt
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import  AssembledADT
 from hwtypes import BitVector, Bit, SMTBitVector, SMTBit
@@ -26,11 +26,14 @@ def test_generic_aadt_smt():
         (0, SBV[8]),
         (0, SBit),
         (0, Tag),
+        (0, Match),
         (1,'a'),
         (1,'b'),
         (2,),
         (3,)
     ]
+    for v in varmap:
+        print(v)
     assert len(expected_paths) == len(varmap)
     for path in expected_paths:
         assert path in varmap
