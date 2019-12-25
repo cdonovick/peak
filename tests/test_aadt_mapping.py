@@ -177,7 +177,7 @@ def test_min_pe_mapping():
             arch_out = (form_var==(2**fi)).ite(form_arch_out, arch_out)
         forall_vars = [var.value for var in ir_varmap.values()]
 
-        with smt.Solver('z3', logic=BV) as solver:
+        with smt.Solver('cvc4', logic=BV) as solver:
             solver.add_assertion(precondition.value)
             constraint = smt.ForAll(forall_vars, (ir_out == arch_out).value)
             solver.add_assertion(constraint)
