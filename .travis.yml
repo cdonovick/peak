@@ -23,8 +23,9 @@ install:
 - pip install pytest-cov fault mantle
 - pip install python-coveralls
 - pip install -e .
-- pysmt-install --cvc4
+- pysmt-install --cvc4 --confirm-agreement
 script:
 - py.test --cov=peak tests/
 after_success:
 - coveralls
+
