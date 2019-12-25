@@ -43,31 +43,24 @@ S = Sum[Word, T]
 Inst_aadt = AssembledADT[Inst, Assembler, SBV]
 
 
-forms = [
-    {("operand_1",):Word},
-    {("operand_1",):T}
-]
-
 
 #Forms:
 
 class Unbound: pass
 
+
+def log2(x):
+    #verify it is a power of 2
+    assert x & (x-1) == 0
+    return x.bit_length() - 1
+
+#TODO maybe helper function for creating predicate and value
 #Manually creating all the forms
-#forms:
-# operand_1 -> Word
-# opeanrd_1 -> Tuple
-forms = []
+forms = [
+    {("operand_1",):Word},
+    {("operand_1",):T}
+]
 
-#form 0
-forms.append([
-    (("operand_1",), Word),
-])
-
-#form 1
-forms.append([
-    (("operand_1",), T),
-])
 
 #Manually create all the bindings
 form_bindings = [[], []]
@@ -102,38 +95,46 @@ form_bindings[1].append([
     (Unbound, ("operand_1", T, 1)),
     (Unbound, ("Opcode",))
 ])
-
-arch_inst, arch_varmap = generic_aadt_smt(Inst_aadt)
-
-#Check that manually created forms and bindings are consistent
-for form in forms:
-    for (path, choice) in form:
-        match_path = path + (Match,)
-        assert match_path in arch_varmap
-        assert choice in arch_varmap[match_path]
-for bindings in form_bindings:
-    for binding in bindings:
-        for ir_path, arch_path in binding:
-            assert arch_path in arch_varmap
-
-#Automatically create the form/binding precondition
-num_forms = len(forms)
-max_bindings = max(len(b) for b in form_bindings)
-
-form_SBV = SBV[num_forms]
-binding_SBV = SBV[max_bindings]
-
-form_var = form_SBV()
-binding_var = binding_SBV()
-
-def log2(x):
-    #verify it is a power of 2
-    assert x & (x-1) == 0
-    return x.bit_length() - 1
-
-or_reduce = partial(operator.or_, reduce)
-
 def test_min_pe_mapping():
+
+
+    arch_forms, arch_varmap = generic_aadt_smt(Inst_aadt)
+
+    for form in arch_forms:
+        print(form.path_dict)
+        assert form.path_dict in forms
+
+    if arch_forms[0].path_dict != forms[0]:
+        print("RRRRRRRRRRRRRR")
+        #swap the forms and bindings
+        arch_forms = list(reversed(arch_forms))
+    else:
+        print("TTTTTTTTTTTTTTT")
+    for form in forms:
+        print(form)
+    #Check that manually created forms and bindings are consistent
+    for form in forms:
+        for path, choice in form.items():
+            match_path = path + (Match,)
+            assert match_path in arch_varmap
+            assert choice in arch_varmap[match_path]
+    for bindings in form_bindings:
+        for binding in bindings:
+            print(binding)
+            for ir_path, arch_path in binding:
+                assert arch_path in arch_varmap
+
+    #Automatically create the form/binding precondition
+    num_forms = len(forms)
+    max_bindings = max(len(b) for b in form_bindings)
+
+    form_SBV = SBV[num_forms]
+    binding_SBV = SBV[max_bindings]
+
+    form_var = form_SBV()
+    binding_var = binding_SBV()
+
+    or_reduce = partial(operator.or_, reduce)
 
     for target in targets:
         #Manually create ir_varmap (This will be done automatically in the future)
@@ -146,19 +147,21 @@ def test_min_pe_mapping():
 
         #Build precondition.
         precondition = SMTBit(0)
-        for fi, form in enumerate(forms):
+        for fi, form in enumerate(arch_forms):
             #form_condition represnts the & of all the appropriate matches
             form_condition = SMTBit(1)
-            for (path, choice) in form:
+            for path, choice in form.path_dict.items():
                 match_path = path + (Match,)
                 form_condition &= arch_varmap[match_path][choice]
             precondition = (form_var == 2**fi).ite(form_condition, precondition)
 
         #Build the constraint
-        general_arch_out = sim(arch_inst)
+        general_arch_out = sim(arch_forms[0].value)
         arch_out0 = SBV[general_arch_out.size](0)
         arch_out = arch_out0
         for fi, bindings in enumerate(form_bindings):
+            general_arch_out = sim(arch_forms[fi].value)
+
             form_arch_out = arch_out0
             for bi, binding in enumerate(bindings):
                 #Build substitution map
