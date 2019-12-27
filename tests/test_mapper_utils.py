@@ -1,11 +1,11 @@
-from peak.mapper.utils import Tag, Match, generic_aadt_smt
+from peak.mapper.utils import Tag, Match, SMTForms
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import  AssembledADT
 from hwtypes import BitVector, Bit, SMTBitVector, SMTBit
 from hwtypes import Product, Sum, Tuple, Enum
 
 
-def test_generic_aadt_smt():
+def test_SMTForms():
     SBV = SMTBitVector
     SBit = SMTBit
     class A(Product):
@@ -39,21 +39,8 @@ def test_generic_aadt_smt():
 
     AT = AssembledADT[T, Assembler, SBV]
 
-    forms, varmap = generic_aadt_smt(AT)
-    print("Forms")
-    for form in forms:
-        print("-----------------")
-        print("  ",form.path_dict)
-        print("  ",form.value._value_._value.serialize())
-        print("  ",form.value._value_._value.simplify().serialize())
-    print("Varmap")
-    for path,value in varmap.items():
-        if isinstance(value,dict):
-            for k,v in value.items():
-                print("  ",k,v._value)
-        else:
-            print("  ",path, value._value)
-    assert 0
+    forms, varmap = SMTForms()(AT)
+
     #expected_paths should be exactly in varmap
     assert len(expected_paths) == len(varmap)
     for path in expected_paths:
@@ -66,5 +53,4 @@ def test_generic_aadt_smt():
             match_path = path + (Match,)
             assert match_path in varmap
             assert field in varmap[match_path]
-
 

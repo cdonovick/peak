@@ -3,7 +3,16 @@ from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, 
 import functools
 
 class Peak:
-    pass
+    @classmethod
+    def get_inputs(cls):
+        assert hasattr(cls.__call__, '_peak_inputs_')
+        return cls.__call__._peak_inputs_
+
+    @classmethod
+    def get_outputs(cls):
+        assert hasattr(cls.__call__, '_peak_inputs_')
+        return cls.__call__._peak_inputs_
+
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types

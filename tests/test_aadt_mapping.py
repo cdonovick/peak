@@ -2,7 +2,7 @@ from hwtypes import Product, Sum, Enum, Tuple
 from hwtypes import SMTBitVector, SMTBit
 from peak.assembler import Assembler
 from peak.assembler import AssembledADT
-from peak.mapper.utils import Tag, Match, generic_aadt_smt
+from peak.mapper.utils import Tag, Match, SMTForms
 from examples.min_pe.sim import gen_sim
 from examples.min_pe.sim import gen_isa
 from functools import reduce
@@ -35,7 +35,7 @@ targets = (
     shftr,
     shftl,
 )
-Word, Bit, Inst, sim = gen_sim(SBV.get_family())
+Word, Bit, Inst, PE = gen_sim(SBV.get_family())
 
 T = Tuple[Word, Bit]
 S = Sum[Word, T]
@@ -97,8 +97,10 @@ form_bindings[1].append([
 ])
 def test_min_pe_mapping():
 
-
-    arch_forms, arch_varmap = generic_aadt_smt(Inst_aadt)
+    _,_,_,PE_BV = gen_sim(SBV.get_family())
+    pe_BV = PE_BV()
+    pe = PE()
+    arch_forms, arch_varmap = SMTForms()(Inst_aadt)
 
     for form in arch_forms:
         print(form.path_dict)
@@ -156,11 +158,11 @@ def test_min_pe_mapping():
             precondition = (form_var == 2**fi).ite(form_condition, precondition)
 
         #Build the constraint
-        general_arch_out = sim(arch_forms[0].value)
+        general_arch_out = pe(arch_forms[0].value)
         arch_out0 = SBV[general_arch_out.size](0)
         arch_out = arch_out0
         for fi, bindings in enumerate(form_bindings):
-            general_arch_out = sim(arch_forms[fi].value)
+            general_arch_out = pe(arch_forms[fi].value)
 
             form_arch_out = arch_out0
             for bi, binding in enumerate(bindings):
@@ -177,7 +179,7 @@ def test_min_pe_mapping():
             arch_out = (form_var==(2**fi)).ite(form_arch_out, arch_out)
         forall_vars = [var.value for var in ir_varmap.values()]
 
-        with smt.Solver('cvc4', logic=BV) as solver:
+        with smt.Solver('z3', logic=BV) as solver:
             solver.add_assertion(precondition.value)
             constraint = smt.ForAll(forall_vars, (ir_out == arch_out).value)
             solver.add_assertion(constraint)
