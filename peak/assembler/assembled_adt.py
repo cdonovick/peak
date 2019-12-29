@@ -293,9 +293,8 @@ class AssembledADT(metaclass=AssembledADTMeta):
     def __ne__(cls, other):
         return ~(cls == other)
 
-
 class AssembledADTRecursor:
-    def __call__(self,aadt_t, *args, **kwargs):
+    def __call__(self, aadt_t, *args, **kwargs):
         if (issubclass(aadt_t, AbstractBit) or issubclass(aadt_t, AbstractBitVector)):
             return self.bv(aadt_t,*args,**kwargs)
         adt_t = aadt_t.adt_t

@@ -2,9 +2,8 @@ from hwtypes import Product, Sum, Enum, Tuple
 from hwtypes import SMTBitVector, SMTBit
 from peak.assembler import Assembler
 from peak.assembler import AssembledADT
-from peak.mapper.utils import Tag, Match, SMTForms
+from peak.mapper.utils import Unbound, Match, SMTForms, extract, aadt_product_to_dict
 from examples.min_pe.sim import gen_sim
-from examples.min_pe.sim import gen_isa
 from functools import reduce
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -40,25 +39,16 @@ Word, Bit, Inst, PE = gen_sim(SBV.get_family())
 T = Tuple[Word, Bit]
 S = Sum[Word, T]
 
-Inst_aadt = AssembledADT[Inst, Assembler, SBV]
-
-
-
-#Forms:
-
-class Unbound: pass
-
 
 def log2(x):
     #verify it is a power of 2
     assert x & (x-1) == 0
     return x.bit_length() - 1
 
-#TODO maybe helper function for creating predicate and value
 #Manually creating all the forms
 forms = [
-    {("operand_1",):Word},
-    {("operand_1",):T}
+    {("inst","operand_1",):Word},
+    {("inst","operand_1",):T}
 ]
 
 
@@ -70,50 +60,44 @@ form_bindings = [[], []]
 #[b -> operand_0, a -> (operand_1, Word)]
 
 form_bindings[0].append([
-    (("a",), ("operand_0",)),
-    (("b",), ("operand_1", Word)),
-    (Unbound, ("Opcode",))
+    (("a",), ("inst","operand_0",)),
+    (("b",), ("inst","operand_1", Word)),
+    (Unbound, ("inst","Opcode",))
 ])
 form_bindings[0].append([
-    (("b",), ("operand_0",)),
-    (("a",), ("operand_1", Word)),
-    (Unbound, ("Opcode",))
+    (("b",), ("inst","operand_0",)),
+    (("a",), ("inst","operand_1", Word)),
+    (Unbound, ("inst","Opcode",))
 ])
 
 #form 1: (operand_1, Tuple[Word, Bit])
 #[a -> operand_0, b -> (operand_1, Tuple, 0)]
 #[b -> operand_0, a -> (operand_1, Tuple, 0)]
 form_bindings[1].append([
-    (("a",), ("operand_0",)),
-    (("b",), ("operand_1", T, 0)),
-    (Unbound, ("operand_1", T, 1)),
-    (Unbound, ("Opcode",))
+    (("a",), ("inst","operand_0",)),
+    (("b",), ("inst","operand_1", T, 0)),
+    (Unbound, ("inst","operand_1", T, 1)),
+    (Unbound, ("inst","Opcode",))
 ])
 form_bindings[1].append([
-    (("b",), ("operand_0",)),
-    (("a",), ("operand_1", T, 0)),
-    (Unbound, ("operand_1", T, 1)),
-    (Unbound, ("Opcode",))
+    (("b",), ("inst","operand_0",)),
+    (("a",), ("inst","operand_1", T, 0)),
+    (Unbound,("inst","operand_1", T, 1)),
+    (Unbound,("inst","Opcode",))
 ])
 def test_min_pe_mapping():
 
-    _,_,_,PE_BV = gen_sim(SBV.get_family())
-    pe_BV = PE_BV()
     pe = PE()
-    arch_forms, arch_varmap = SMTForms()(Inst_aadt)
+    input_aadt_t = AssembledADT[PE.get_inputs(), Assembler, SBV]
+    arch_forms, arch_varmap = SMTForms()(input_aadt_t)
 
     for form in arch_forms:
-        print(form.path_dict)
         assert form.path_dict in forms
 
     if arch_forms[0].path_dict != forms[0]:
-        print("RRRRRRRRRRRRRR")
         #swap the forms and bindings
         arch_forms = list(reversed(arch_forms))
-    else:
-        print("TTTTTTTTTTTTTTT")
-    for form in forms:
-        print(form)
+
     #Check that manually created forms and bindings are consistent
     for form in forms:
         for path, choice in form.items():
@@ -122,7 +106,6 @@ def test_min_pe_mapping():
             assert choice in arch_varmap[match_path]
     for bindings in form_bindings:
         for binding in bindings:
-            print(binding)
             for ir_path, arch_path in binding:
                 assert arch_path in arch_varmap
 
@@ -158,11 +141,13 @@ def test_min_pe_mapping():
             precondition = (form_var == 2**fi).ite(form_condition, precondition)
 
         #Build the constraint
-        general_arch_out = pe(arch_forms[0].value)
-        arch_out0 = SBV[general_arch_out.size](0)
+        output_aadt_t = AssembledADT[PE.get_outputs(), Assembler, SBV]
+        out_width = output_aadt_t.assembler_t(output_aadt_t.adt_t).width
+        arch_out0 = SBV[out_width](0)
         arch_out = arch_out0
         for fi, bindings in enumerate(form_bindings):
-            general_arch_out = pe(arch_forms[fi].value)
+            inputs = aadt_product_to_dict(arch_forms[fi].value)
+            general_arch_out = pe(**inputs)
 
             form_arch_out = arch_out0
             for bi, binding in enumerate(bindings):
@@ -189,6 +174,20 @@ def test_min_pe_mapping():
                 print("Successfully did not find", target)
                 continue
             assert target in (add, sub, and_, nand, or_, nor)
+
+            ##Test that the values found are valid
+            arch_fc = lambda f: gen_sim(f)[3]
+            bounds, binding = extract(solver, Assembler, form_var, binding_var, form_bindings, arch_varmap, arch_fc)
+            assert ("a",) in bounds
+            assert ("b",) in bounds
+            assert 0
+            for a,b in ((Word.random(Word.size),Word.random(Word.size)) for _ in range(16)):
+                gold = target(a=a,b=b)
+                pe_inputs = input_builder(arch_fc, binding, {("a",):a,("b",):b})
+                res = pe_BV(**pe_inputs)
+                assert gold == res
+
+
             print("Successfully found", target)
             form_val = solver.get_value(form_var.value).constant_value()
             binding_val = solver.get_value(binding_var.value).constant_value()
