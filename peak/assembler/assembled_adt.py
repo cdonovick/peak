@@ -280,6 +280,7 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
     def __eq__(self, other):
         cls = type(self)
+        #The bug is here. cls.adt_t (opcode) is different than opcode
         if isinstance(other, cls):
             return self._value_ == other._value_
         elif isinstance(other, cls.bv_type[self._assembler_.width]):

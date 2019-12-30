@@ -1,8 +1,8 @@
 from hwtypes import Product, Sum, Enum, Tuple
-from hwtypes import SMTBitVector, SMTBit
+from hwtypes import SMTBitVector, SMTBit, Bit, BitVector
 from peak.assembler import Assembler
 from peak.assembler import AssembledADT
-from peak.mapper.utils import Unbound, Match, SMTForms, extract, aadt_product_to_dict
+from peak.mapper.utils import Unbound, Match, SMTForms, extract, aadt_product_to_dict, input_builder
 from examples.min_pe.sim import gen_sim
 from functools import reduce
 import pysmt.shortcuts as smt
@@ -34,11 +34,10 @@ targets = (
     shftr,
     shftl,
 )
-Word, Bit, Inst, PE = gen_sim(SBV.get_family())
+Word_smt, Bit_smt, Inst_smt, PE_smt = gen_sim(SBV.get_family())
 
-T = Tuple[Word, Bit]
-S = Sum[Word, T]
-
+T_smt = Tuple[Word_smt, Bit_smt]
+S_smt = Sum[Word_smt, T_smt]
 
 def log2(x):
     #verify it is a power of 2
@@ -47,8 +46,8 @@ def log2(x):
 
 #Manually creating all the forms
 forms = [
-    {("inst","operand_1",):Word},
-    {("inst","operand_1",):T}
+    {("inst","operand_1",):Word_smt},
+    {("inst","operand_1",):T_smt}
 ]
 
 
@@ -61,12 +60,12 @@ form_bindings = [[], []]
 
 form_bindings[0].append([
     (("a",), ("inst","operand_0",)),
-    (("b",), ("inst","operand_1", Word)),
+    (("b",), ("inst","operand_1", Word_smt)),
     (Unbound, ("inst","Opcode",))
 ])
 form_bindings[0].append([
     (("b",), ("inst","operand_0",)),
-    (("a",), ("inst","operand_1", Word)),
+    (("a",), ("inst","operand_1", Word_smt)),
     (Unbound, ("inst","Opcode",))
 ])
 
@@ -75,20 +74,19 @@ form_bindings[0].append([
 #[b -> operand_0, a -> (operand_1, Tuple, 0)]
 form_bindings[1].append([
     (("a",), ("inst","operand_0",)),
-    (("b",), ("inst","operand_1", T, 0)),
-    (Unbound, ("inst","operand_1", T, 1)),
+    (("b",), ("inst","operand_1", T_smt, 0)),
+    (Unbound, ("inst","operand_1", T_smt, 1)),
     (Unbound, ("inst","Opcode",))
 ])
 form_bindings[1].append([
     (("b",), ("inst","operand_0",)),
-    (("a",), ("inst","operand_1", T, 0)),
-    (Unbound,("inst","operand_1", T, 1)),
+    (("a",), ("inst","operand_1", T_smt, 0)),
+    (Unbound,("inst","operand_1", T_smt, 1)),
     (Unbound,("inst","Opcode",))
 ])
 def test_min_pe_mapping():
-
-    pe = PE()
-    input_aadt_t = AssembledADT[PE.get_inputs(), Assembler, SBV]
+    pe_smt = PE_smt()
+    input_aadt_t = AssembledADT[PE_smt.get_inputs(), Assembler, SBV]
     arch_forms, arch_varmap = SMTForms()(input_aadt_t)
 
     for form in arch_forms:
@@ -141,13 +139,13 @@ def test_min_pe_mapping():
             precondition = (form_var == 2**fi).ite(form_condition, precondition)
 
         #Build the constraint
-        output_aadt_t = AssembledADT[PE.get_outputs(), Assembler, SBV]
+        output_aadt_t = AssembledADT[PE_smt.get_outputs(), Assembler, SBV]
         out_width = output_aadt_t.assembler_t(output_aadt_t.adt_t).width
         arch_out0 = SBV[out_width](0)
         arch_out = arch_out0
         for fi, bindings in enumerate(form_bindings):
             inputs = aadt_product_to_dict(arch_forms[fi].value)
-            general_arch_out = pe(**inputs)
+            general_arch_out = pe_smt(**inputs)
 
             form_arch_out = arch_out0
             for bi, binding in enumerate(bindings):
@@ -177,32 +175,12 @@ def test_min_pe_mapping():
 
             ##Test that the values found are valid
             arch_fc = lambda f: gen_sim(f)[3]
+            pe_BV = arch_fc(Bit.get_family())()
             bounds, binding = extract(solver, Assembler, form_var, binding_var, form_bindings, arch_varmap, arch_fc)
             assert ("a",) in bounds
             assert ("b",) in bounds
-            assert 0
-            for a,b in ((Word.random(Word.size),Word.random(Word.size)) for _ in range(16)):
+            for a,b in ((BitVector.random(Word_smt.size),BitVector.random(Word_smt.size)) for _ in range(16)):
                 gold = target(a=a,b=b)
                 pe_inputs = input_builder(arch_fc, binding, {("a",):a,("b",):b})
                 res = pe_BV(**pe_inputs)
                 assert gold == res
-
-
-            print("Successfully found", target)
-            form_val = solver.get_value(form_var.value).constant_value()
-            binding_val = solver.get_value(binding_var.value).constant_value()
-            form_val = log2(form_val)
-            binding_val = log2(binding_val)
-            print("for target", target.__name__)
-            print("form", form_val)
-            print("binding", binding_val)
-            binding = form_bindings[form_val][binding_val]
-            arch_vals = {}
-            for ir_path, arch_path in binding:
-                if ir_path is Unbound:
-                    var = arch_varmap[arch_path]
-                    var_val = solver.get_value(var.value).constant_value()
-                    print(var_val, arch_path)
-                else:
-                    print(ir_path, arch_path)
-

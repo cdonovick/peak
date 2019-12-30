@@ -4,10 +4,13 @@ from peak.assembler import AssembledADTRecursor
 import typing as tp
 from hwtypes import BitVector, Bit, SMTBitVector, SMTBit
 from hwtypes import Product, Sum, Tuple, Enum
+from hwtypes import AbstractBit, AbstractBitVector
 from collections import namedtuple, OrderedDict
 import itertools as it
 from functools import wraps
-
+import inspect
+from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
+from hwtypes.adt_util import rebind_bitvector
 
 class Tag: pass
 class Match: pass
@@ -174,7 +177,6 @@ class SimplifyBinding(AssembledADTRecursor):
         simplified_binding_dict = {}
         for field_name, sub_binding in sub_binding_dict.items():
             simplified_binding = self(aadt_t[field_name],sub_binding)
-            assert simplified_binding is not None
             simplified_binding_dict[field_name] = simplified_binding
             simplify &= len(simplified_binding)==1 and not isinstance(simplified_binding[0][0],tuple)
 
@@ -188,8 +190,8 @@ class SimplifyBinding(AssembledADTRecursor):
             return [(value,())]
         else:
             ret_binding = []
-            for field_name, bs in simplified_binding.items():
-                ret_binding += [(ir_path, (sub_field,) + arch_path) for ir_path, arch_path in simplified_binding]
+            for sub_field, binding in simplified_binding_dict.items():
+                ret_binding += [(ir_path, (sub_field,) + arch_path) for ir_path, arch_path in binding]
             return ret_binding
 
     @check_leaf(required=False)
@@ -206,29 +208,19 @@ def log2(x):
     assert x & (x-1) == 0
     return x.bit_length() - 1
 
-def smt_to_bv(smt_value):
-    value = smt_value.value
-    if not value.is_constant():
-        raise ValueError("SBV is not a constant")
-    if isinstance(smt_value,SMTBit):
-        return Bit(value)
+def solved_to_bv(var, solver):
+    solver_value = solver.get_value(var.value).constant_value()
+    if isinstance(var,SMTBit):
+        return Bit(solver_value)
     else:
-        return BitVector[smt_value.size](value)
+        return BitVector[var.size](solver_value)
 
 #returns a binding where all aadt values are changed to binding
 def smt_binding_to_bv_binding(binding):
     #TODO arch_path types need to be changed to product
     ret_binding = []
     for ir_path, arch_path in binding:
-        if not isinstance(ir_path,tuple):
-            assert isinstance(ir_path, AssembledADT)
-            aadt_t = type(ir_path)
-            adt_t, assembler_t, bv_t = aadt_t.fields
-            assert bv_t is SMTBitVector
-            smt_value = ir_path._value_
-            bv_value = smt_to_bv(smt_value)
-            bv_aadt_t = AssembledADT[adt_t, assembler_t, BitVector]
-            ir_path = bv_aadt_t(bv_value)
+        arch_path = tuple(rebind_type(t,Bit.get_family()) for t in arch_path)
         ret_binding.append((ir_path, arch_path))
     return ret_binding
 
@@ -243,23 +235,20 @@ def extract(solver, Assembler, form_var, binding_var, form_bindings, arch_varmap
     binding_val = log2(binding_val)
     print("form#", form_val)
     print("binding#", binding_val)
-    binding = smt_binding_to_bv_binding(smt_binding)
-    for ip, ap in binding:
-        print(f"  {ip} <=> {ap}")
+    binding = form_bindings[form_val][binding_val]
     res_binding = []
     bounds = set()
     for ir_path, arch_path in binding:
         if ir_path is Unbound:
-            #TODO this needs to be a bitvector
             var = arch_varmap[arch_path]
-            var_val = solver.get_value(var.value).constant_value()
-            ir_path = var_val
+            bv_val = solved_to_bv(var,solver)
+            ir_path = bv_val
         else:
             bounds.add(ir_path)
         res_binding.append((ir_path,arch_path))
-    smt_binding = form_bindings[form_val][binding_val]
-    res_binding = SimplifyBinding()(aadt_t,res_binding)
-    return bounds, res_binding
+    bv_binding = smt_binding_to_bv_binding(res_binding)
+    bv_binding = SimplifyBinding()(aadt_t,bv_binding)
+    return bounds, bv_binding
 
 def aadt_product_to_dict(value : AssembledADT):
     assert isinstance(value, AssembledADT)
@@ -269,13 +258,18 @@ def aadt_product_to_dict(value : AssembledADT):
         ret[field_name] = value[field_name]
     return ret
 
-def input_builder(aadt_t, binding, bound_dict : tp.Mapping["ir_path","BV"]):
+def input_builder(arch_fc, binding, bound_dict : tp.Mapping["ir_path","BV"]):
+    arch = arch_fc(Bit.get_family())
+    input_t = arch.get_inputs()
+    aadt_t = AssembledADT[input_t, Assembler, BitVector]
     arch_bindings = {}
-    complete_binding = list(binding)
+    complete_binding = []
     for ir_path, arch_path in binding:
         if isinstance(ir_path,tuple):
             assert ir_path in bound_dict
             complete_binding.append((bound_dict[ir_path], arch_path))
+        else:
+            complete_binding.append((ir_path,arch_path))
     complete_binding = SimplifyBinding()(aadt_t,complete_binding)
     assert len(complete_binding)==1
     assert complete_binding[0][1] is ()
@@ -286,5 +280,21 @@ def input_builder(aadt_t, binding, bound_dict : tp.Mapping["ir_path","BV"]):
     for field_name, field in aadt_t.adt_t.field_dict.items():
         input_vals[field_name] = input_val[field_name]
     return input_vals
+
+def rebind_type(T, family):
+    def _rebind_bv(T):
+        return rebind_bitvector(T,AbstractBitVector,family.BitVector).rebind(AbstractBit,family.Bit,True)
+    if not inspect.isclass(T):
+        return T
+    elif is_modified(T):
+        return get_modifier(T)(rebind_type(get_unmodified(T),family,dont_rebind,do_rebind,is_magma))
+    elif issubclass(T,AbstractBitVector):
+        return rebind_bitvector(T,AbstractBitVector,family.BitVector)
+    elif issubclass(T,AbstractBit):
+        return family.Bit
+    elif issubclass(T,(Product,Tuple,Sum)):
+        return _rebind_bv(T)
+    else:
+        return T
 
 

@@ -3,12 +3,12 @@ from hwtypes import Product, Sum, Enum, Tuple
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
 from peak import Peak, name_outputs
+from functools import lru_cache
 
+@lru_cache(None)
 def gen_sim(family):
     Word, Bit, Inst  = gen_isa(family)
     T = Tuple[Word, Bit]
-    S = Sum[Word, T]
-
     class PE(Peak):
 
         @end_rewrite()
@@ -19,8 +19,6 @@ def gen_sim(family):
         @name_outputs(out=Word)
         def __call__(self, inst: Inst):
             o0 = inst.operand_0
-            op = inst.Opcode
-
             if inst.operand_1[Word].match:
                 # arith op
                 o1 = inst.operand_1[Word].value
