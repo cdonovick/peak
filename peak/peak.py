@@ -1,15 +1,27 @@
 from collections import OrderedDict
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type
+from hwtypes.adt import Product
 import functools
 
-class Peak:
-    pass
+class PeakMeta(type):
+    @property
+    def input_t(cls):
+        if not hasattr(cls.__call__, '_peak_inputs_'):
+            raise ValueError("Missing type annotations. Did you forget to decorate __call__ with 'name_outputs'")
+        return cls.__call__._peak_inputs_
+
+    @property
+    def output_t(cls):
+        if not hasattr(cls.__call__, '_peak_outputs_'):
+            raise ValueError("Missing type annotations. Did you forget to decorate __call__ with 'name_outputs'")
+        return cls.__call__._peak_outputs_
+
+class Peak(metaclass=PeakMeta): pass
 
 def name_outputs(**outputs):
     """Decorator meant to apply to any function to specify output types
-    The output types will be stored in fn._peak_outputs__
-    The input types will be stored in fn._peak_inputs_
-    The ISA will be stored in fn._peak_isa_
+    The output type will be stored in fn._peak_outputs__
+    The input type will be stored in fn._peak_inputs_
     Will verify that all the inputs have type annotations
     Will also verify that the outputs of running fn will have the correct number of bits
     """
@@ -28,15 +40,16 @@ def name_outputs(**outputs):
             return results
 
         #Set all the outputs
-        call_wrapper._peak_outputs_ = OrderedDict()
+        peak_outputs = OrderedDict()
         for oname,otype in outputs.items():
             if not issubclass(otype, (AbstractBitVector, AbstractBit)):
                 raise TypeError(f"{oname} is not a Bitvector class")
-            call_wrapper._peak_outputs_[oname] = otype
+            peak_outputs[oname] = otype
+        call_wrapper._peak_outputs_ = Product.from_fields("Output",peak_outputs)
 
         #set all the inputs
         arg_offset = 1 if call_fn.__name__ == "__call__" else 0
-        call_wrapper._peak_inputs_ = OrderedDict()
+        peak_inputs = OrderedDict()
         num_inputs = call_fn.__code__.co_argcount
         input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
         in_types = call_fn.__annotations__
@@ -46,18 +59,10 @@ def name_outputs(**outputs):
             in_type_keys.remove("return")
         if set(input_names) != set(in_type_keys):
             raise TypeError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_type_keys)}")
-        isa = []
         for name in input_names:
             input_type= in_types[name]
-            if is_adt_type(input_type):
-                isa.append((name,input_type))
-                continue
-            call_wrapper._peak_inputs_[name] = in_types[name]
-        if len(isa) == 0:
-            raise TypeError("Need to pass peak ISA instruction to __call__")
-        if len(isa) > 1:
-            raise NotImplementedError("Can only pass in single instruction")
-        call_wrapper._peak_isa_ = isa[0]
+            peak_inputs[name] = in_types[name]
+        call_wrapper._peak_inputs_ = Product.from_fields("Input", peak_inputs)
         return call_wrapper
     return decorator
 
