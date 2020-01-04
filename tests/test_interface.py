@@ -1,4 +1,4 @@
-from peak.pe1 import PE, Inst, Bit, Data
+from examples.pe1 import PE, Inst, Bit, Data
 from hwtypes.adt import Product
 
 def test_inputs():
