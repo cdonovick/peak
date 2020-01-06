@@ -14,6 +14,9 @@ from hwtypes.adt_util import rebind_bitvector
 import pysmt.shortcuts as smt
 import typing as tp
 
+from ast_tools.passes import begin_rewrite, end_rewrite
+from ast_tools.passes import ssa, bool_to_bit, if_to_phi
+
 class Match: pass
 class Unbound: pass
 Form = namedtuple("Form", ["value", "path_dict", "varmap"])
@@ -345,4 +348,5 @@ def pretty_print_binding(binding):
     for ir_path, arch_path in binding:
         print(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
     print(")")
+
 

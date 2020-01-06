@@ -3,6 +3,11 @@ from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, 
 from hwtypes.adt import Product
 import functools
 from inspect import isclass
+from hwtypes import SMTBit
+from ast_tools.passes import begin_rewrite, end_rewrite
+from ast_tools.passes import ssa, bool_to_bit, if_to_phi
+
+
 
 class PeakMeta(type):
     @property
@@ -87,4 +92,21 @@ def family_closure(f):
 
 class PeakNotImplementedError(NotImplementedError):
     pass
+
+
+#This will update the call function of peak appropriately for automapping
+#Needs to be called from within the family_closure function
+def update_peak(peak_cls, family):
+    if family is SMTBit.get_family():
+        call = peak_cls.__call__
+        for dec in (
+            begin_rewrite(),
+            ssa(),
+            bool_to_bit(),
+            if_to_phi(family.Bit.ite),
+            end_rewrite()
+        ):
+            call = dec(call)
+        peak_cls.__call__ = call
+    return peak_cls
 
