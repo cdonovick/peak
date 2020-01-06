@@ -8,6 +8,7 @@ from examples.smallir import gen_SmallIR
 from examples.alu import gen_alu
 import pytest
 from random import randint
+from peak.mapper.utils import rebind_type
 
 def rand_value(width):
     return randint(0,2**width-1)
@@ -35,6 +36,13 @@ def test_add_peak_instruction():
     assert "Simple" in ir.instructions
     Simple_fc = ir.instructions["Simple"]
     Simple = Simple_fc(Bit.get_family())
+    InputBV = rebind_type(Input, Bit.get_family())
+    OutputBV = rebind_type(Output, Bit.get_family())
+    for name, t in InputBV.field_dict.items():
+        assert Simple.input_t.field_dict[name] is t
+    for name, t in OutputBV.field_dict.items():
+        assert Simple.output_t.field_dict[name] is t
+
     simple = Simple()
     BV16 = BitVector[16]
     x,y = simple(BV16(5),BV16(6),Bit(1))
@@ -51,7 +59,7 @@ def test_smallir(family, args):
 
     #IR
     ir = gen_SmallIR(16)
-
+    
     for name, fun in (
         ("Add",  lambda x, y: x+y),
         ("Sub",  lambda x, y: x-y),

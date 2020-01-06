@@ -4,6 +4,7 @@ from hwtypes.adt import Product
 from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
 from .peak import Peak, name_outputs
 import itertools as it
+from peak.mapper.utils import rebind_type
 
 class IR:
     def __init__(self):
@@ -31,9 +32,11 @@ class IR:
                 t_to_tname[t] = f"t{idx}"
                 idx +=1
         class_src = f"def peak_fc(family):\n"
+        for t,tname in t_to_tname.items():
+            class_src += f"{ts(1)}_{tname} = _rebind_type({tname}, family)\n"
         class_src += f"{ts(1)}class {name}(Peak):\n"
-        output_types = ", ".join([f"{field} = {t_to_tname[t]}" for field,t in outputs.items()])
-        input_types = ", ".join([f"{field} : {t_to_tname[t]}" for field,t in inputs.items()])
+        output_types = ", ".join([f"{field} = _{t_to_tname[t]}" for field,t in outputs.items()])
+        input_types = ", ".join([f"{field} : _{t_to_tname[t]}" for field,t in inputs.items()])
         fun_call = "family, " + ", ".join(inputs.keys())
         class_src += f"{ts(2)}@name_outputs({output_types})\n"
         class_src += f"{ts(2)}def __call__(self, {input_types}):\n"
@@ -45,7 +48,8 @@ class IR:
         exec_gs.update(dict(
             Peak=Peak,
             name_outputs=name_outputs,
-            _fun_=fun
+            _fun_=fun,
+            _rebind_type=rebind_type
         ))
         exec(class_src,exec_gs,exec_ls)
         peak_fc = exec_ls["peak_fc"]
