@@ -1,13 +1,13 @@
 from hwtypes import Bit, BitVector
 from peak.mapper.utils import pretty_print_binding
 from peak.mapper import ArchMapper
-from examples.min_pe.sim import gen_sim
+from examples.min_pe.sim import PE_fc
 from examples.smallir import gen_SmallIR
 
 num_test_vectors = 16
-def test_min_pe_auto():
+def test_automapper():
     IR = gen_SmallIR(8)
-    arch_fc = lambda f: gen_sim(f)[3]
+    arch_fc = PE_fc
     arch_bv = arch_fc(Bit.get_family())
     arch_mapper = ArchMapper(arch_fc)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
@@ -29,5 +29,3 @@ def test_min_pe_auto():
             ir_inputs = solution.build_ir_input(ir_vals)
             arch_inputs = solution.build_arch_input(ir_vals)
             assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)
-
-test_min_pe_auto()
