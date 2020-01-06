@@ -7,12 +7,13 @@ from .assembler_abc import AssemblerMeta
 from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum, Sum, Product, Tuple
 from hwtypes import AbstractBitVector, AbstractBit
 from hwtypes.adt_meta import BoundMeta
+import abc
 
 
 from .assembler_util import _issubclass
 
 class _MISSING: pass
-
+class Tag: pass
 
 RESERVED_NAMES = frozenset({
     'adt_t',
@@ -244,14 +245,18 @@ class AssembledADT(metaclass=AssembledADTMeta):
                 field = self._value_[sub.idx][0]
             else:
                 field = cls[key](self._value_[sub.idx])
-        else:
+        elif key is Tag and not _issubclass(cls.adt_t, Sum):
+            raise KeyError(f"can only get tag from Sum types")
+        elif not key is Tag:
             raise KeyError(key)
 
         if not _issubclass(cls.adt_t, Sum):
             return field
-
         tag = self._value_[self._assembler_.sub.tag_idx]
         # if key is an assembled adt class just grab the type from it
+        if key is Tag:
+            return tag
+
         if _issubclass(key, AssembledADT):
             T = key.adt_t
         else:
@@ -279,6 +284,7 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
     def __eq__(self, other):
         cls = type(self)
+        #The bug is here. cls.adt_t (opcode) is different than opcode
         if isinstance(other, cls):
             return self._value_ == other._value_
         elif isinstance(other, cls.bv_type[self._assembler_.width]):
@@ -291,3 +297,36 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
     def __ne__(cls, other):
         return ~(cls == other)
+
+class AssembledADTRecursor:
+    def __call__(self, aadt_t, *args, **kwargs):
+        if (issubclass(aadt_t, AbstractBit) or issubclass(aadt_t, AbstractBitVector)):
+            return self.bv(aadt_t,*args,**kwargs)
+        adt_t = aadt_t.adt_t
+        if issubclass(adt_t, Enum):
+            return self.enum(aadt_t, *args, **kwargs)
+        elif issubclass(adt_t, Sum):
+            return self.sum(aadt_t, *args, **kwargs)
+        elif issubclass(adt_t, Product):
+            return self.product(aadt_t, *args, **kwargs)
+        elif issubclass(adt_t, Tuple):
+            return self.tuple(aadt_t, *args, **kwargs)
+        else:
+            raise ValueError("Unreachable")
+
+    @abc.abstractmethod
+    def bv(self):
+        return
+
+    @abc.abstractmethod
+    def enum(self):
+        return
+
+    @abc.abstractmethod
+    def sum(self):
+        return
+
+    @abc.abstractmethod
+    def product(self):
+        return
+
