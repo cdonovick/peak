@@ -35,6 +35,7 @@ def test_add_peak_instruction():
 
     assert "Simple" in ir.instructions
     Simple_fc = ir.instructions["Simple"]
+    assert hasattr(Simple_fc,"_is_fc") and Simple_fc._is_fc
     Simple = Simple_fc(Bit.get_family())
     InputBV = rebind_type(Input, Bit.get_family())
     OutputBV = rebind_type(Output, Bit.get_family())

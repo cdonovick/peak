@@ -2,7 +2,7 @@ from collections import namedtuple
 import typing as tp
 from hwtypes.adt import Product
 from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
-from .peak import Peak, name_outputs
+from .peak import Peak, name_outputs, family_closure
 import itertools as it
 from peak.mapper.utils import rebind_type
 
@@ -31,7 +31,8 @@ class IR:
             if not t in t_to_tname:
                 t_to_tname[t] = f"t{idx}"
                 idx +=1
-        class_src = f"def peak_fc(family):\n"
+        class_src = f"@_family_closure\n"
+        class_src += f"def peak_fc(family):\n"
         for t,tname in t_to_tname.items():
             class_src += f"{ts(1)}_{tname} = _rebind_type({tname}, family)\n"
         class_src += f"{ts(1)}class {name}(Peak):\n"
@@ -49,7 +50,8 @@ class IR:
             Peak=Peak,
             name_outputs=name_outputs,
             _fun_=fun,
-            _rebind_type=rebind_type
+            _rebind_type=rebind_type,
+            _family_closure=family_closure
         ))
         exec(class_src,exec_gs,exec_ls)
         peak_fc = exec_ls["peak_fc"]
