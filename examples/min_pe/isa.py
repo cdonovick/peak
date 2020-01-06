@@ -3,7 +3,7 @@ from hwtypes import new_instruction
 from functools import lru_cache
 
 @lru_cache(None)
-def gen_isa(family):
+def ISA_fc(family):
     Word = family.BitVector[8]
     Bit  = family.BitVector[1]
 

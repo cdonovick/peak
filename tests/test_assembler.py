@@ -2,7 +2,7 @@ from peak.assembler.assembler import Assembler
 from examples.demo_pes.pe5.isa import INST as pe5_isa
 from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
-from examples.min_pe.isa import gen_isa as gen_min_isa
+from examples.min_pe.isa import ISA_fc as gen_min_isa
 from hwtypes import AbstractBitVector
 from hwtypes.adt import Enum, Product, Tuple, Sum
 from hwtypes.adt import new_instruction

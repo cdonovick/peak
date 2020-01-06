@@ -1,13 +1,12 @@
-from .isa import gen_isa
+from .isa import ISA_fc
 from hwtypes import Product, Sum, Enum, Tuple
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
-from peak import Peak, name_outputs
-from functools import lru_cache
+from peak import Peak, name_outputs, family_closure
 
-@lru_cache(None)
-def gen_sim(family):
-    Word, Bit, Inst  = gen_isa(family)
+@family_closure
+def PE_fc(family):
+    Word, Bit, Inst  = ISA_fc(family)
     T = Tuple[Word, Bit]
     class PE(Peak):
 
@@ -37,4 +36,4 @@ def gen_sim(family):
                     res = o0 | o1
                 return b.ite(~res, res)
 
-    return Word, Bit, Inst, PE
+    return PE
