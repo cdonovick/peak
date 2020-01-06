@@ -2,6 +2,7 @@ from collections import OrderedDict
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type
 from hwtypes.adt import Product
 import functools
+from inspect import isclass
 
 class PeakMeta(type):
     @property
@@ -66,7 +67,24 @@ def name_outputs(**outputs):
         return call_wrapper
     return decorator
 
+#This decorator does the following:
+#1) Caches the function call
+#2) Stores the family closure in Peak._fc_
+def family_closure(f):
+    num_inputs = f.__code__.co_argcount
+    if num_inputs != 1:
+        raise ValueError("Family Closure must take a single input 'family'")
+    @functools.lru_cache(None)
+    @functools.wraps(f)
+    def fc(family):
+        cls = f(family)
+        if not (isclass(cls) and issubclass(cls,Peak)):
+            raise ValueError("Family closure must return a peak class")
+        cls._fc_ = fc
+        return cls
+    fc._is_fc = True
+    return fc
+
 class PeakNotImplementedError(NotImplementedError):
     pass
-
 
