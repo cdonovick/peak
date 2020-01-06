@@ -1,5 +1,8 @@
 from examples.pe1 import PE, Inst, Bit, Data
 from hwtypes.adt import Product
+from hwtypes import BitVector, SMTBitVector
+from peak import Peak, name_outputs, family_closure
+import pytest
 
 def test_inputs():
     #Expected inputs
@@ -23,3 +26,43 @@ def test_outputs():
         assert oname == expected_names[i]
         assert otype == expected_types[i]
 
+def test_family_closure():
+    #family_closure needs single argument
+    with pytest.raises(ValueError):
+        @family_closure
+        def fc(family,otherarg):
+            class A(Peak): pass
+            return A
+
+    #family_closure needs to return a peak class
+    with pytest.raises(ValueError):
+        @family_closure
+        def fc(family):
+            return 5
+        cls = fc(Bit.get_family())
+
+    #family_closure needs to return only a peak class
+    with pytest.raises(ValueError):
+        @family_closure
+        def fc(family):
+            class A(Peak): pass
+            return A, 5
+        cls,val = fc(Bit.get_family())
+
+    @family_closure
+    def PE_fc(family):
+        Word = family.BitVector[16]
+        class PE(Peak):
+            @name_outputs(out=Word)
+            def __call__(self,in0:Word,in1:Word):
+                return in0 + in1
+        return PE
+
+    assert hasattr(PE_fc,"_is_fc") and PE_fc._is_fc is True
+
+    for family in (BitVector.get_family(), SMTBitVector.get_family()):
+        #Test caching
+        assert PE_fc(family) is PE_fc(family)
+
+        #Test storing the family closure in the Peak class
+        assert PE_fc(family)._fc_ is PE_fc
