@@ -1,7 +1,7 @@
 from peak.assembler import Assembler
 from peak.assembler import AssembledADT
 from peak.assembler import AssembledADTRecursor
-from peak.assembler import Tag
+from peak.assembler import _TAG
 from hwtypes import BitVector, Bit, SMTBitVector, SMTBit
 from hwtypes import Product, Sum, Tuple
 from hwtypes import AbstractBit, AbstractBitVector
@@ -60,20 +60,19 @@ class SMTForms(AssembledADTRecursor):
     def sum(self, aadt_t, path, value):
         adt_t, assembler_t, bv_t = aadt_t.fields
         assembler = assembler_t(adt_t)
-        #Create Tag
+        #Create _TAG
         if value is None:
             tag = SMTBitVector[assembler.tag_width]()
         else:
-            tag = value[Tag]
+            tag = value[_TAG]
 
         forms = []
         varmap = {}
-        varmap[path + (Tag, )] = tag
+        varmap[path + (_TAG, )] = tag
         varmap[path + (Match, )] = {}
         for field in adt_t.fields:
-            field_tag_value = assembler.assemble_tag(field, bv_t)
-            tag_match = (tag==field_tag_value)
-            varmap[path + (Match, )][field] = tag_match
+            #field_tag_value = assembler.assemble_tag(field, bv_t)
+            #tag_match = (tag==field_tag_value)
             sub_aadt_t = aadt_t[field]
             if value is None:
                 sub_value = None
@@ -84,8 +83,12 @@ class SMTForms(AssembledADTRecursor):
             for sub_form in sub_forms:
                 assert path not in sub_form.path_dict
                 path_dict = {path:field, **sub_form.path_dict}
-                form_value = aadt_t.from_fields(field, sub_form.value, tag_bv=tag)
+                if value is None:
+                    form_value = aadt_t.from_fields(field, sub_form.value, tag_bv=tag)
+                else:
+                    form_value = value
                 forms.append(Form(value=form_value, path_dict=path_dict, varmap=sub_form.varmap))
+            varmap[path + (Match, )][field] = forms[0].value[field].match
             varmap.update(sub_varmap)
         return forms, varmap
 

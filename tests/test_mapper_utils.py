@@ -1,4 +1,4 @@
-from peak.mapper.utils import Tag, Match, SMTForms
+from peak.mapper.utils import _TAG, Match, SMTForms
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import  AssembledADT
 from hwtypes import SMTBitVector as SBV, SMTBit as SBit
@@ -26,7 +26,7 @@ def test_SMTForms():
         (0, A,'b'),
         (0, SBV[8]),
         (0, SBit),
-        (0, Tag),
+        (0, _TAG),
         (0, Match),
         (1,'a'),
         (1,'b'),
