@@ -1,14 +1,14 @@
 from examples.pe1 import PE, Inst, Bit, Data
-
+from hwtypes.adt import Product
 
 def test_inputs():
     #Expected inputs
-    expected_names = ["data0", "data1", "bit0", "bit1", "bit2", "clk_en"]
-    expected_types = [Data,Data,Bit,Bit,Bit,Bit]
+    expected_names = ["inst", "data0", "data1", "bit0", "bit1", "bit2", "clk_en"]
+    expected_types = [Inst,Data,Data,Bit,Bit,Bit,Bit]
 
-    assert hasattr(PE.__call__,"_peak_inputs_")
-    inputs = PE.__call__._peak_inputs_
-    for i, (iname,itype) in enumerate(inputs.items()):
+    input_t = PE.input_t
+    assert issubclass(input_t, Product)
+    for i, (iname,itype) in enumerate(input_t.field_dict.items()):
         assert iname == expected_names[i]
         assert itype == expected_types[i]
 
@@ -17,13 +17,9 @@ def test_outputs():
     expected_names = ["alu_res", "res_p", "irq"]
     expected_types = [Data,Bit,Bit]
 
-    assert hasattr(PE.__call__,"_peak_outputs_")
-    outputs = PE.__call__._peak_outputs_
-    for i, (oname,otype) in enumerate(outputs.items()):
+    output_t = PE.output_t
+    assert issubclass(output_t, Product)
+    for i, (oname,otype) in enumerate(output_t.field_dict.items()):
         assert oname == expected_names[i]
         assert otype == expected_types[i]
 
-def test_isa():
-    assert hasattr(PE.__call__,"_peak_isa_")
-    isa = PE.__call__._peak_isa_
-    assert isa == ("inst",Inst)
