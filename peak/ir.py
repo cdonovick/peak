@@ -5,6 +5,7 @@ from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
 from .peak import Peak, name_outputs
 import itertools as it
 
+_TAB_SIZE = 4
 class IR:
     def __init__(self):
         #Stores a list of instructions (name : family_closure)
@@ -20,25 +21,23 @@ class IR:
         #Assuming for now that abstract bitvectors are used in the interfaces
         inputs = input_interface.field_dict
         outputs = output_interface.field_dict
-
-        def ts(n):
-            assert n>0
-            return "".join(["    " for _ in range(n)])
+        tab = ' '*_TAB_SIZE
         t_to_tname = {}
         idx = 0
         for t in it.chain(inputs.values(),outputs.values()):
             if not t in t_to_tname:
                 t_to_tname[t] = f"t{idx}"
                 idx +=1
-        class_src = f"def peak_fc(family):\n"
-        class_src += f"{ts(1)}class {name}(Peak):\n"
+        class_src = [f"def peak_fc(family):"]
+        class_src.append(f"{tab*1}class {name}(Peak):")
         output_types = ", ".join([f"{field} = {t_to_tname[t]}" for field,t in outputs.items()])
         input_types = ", ".join([f"{field} : {t_to_tname[t]}" for field,t in inputs.items()])
         fun_call = "family, " + ", ".join(inputs.keys())
-        class_src += f"{ts(2)}@name_outputs({output_types})\n"
-        class_src += f"{ts(2)}def __call__(self, {input_types}):\n"
-        class_src += f"{ts(3)}return _fun_({fun_call})\n"
-        class_src += f"{ts(1)}return {name}\n"
+        class_src.append(f"{tab*2}@name_outputs({output_types})")
+        class_src.append(f"{tab*2}def __call__(self, {input_types}):")
+        class_src.append(f"{tab*3}return _fun_({fun_call})")
+        class_src.append(f"{tab*1}return {name}")
+        class_src = '\n'.join(class_src)
         exec_ls = {}
         #add all the types to globals
         exec_gs = {tname:t for t,tname in t_to_tname.items()}
