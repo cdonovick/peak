@@ -44,7 +44,7 @@ Form 1:
      ('b',) -> Bit
 
 Form 2:
-  sum choices: [('a',) -> T]
+  sum choices: [('a',) -> T2]
   leaf nodes:
      ('a', T2) -> T2
      ('b',) -> Bit
@@ -59,7 +59,7 @@ For example:
 
 class PE(Peak):
    @name_outputs(o1=T3,o2=T4)
-   def __call__(self, a=T1,b=T2):
+   def __call__(self, a : T1, b : T2):
       ...
 
 PE.input_t would be equivelent to:
