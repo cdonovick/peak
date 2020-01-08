@@ -45,9 +45,9 @@ class SMTMapper:
             output = Peak_cls()(**inputs)
             if isinstance(output,tuple):
                 ofields = {field:output[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
-                output = output_aadt_t.from_fields(**ofields)
             else:
-                output = output_aadt_t(output)
+                ofields = {field:output for field in output_aadt_t.adt_t.field_dict}
+            output = output_aadt_t.from_fields(**ofields)
 
             forms, output_varmap = SMTForms()(output_aadt_t, value=output)
             #Check consistency of SMTForms
