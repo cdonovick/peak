@@ -10,7 +10,7 @@ import itertools as it
 from functools import wraps
 import inspect
 from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
-from hwtypes.adt_util import rebind_bitvector
+from hwtypes.adt_util import rebind_type
 import pysmt.shortcuts as smt
 import typing as tp
 
@@ -270,22 +270,6 @@ def aadt_product_to_dict(value : AssembledADT):
     for field_name in aadt_t.adt_t.field_dict:
         ret[field_name] = value[field_name]
     return ret
-
-def rebind_type(T, family):
-    def _rebind_bv(T):
-        return rebind_bitvector(T, AbstractBitVector, family.BitVector).rebind(AbstractBit, family.Bit, True)
-    if not inspect.isclass(T):
-        return T
-    elif is_modified(T):
-        return get_modifier(T)(rebind_type(get_unmodified(T), family, dont_rebind, do_rebind, is_magma))
-    elif issubclass(T, AbstractBitVector):
-        return rebind_bitvector(T, AbstractBitVector, family.BitVector)
-    elif issubclass(T, AbstractBit):
-        return family.Bit
-    elif issubclass(T, (Product, Tuple, Sum)):
-        return _rebind_bv(T)
-    else:
-        return T
 
 def _sort_by_t(path2t : tp.Mapping[tuple, "adt"]) ->tp.Mapping["adt", tp.List[tuple]]:
 

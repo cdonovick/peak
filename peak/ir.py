@@ -31,9 +31,11 @@ class IR:
                 idx +=1
 
         class_src = [f"def peak_fc(family):"]
+        for t,tname in t_to_tname.items():
+            class_src.append(f"{tab*1}_{tname} = _rebind_type({tname}, family)")
         class_src.append(f"{tab*1}class {name}(Peak):")
-        output_types = ", ".join([f"{field} = {t_to_tname[t]}" for field,t in outputs.items()])
-        input_types = ", ".join([f"{field} : {t_to_tname[t]}" for field,t in inputs.items()])
+        output_types = ", ".join([f"{field} = _{t_to_tname[t]}" for field,t in outputs.items()])
+        input_types = ", ".join([f"{field} : _{t_to_tname[t]}" for field,t in inputs.items()])
         fun_call = "family, " + ", ".join(inputs.keys())
         class_src.append(f"{tab*2}@name_outputs({output_types})")
         class_src.append(f"{tab*2}def __call__(self, {input_types}):")
