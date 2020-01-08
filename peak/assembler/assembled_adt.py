@@ -13,7 +13,7 @@ import abc
 from .assembler_util import _issubclass
 
 class _MISSING: pass
-class Tag: pass
+class _TAG: pass
 
 RESERVED_NAMES = frozenset({
     'adt_t',
@@ -245,16 +245,16 @@ class AssembledADT(metaclass=AssembledADTMeta):
                 field = self._value_[sub.idx][0]
             else:
                 field = cls[key](self._value_[sub.idx])
-        elif key is Tag and not _issubclass(cls.adt_t, Sum):
+        elif key is _TAG and not _issubclass(cls.adt_t, Sum):
             raise KeyError(f"can only get tag from Sum types")
-        elif not key is Tag:
+        elif not key is _TAG:
             raise KeyError(key)
 
         if not _issubclass(cls.adt_t, Sum):
             return field
         tag = self._value_[self._assembler_.sub.tag_idx]
         # if key is an assembled adt class just grab the type from it
-        if key is Tag:
+        if key is _TAG:
             return tag
 
         if _issubclass(key, AssembledADT):

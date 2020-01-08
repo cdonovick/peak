@@ -1,3 +1,3 @@
 from .assembler import *
-from .assembled_adt import AssembledADT, AssembledADTRecursor, Tag
+from .assembled_adt import AssembledADT, AssembledADTRecursor, _TAG
 

@@ -1,7 +1,7 @@
 from peak.assembler import Assembler
 from peak.assembler import AssembledADT
 from peak.assembler import AssembledADTRecursor
-from peak.assembler import Tag
+from peak.assembler import _TAG
 from hwtypes import BitVector, Bit, SMTBitVector, SMTBit
 from hwtypes import Product, Sum, Tuple
 from hwtypes import AbstractBit, AbstractBitVector
@@ -10,7 +10,7 @@ import itertools as it
 from functools import wraps
 import inspect
 from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
-from hwtypes.adt_util import rebind_bitvector
+from hwtypes.adt_util import rebind_type
 import pysmt.shortcuts as smt
 import typing as tp
 
@@ -63,20 +63,19 @@ class SMTForms(AssembledADTRecursor):
     def sum(self, aadt_t, path, value):
         adt_t, assembler_t, bv_t = aadt_t.fields
         assembler = assembler_t(adt_t)
-        #Create Tag
+        #Create _TAG
         if value is None:
             tag = SMTBitVector[assembler.tag_width]()
         else:
-            tag = value[Tag]
+            tag = value[_TAG]
 
         forms = []
         varmap = {}
-        varmap[path + (Tag, )] = tag
+        varmap[path + (_TAG, )] = tag
         varmap[path + (Match, )] = {}
         for field in adt_t.fields:
-            field_tag_value = assembler.assemble_tag(field, bv_t)
-            tag_match = (tag==field_tag_value)
-            varmap[path + (Match, )][field] = tag_match
+            #field_tag_value = assembler.assemble_tag(field, bv_t)
+            #tag_match = (tag==field_tag_value)
             sub_aadt_t = aadt_t[field]
             if value is None:
                 sub_value = None
@@ -87,8 +86,12 @@ class SMTForms(AssembledADTRecursor):
             for sub_form in sub_forms:
                 assert path not in sub_form.path_dict
                 path_dict = {path:field, **sub_form.path_dict}
-                form_value = aadt_t.from_fields(field, sub_form.value, tag_bv=tag)
+                if value is None:
+                    form_value = aadt_t.from_fields(field, sub_form.value, tag_bv=tag)
+                else:
+                    form_value = value
                 forms.append(Form(value=form_value, path_dict=path_dict, varmap=sub_form.varmap))
+            varmap[path + (Match, )][field] = forms[0].value[field].match
             varmap.update(sub_varmap)
         return forms, varmap
 
@@ -270,22 +273,6 @@ def aadt_product_to_dict(value : AssembledADT):
     for field_name in aadt_t.adt_t.field_dict:
         ret[field_name] = value[field_name]
     return ret
-
-def rebind_type(T, family):
-    def _rebind_bv(T):
-        return rebind_bitvector(T, AbstractBitVector, family.BitVector).rebind(AbstractBit, family.Bit, True)
-    if not inspect.isclass(T):
-        return T
-    elif is_modified(T):
-        return get_modifier(T)(rebind_type(get_unmodified(T), family, dont_rebind, do_rebind, is_magma))
-    elif issubclass(T, AbstractBitVector):
-        return rebind_bitvector(T, AbstractBitVector, family.BitVector)
-    elif issubclass(T, AbstractBit):
-        return family.Bit
-    elif issubclass(T, (Product, Tuple, Sum)):
-        return _rebind_bv(T)
-    else:
-        return T
 
 def _sort_by_t(path2t : tp.Mapping[tuple, "adt"]) ->tp.Mapping["adt", tp.List[tuple]]:
 
