@@ -38,7 +38,7 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
                 if type(value) == m.Out(inst_type):
                     wire_inst_fields(getattr(io, key), getattr(pe, key),
                                      layout)
-                elif value.isoutput():
+                elif value.is_output():
                     getattr(pe, key) <= getattr(io, key)
                 else:
                     getattr(io, key) <= getattr(pe, key)
