@@ -25,7 +25,7 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
                 end = value[1]
                 region = wrapper_inst[begin:end]
                 field = getattr(pe_inst, key)
-                if isinstance(type(field), m._BitKind):
+                if issubclass(type(field), m.Digital):
                     region = m.bit(region)
                 m.wire(region, field)
 
