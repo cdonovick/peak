@@ -1,6 +1,6 @@
 import typing as tp
 import itertools as it
-from peak import Peak
+from peak import Peak, family_closure
 from hwtypes.adt import Product
 from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
@@ -14,6 +14,7 @@ from .utils import solved_to_bv, log2
 from .utils import smt_binding_to_bv_binding
 from .utils import pretty_print_binding
 
+
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
 from collections import OrderedDict
@@ -26,7 +27,7 @@ and_reduce = partial(reduce, operator.and_)
 
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
-        if not (hasattr(peak_fc,"_is_fc") and peak_fc._is_fc):
+        if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
         Peak_cls = peak_fc(SMTBit.get_family())
         input_t = Peak_cls.input_t
@@ -43,7 +44,7 @@ class SMTMapper:
 
             #Construct output_aadt value
             output = Peak_cls()(**inputs)
-            if isinstance(output,tuple):
+            if isinstance(output, tuple):
                 ofields = {field:output[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
             else:
                 ofields = {field:output for field in output_aadt_t.adt_t.field_dict}

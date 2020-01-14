@@ -33,11 +33,11 @@ def name_outputs(**outputs):
     """
     def decorator(call_fn):
         @functools.wraps(call_fn)
-        def call_wrapper(*args,**kwargs):
-            results = call_fn(*args,**kwargs)
-            single_output = not isinstance(results,tuple)
+        def call_wrapper(*args, **kwargs):
+            results = call_fn(*args, **kwargs)
+            single_output = not isinstance(results, tuple)
             if single_output:
-                results = (results,)
+                results = (results, )
             for i, (oname, otype) in enumerate(outputs.items()):
                 if not isinstance(results[i], otype):
                     raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
@@ -47,11 +47,11 @@ def name_outputs(**outputs):
 
         #Set all the outputs
         peak_outputs = OrderedDict()
-        for oname,otype in outputs.items():
+        for oname, otype in outputs.items():
             if not issubclass(otype, (AbstractBitVector, AbstractBit)):
                 raise TypeError(f"{oname} is not a Bitvector class")
             peak_outputs[oname] = otype
-        call_wrapper._peak_outputs_ = Product.from_fields("Output",peak_outputs)
+        call_wrapper._peak_outputs_ = Product.from_fields("Output", peak_outputs)
 
         #set all the inputs
         arg_offset = 1 if call_fn.__name__ == "__call__" else 0
@@ -75,20 +75,25 @@ def name_outputs(**outputs):
 #This decorator does the following:
 #1) Caches the function call
 #2) Stores the family closure in Peak._fc_
-def family_closure(f):
-    num_inputs = f.__code__.co_argcount
-    if num_inputs != 1:
-        raise ValueError("Family Closure must take a single input 'family'")
-    @functools.lru_cache(None)
-    @functools.wraps(f)
-    def fc(family):
-        cls = f(family)
-        if not (isclass(cls) and issubclass(cls,Peak)):
-            raise ValueError("Family closure must return a peak class")
-        cls._fc_ = fc
+class family_closure:
+    def __init__(self, f):
+        self.f = f
+
+        num_inputs = f.__code__.co_argcount
+        if num_inputs != 1:
+            raise SyntaxError("Family Closure must take a single input 'family'")
+        functools.update_wrapper(self, f)
+        self.cache = {}
+
+    def __call__(self, family):
+        if family in self.cache:
+            return self.cache[family]
+        cls = self.f(family)
+        if not (isclass(cls) and issubclass(cls, Peak)):
+            raise SyntaxError("Family closure must return a peak class")
+        cls._fc_ = self
+        self.cache[family] = cls
         return cls
-    fc._is_fc = True
-    return fc
 
 class PeakNotImplementedError(NotImplementedError):
     pass
@@ -104,8 +109,7 @@ def update_peak(peak_cls, family):
             ssa(),
             bool_to_bit(),
             if_to_phi(family.Bit.ite),
-            end_rewrite()
-        ):
+            end_rewrite()):
             call = dec(call)
         peak_cls.__call__ = call
     return peak_cls

@@ -25,7 +25,7 @@ def test_assembler_disassembler(isa, bv_type):
         assert isinstance(opcode, bv_type[assembler.width])
         assert assembler.disassemble(opcode) == inst
 
-        for name,field in isa.field_dict.items():
+        for name, field in isa.field_dict.items():
             sub_assembler = Assembler(field)
             if issubclass(isa, Sum):
                 assert assembler.sub[field].asm is sub_assembler
