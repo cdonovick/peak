@@ -91,7 +91,8 @@ class family_closure:
         cls = self.f(family)
         if not (isclass(cls) and issubclass(cls, Peak)):
             warnings.warn("Family closure should return a single Peak class")
-        cls._fc_ = self
+        else:
+            cls._fc_ = self
         self.cache[family] = cls
         return cls
 
