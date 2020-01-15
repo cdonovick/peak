@@ -2,6 +2,12 @@ from collections import OrderedDict
 from hwtypes import TypeFamily, AbstractBitVector, AbstractBit, BitVector, Bit, is_adt_type
 from hwtypes.adt import Product
 import functools
+from inspect import isclass
+from hwtypes import SMTBit
+from ast_tools.passes import begin_rewrite, end_rewrite
+from ast_tools.passes import ssa, bool_to_bit, if_to_phi
+import warnings
+
 
 class PeakMeta(type):
     @property
@@ -27,9 +33,9 @@ def name_outputs(**outputs):
     """
     def decorator(call_fn):
         @functools.wraps(call_fn)
-        def call_wrapper(*args,**kwargs):
-            results = call_fn(*args,**kwargs)
-            single_output = not isinstance(results,tuple)
+        def call_wrapper(*args, **kwargs):
+            results = call_fn(*args, **kwargs)
+            single_output = not isinstance(results, tuple)
             if single_output:
                 results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
@@ -41,11 +47,11 @@ def name_outputs(**outputs):
 
         #Set all the outputs
         peak_outputs = OrderedDict()
-        for oname,otype in outputs.items():
+        for oname, otype in outputs.items():
             if not issubclass(otype, (AbstractBitVector, AbstractBit)):
                 raise TypeError(f"{oname} is not a Bitvector class")
             peak_outputs[oname] = otype
-        call_wrapper._peak_outputs_ = Product.from_fields("Output",peak_outputs)
+        call_wrapper._peak_outputs_ = Product.from_fields("Output", peak_outputs)
 
         #set all the inputs
         arg_offset = 1 if call_fn.__name__ == "__call__" else 0
@@ -66,7 +72,46 @@ def name_outputs(**outputs):
         return call_wrapper
     return decorator
 
+#This decorator does the following:
+#1) Caches the function call
+#2) Stores the family closure in Peak._fc_
+class family_closure:
+    def __init__(self, f):
+        self.f = f
+
+        num_inputs = f.__code__.co_argcount
+        if num_inputs != 1:
+            warnings.warn("Family Closure should take a single input 'family'")
+        functools.update_wrapper(self, f)
+        self.cache = {}
+
+    def __call__(self, family):
+        if family in self.cache:
+            return self.cache[family]
+        cls = self.f(family)
+        if not (isclass(cls) and issubclass(cls, Peak)):
+            warnings.warn("Family closure should return a single Peak class")
+        else:
+            cls._fc_ = self
+        self.cache[family] = cls
+        return cls
+
 class PeakNotImplementedError(NotImplementedError):
     pass
 
+
+#This will update the call function of peak appropriately for automapping
+#Needs to be called from within the family_closure function
+def update_peak(peak_cls, family):
+    if family is SMTBit.get_family():
+        call = peak_cls.__call__
+        for dec in (
+            begin_rewrite(),
+            ssa(),
+            bool_to_bit(),
+            if_to_phi(family.Bit.ite),
+            end_rewrite()):
+            call = dec(call)
+        peak_cls.__call__ = call
+    return peak_cls
 

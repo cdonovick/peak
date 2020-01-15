@@ -2,7 +2,7 @@ from peak.assembler.assembler import Assembler
 from examples.demo_pes.pe5.isa import INST as pe5_isa
 from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
-from examples.min_pe.isa import gen_isa as gen_min_isa
+from examples.min_pe.isa import ISA_fc as gen_min_isa
 from hwtypes import AbstractBitVector
 from hwtypes.adt import Enum, Product, Tuple, Sum
 from hwtypes.adt import new_instruction
@@ -25,7 +25,7 @@ def test_assembler_disassembler(isa, bv_type):
         assert isinstance(opcode, bv_type[assembler.width])
         assert assembler.disassemble(opcode) == inst
 
-        for name,field in isa.field_dict.items():
+        for name, field in isa.field_dict.items():
             sub_assembler = Assembler(field)
             if issubclass(isa, Sum):
                 assert assembler.sub[field].asm is sub_assembler

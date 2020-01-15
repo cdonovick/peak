@@ -1,6 +1,6 @@
 import typing as tp
 import itertools as it
-from peak import Peak
+from peak import Peak, family_closure
 from hwtypes.adt import Product
 from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
@@ -12,6 +12,8 @@ from .utils import create_bindings
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import smt_binding_to_bv_binding
+from .utils import pretty_print_binding
+
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -25,6 +27,8 @@ and_reduce = partial(reduce, operator.and_)
 
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
+        if not isinstance(peak_fc, family_closure):
+            raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
         Peak_cls = peak_fc(SMTBit.get_family())
         input_t = Peak_cls.input_t
         output_t = Peak_cls.output_t
@@ -37,8 +41,15 @@ class SMTMapper:
         output_forms = []
         for input_form in input_forms:
             inputs = aadt_product_to_dict(input_form.value)
+
+            #Construct output_aadt value
             output = Peak_cls()(**inputs)
-            output = output_aadt_t(output)
+            if isinstance(output, tuple):
+                ofields = {field:output[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
+            else:
+                ofields = {field:output for field in output_aadt_t.adt_t.field_dict}
+            output = output_aadt_t.from_fields(**ofields)
+
             forms, output_varmap = SMTForms()(output_aadt_t, value=output)
             #Check consistency of SMTForms
             for f in forms:
@@ -86,7 +97,6 @@ class IRMapper(SMTMapper):
 
         #binding = [input_form_idx][bidx]
         input_bindings = [create_bindings(af.varmap, ir_input_form.varmap) for af in archmapper.input_forms]
-        assert input_bindings[0] != input_bindings[1]
 
         #binding = [bidx]
         output_bindings = create_bindings(archmapper.output_forms[0][0].varmap, ir_output_form.varmap)
@@ -129,6 +139,8 @@ class IRMapper(SMTMapper):
                     bo_match = (ob_var == 2**bo)
                     conditions = list(form_conditions[fi]) + [bi_match, bo_match]
                     for ir_path, arch_path in obinding:
+                        if ir_path is Unbound:
+                            continue
                         ir_out = self.output_forms[0][0].varmap[ir_path]
                         arch_out = archmapper.output_forms[fi][0].varmap[arch_path]
                         arch_out = arch_out.substitute(*submap)
