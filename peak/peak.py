@@ -6,7 +6,7 @@ from inspect import isclass
 from hwtypes import SMTBit
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
-
+import warnings
 
 
 class PeakMeta(type):
@@ -81,7 +81,7 @@ class family_closure:
 
         num_inputs = f.__code__.co_argcount
         if num_inputs != 1:
-            raise SyntaxError("Family Closure must take a single input 'family'")
+            warnings.warn("Family Closure should take a single input 'family'")
         functools.update_wrapper(self, f)
         self.cache = {}
 
@@ -90,7 +90,7 @@ class family_closure:
             return self.cache[family]
         cls = self.f(family)
         if not (isclass(cls) and issubclass(cls, Peak)):
-            raise SyntaxError("Family closure must return a peak class")
+            warnings.warn("Family closure should return a single Peak class")
         cls._fc_ = self
         self.cache[family] = cls
         return cls

@@ -27,27 +27,6 @@ def test_outputs():
         assert otype == expected_types[i]
 
 def test_family_closure():
-    #family_closure needs single argument
-    with pytest.raises(SyntaxError):
-        @family_closure
-        def fc(family, otherarg):
-            class A(Peak): pass
-            return A
-
-    #family_closure needs to return a peak class
-    with pytest.raises(SyntaxError):
-        @family_closure
-        def fc(family):
-            return 5
-        cls = fc(Bit.get_family())
-
-    #family_closure needs to return only a peak class
-    with pytest.raises(SyntaxError):
-        @family_closure
-        def fc(family):
-            class A(Peak): pass
-            return A, 5
-        cls, val = fc(Bit.get_family())
 
     @family_closure
     def PE_fc(family):
