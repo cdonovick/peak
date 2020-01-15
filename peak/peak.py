@@ -37,7 +37,7 @@ def name_outputs(**outputs):
             results = call_fn(*args, **kwargs)
             single_output = not isinstance(results, tuple)
             if single_output:
-                results = (results, )
+                results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
                 if not isinstance(results[i], otype):
                     raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
