@@ -6,7 +6,7 @@ from inspect import isclass
 from hwtypes import SMTBit
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
-
+import warnings
 
 
 class PeakMeta(type):
@@ -37,7 +37,7 @@ def name_outputs(**outputs):
             results = call_fn(*args, **kwargs)
             single_output = not isinstance(results, tuple)
             if single_output:
-                results = (results, )
+                results = (results,)
             for i, (oname, otype) in enumerate(outputs.items()):
                 if not isinstance(results[i], otype):
                     raise TypeError(f"result type for {oname} : {type(results[i])} did not match expected type {otype}")
@@ -81,7 +81,7 @@ class family_closure:
 
         num_inputs = f.__code__.co_argcount
         if num_inputs != 1:
-            raise SyntaxError("Family Closure must take a single input 'family'")
+            warnings.warn("Family Closure should take a single input 'family'")
         functools.update_wrapper(self, f)
         self.cache = {}
 
@@ -90,8 +90,9 @@ class family_closure:
             return self.cache[family]
         cls = self.f(family)
         if not (isclass(cls) and issubclass(cls, Peak)):
-            raise SyntaxError("Family closure must return a peak class")
-        cls._fc_ = self
+            warnings.warn("Family closure should return a peak class")
+        else:
+            cls._fc_ = self
         self.cache[family] = cls
         return cls
 

@@ -28,21 +28,21 @@ def test_outputs():
 
 def test_family_closure():
     #family_closure needs single argument
-    with pytest.raises(SyntaxError):
+    with pytest.warns(Warning):
         @family_closure
         def fc(family, otherarg):
             class A(Peak): pass
             return A
 
     #family_closure needs to return a peak class
-    with pytest.raises(SyntaxError):
+    with pytest.warns(Warning):
         @family_closure
         def fc(family):
             return 5
         cls = fc(Bit.get_family())
 
     #family_closure needs to return only a peak class
-    with pytest.raises(SyntaxError):
+    with pytest.warns(Warning):
         @family_closure
         def fc(family):
             class A(Peak): pass
