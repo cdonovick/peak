@@ -76,7 +76,7 @@ class ArchMapper(SMTMapper):
     def __init__(self, arch_fc):
         super().__init__(arch_fc)
         if self.num_output_forms > 1:
-            raise NotImplementedError("NYI, multiple ir output forms")
+            raise NotImplementedError("Multiple ir output forms")
 
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
@@ -86,9 +86,9 @@ class IRMapper(SMTMapper):
         super().__init__(ir_fc)
         #For now assume that ir input forms and ir output forms is just 1
         if self.num_input_forms > 1:
-            raise NotImplementedError("NYI, multiple ir input forms")
+            raise NotImplementedError("Multiple ir input forms")
         if self.num_output_forms > 1:
-            raise NotImplementedError("NYI, multiple ir output forms")
+            raise NotImplementedError("Multiple ir output forms")
         ir_input_form = self.input_forms[0]
         ir_output_form = self.output_forms[0][0]
 
@@ -109,7 +109,7 @@ class IRMapper(SMTMapper):
             #form_condition represents the & of all the appropriate matche
             conditions = [form_var == 2**fi]
             for path, choice in form.path_dict.items():
-                match_path = path + (Match, )
+                match_path = path + (Match,)
                 assert match_path in archmapper.input_varmap
                 conditions.append(archmapper.input_varmap[match_path][choice])
             form_conditions.append(conditions)
