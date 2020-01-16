@@ -4,7 +4,7 @@ from peak.assembler.assembler_util import _issubclass
 from examples.demo_pes.pe5.isa import INST as pe5_isa
 from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
-from examples.min_pe.isa import gen_isa as gen_min_isa
+from examples.min_pe.isa import ISA_fc as gen_min_isa
 import examples.pico.asm as pico_asm
 
 from hwtypes import BitVector, Bit

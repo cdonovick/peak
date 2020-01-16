@@ -1,7 +1,9 @@
 from hwtypes import Product, Sum, Enum, Tuple
 from hwtypes import new_instruction
+from functools import lru_cache
 
-def gen_isa(family):
+@lru_cache(None)
+def ISA_fc(family):
     Word = family.BitVector[8]
     Bit  = family.BitVector[1]
 
