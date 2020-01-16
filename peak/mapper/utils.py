@@ -4,18 +4,13 @@ from peak.assembler import AssembledADTRecursor
 from peak.assembler import _TAG
 from hwtypes import BitVector, Bit, SMTBitVector, SMTBit
 from hwtypes import Product, Sum, Tuple
-from hwtypes import AbstractBit, AbstractBitVector
 from collections import namedtuple, OrderedDict
 import itertools as it
 from functools import wraps
-import inspect
-from hwtypes.modifiers import is_modified, get_modifier, get_unmodified
 from hwtypes.adt_util import rebind_type
 import pysmt.shortcuts as smt
 import typing as tp
-
-from ast_tools.passes import begin_rewrite, end_rewrite
-from ast_tools.passes import ssa, bool_to_bit, if_to_phi
+from hwtypes.adt_util import rebind_type
 
 class Match: pass
 class Unbound: pass
