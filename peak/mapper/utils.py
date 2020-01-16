@@ -16,16 +16,16 @@ class Match: pass
 class Unbound: pass
 Form = namedtuple("Form", ["value", "path_dict", "varmap"])
 
-#SMTForms Constrcuts all the Forms for a particular AssemledADT type
-#A Form represents a single 'product' when the ADT type is simplified to 'Sum of Products' form.
-#Form contains
-#  value: constructed value from varmap if value is none;
+# SMTForms Constrcuts all the Forms for a particular AssemledADT type
+# A Form represents a single 'product' when the ADT type is simplified to 'Sum of Products' form.
+# Form contains
+#   value: constructed value from varmap if value is none;
 #         otherwise original value
-#  path_dict: all the sum decisions that uniquely identify that particular form
-#  varmap: contains
-#     values of all the leaf nodes (free vars if value is none)
-#     tags of all the sum types (free vars if value is none)
-#     match expressions for all possible sum choices
+#   path_dict: all the sum decisions that uniquely identify that particular form
+#   varmap: contains
+#      values of all the leaf nodes (free vars if value is none)
+#      tags of all the sum types (free vars if value is none)
+#      match expressions for all possible sum choices
 class SMTForms(AssembledADTRecursor):
     def __call__(self, aadt_t, path=(), value=None) -> (tp.List[Form], tp.Mapping["path", SMTBitVector]):
         if value is not None:
@@ -66,8 +66,8 @@ class SMTForms(AssembledADTRecursor):
 
         forms = []
         varmap = {}
-        varmap[path + (_TAG, )] = tag
-        varmap[path + (Match, )] = {}
+        varmap[path + (_TAG,)] = tag
+        varmap[path + (Match,)] = {}
         for field in adt_t.fields:
             #field_tag_value = assembler.assemble_tag(field, bv_t)
             #tag_match = (tag==field_tag_value)
@@ -76,7 +76,7 @@ class SMTForms(AssembledADTRecursor):
                 sub_value = None
             else:
                 sub_value = value[field].value
-            sub_forms, sub_varmap = self(sub_aadt_t, path=path + (field, ), value=sub_value)
+            sub_forms, sub_varmap = self(sub_aadt_t, path=path + (field,), value=sub_value)
             #update sub_forms with current match path
             for sub_form in sub_forms:
                 assert path not in sub_form.path_dict
@@ -86,7 +86,7 @@ class SMTForms(AssembledADTRecursor):
                 else:
                     form_value = value
                 forms.append(Form(value=form_value, path_dict=path_dict, varmap=sub_form.varmap))
-            varmap[path + (Match, )][field] = forms[0].value[field].match
+            varmap[path + (Match,)][field] = forms[0].value[field].match
             varmap.update(sub_varmap)
         return forms, varmap
 
@@ -105,7 +105,7 @@ class SMTForms(AssembledADTRecursor):
                 sub_value = None
             else:
                 sub_value = value[field_name]
-            sub_forms, sub_varmap = self(sub_aadt_t, path=path + (field_name, ), value=sub_value)
+            sub_forms, sub_varmap = self(sub_aadt_t, path=path + (field_name,), value=sub_value)
             varmap.update(sub_varmap)
             forms_to_product.append(sub_forms)
         for sub_forms in it.product(*forms_to_product):
@@ -134,7 +134,7 @@ class SMTForms(AssembledADTRecursor):
                 sub_value = None
             else:
                 sub_value = value[idx]
-            sub_forms, sub_varmap = self(sub_aadt_t, path=path + (idx, ), value=sub_value)
+            sub_forms, sub_varmap = self(sub_aadt_t, path=path + (idx,), value=sub_value)
             varmap.update(sub_varmap)
             forms_to_product.append(sub_forms)
         for sub_forms in it.product(*forms_to_product):
@@ -170,12 +170,10 @@ class SimplifyBinding(AssembledADTRecursor):
 
     @check_leaf(required=True)
     def bv(self, aadt_t, binding):
-        assert 0
         pass
 
     @check_leaf(required=True)
     def enum(self, aadt_t, binding):
-        assert 0
         pass
 
     @check_leaf(required=False)
@@ -198,7 +196,7 @@ class SimplifyBinding(AssembledADTRecursor):
             value = aadt_t.from_fields(sub_field, sub_value)
             return [(value, ())]
         else:
-            return [(ir_path, (sub_field, ) + arch_path) for ir_path, arch_path in simplified_binding]
+            return [(ir_path, (sub_field,) + arch_path) for ir_path, arch_path in simplified_binding]
 
     def product_or_tuple(self, aadt_t, binding, *, is_product):
         adt_t, assembler_t, bv_t = aadt_t.fields
@@ -228,7 +226,7 @@ class SimplifyBinding(AssembledADTRecursor):
         else:
             ret_binding = []
             for sub_field, binding in simplified_binding_dict.items():
-                ret_binding += [(ir_path, (sub_field, ) + arch_path) for ir_path, arch_path in binding]
+                ret_binding += [(ir_path, (sub_field,) + arch_path) for ir_path, arch_path in binding]
             return ret_binding
 
     @check_leaf(required=False)
@@ -291,7 +289,7 @@ def create_bindings(
         ir_paths = ir_by_t.setdefault(arch_type, [])
 
         #ir_poss represents all the possible inputs that could be bound to each arch_input
-        ir_poss = tuple(ir_paths) + (Unbound, )
+        ir_poss = tuple(ir_paths) + (Unbound,)
         #Now ir_poss has all the possible mappings for each arch_path
 
         #Filter out some bindings
