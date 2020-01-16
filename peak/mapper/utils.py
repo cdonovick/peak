@@ -276,11 +276,9 @@ def _sort_by_t(path2t : tp.Mapping[tuple, "adt"]) ->tp.Mapping["adt", tp.List[tu
     return t2path
 
 def create_bindings(
-    arch_varmap : Product,
-    ir_varmap : Product,
+    arch_flat : Product,
+    ir_flat : Product,
 ):
-    arch_flat = {p:type(v) for p, v in arch_varmap.items()}
-    ir_flat = {p:type(v) for p, v in ir_varmap.items()}
     arch_by_t = _sort_by_t(arch_flat)
     ir_by_t = _sort_by_t(ir_flat)
 
@@ -328,5 +326,4 @@ def pretty_print_binding(binding):
     for ir_path, arch_path in binding:
         print(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
     print(")")
-
 
