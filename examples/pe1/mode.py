@@ -15,7 +15,7 @@ class Mode(Enum):
 def gen_register_mode(family: TypeFamily, T, init=0):
     class RegisterMode(Peak):
         def __init__(self):
-            self.register: T = gen_register(T, init)(family)()
+            self.register: T = gen_register(family, T, init)()
 
         def reset(self):
             self.register.reset()

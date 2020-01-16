@@ -1,10 +1,10 @@
-from peak.register import gen_register2
+from peak.register import gen_register
 import magma as m
 import fault
 
 
 def test_register():
-    Reg = gen_register2(m.get_family(), m.Bits[2], 1)
+    Reg = gen_register(m.get_family(), m.Bits[2], 1)
     tester = fault.Tester(Reg, Reg.CLK)
 
     tester.circuit.ASYNCRESET = 0

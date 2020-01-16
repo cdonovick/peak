@@ -9,7 +9,7 @@ from examples.smallir import gen_SmallIR
 from examples.alu import gen_alu
 import pytest
 from random import randint
-from hwtypes.adt_util import rebind_type
+from peak.mapper.utils import rebind_type
 
 def rand_value(width):
     return randint(0, 2**width-1)

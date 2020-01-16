@@ -4,7 +4,7 @@ from hwtypes.adt import Product
 from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
 from .peak import Peak, name_outputs, family_closure
 import itertools as it
-from hwtypes.adt_util import rebind_type
+from peak.mapper.utils import rebind_type
 
 _TAB_SIZE = 4
 class IR:

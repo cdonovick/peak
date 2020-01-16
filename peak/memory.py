@@ -1,5 +1,5 @@
 from .peak import Peak
-from .register import gen_register2
+from .register import gen_register
 from hwtypes import BitVector
 
 class ROM(Peak):
@@ -7,8 +7,8 @@ class ROM(Peak):
         self.mem = []
         for i in range(n):
             data = mem[i] if i < len(mem) else init
-            self.mem.append( gen_register2(BitVector.get_family(), type, init=data)() )
-
+            self.mem.append( gen_register(BitVector.get_family(), type, init=data)() )
+        
     def __call__(self, addr):
         return self.mem[int(addr)](0, 0)
 
