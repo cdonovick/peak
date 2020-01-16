@@ -6,6 +6,7 @@ from inspect import isclass
 from hwtypes import SMTBit
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
+from hwtypes import make_modifier
 import warnings
 
 
@@ -99,7 +100,6 @@ class family_closure:
 class PeakNotImplementedError(NotImplementedError):
     pass
 
-
 #This will update the call function of peak appropriately for automapping
 #Needs to be called from within the family_closure function
 def update_peak(peak_cls, family):
@@ -115,3 +115,5 @@ def update_peak(peak_cls, family):
         peak_cls.__call__ = call
     return peak_cls
 
+
+Const = make_modifier("Const")
