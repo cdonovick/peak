@@ -74,3 +74,61 @@ def test_const():
     solution = ir_mapper.solve('z3')
     assert solution.solved
     assert (('const_value',), ('inst', 'imm')) in solution.ibinding
+
+def test_early_out_inputs():
+    @family_closure
+    def IR_fc(family):
+        Data = family.BitVector[16]
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, const_value : Const(Data)):
+                return const_value
+        return update_peak(IR, family)
+
+    @family_closure
+    def Arch_fc(family):
+        Data = family.BitVector[16]
+        class Arch(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in0 : Data, in1 : Data):
+                return in0 + in1
+        return update_peak(Arch, family)
+
+    arch_fc = Arch_fc
+    arch_bv = arch_fc(Bit.get_family())
+    arch_mapper = ArchMapper(arch_fc)
+    ir_fc = IR_fc
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    solution = ir_mapper.solve('z3')
+    assert not solution.solved
+    assert not ir_mapper.has_bindings
+
+def test_early_out_outputs():
+    @family_closure
+    def IR_fc(family):
+        Data = family.BitVector[16]
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in_: Data):
+                return in_
+        return update_peak(IR, family)
+
+    @family_closure
+    def Arch_fc(family):
+        Data = family.BitVector[16]
+        Bit = family.Bit
+        class Arch(Peak):
+            @name_outputs(out=Bit)
+            def __call__(self, in_ : Data):
+                return in_[0]
+        return update_peak(Arch, family)
+
+    arch_fc = Arch_fc
+    arch_bv = arch_fc(Bit.get_family())
+    arch_mapper = ArchMapper(arch_fc)
+    ir_fc = IR_fc
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    solution = ir_mapper.solve('z3')
+    assert not solution.solved
+    assert not ir_mapper.has_bindings
+

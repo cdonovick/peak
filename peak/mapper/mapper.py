@@ -107,8 +107,8 @@ class IRMapper(SMTMapper):
         self.archmapper = archmapper
         arch_output_form = archmapper.output_forms[0]
 
-
-        #binding = [input_form_idx][bidx]
+        # Create input bindings
+        # binding = [input_form_idx][bidx]
         input_bindings = []
         p_arch_input_adt_t = push_modifiers(archmapper.peak_fc(SMTBit.get_family()).input_t)
         p_ir_input_adt_t = push_modifiers(self.peak_fc(SMTBit.get_family()).input_t)
@@ -117,7 +117,12 @@ class IRMapper(SMTMapper):
             arch_flat_map = _create_flat_map(p_arch_input_adt_t, af.varmap)
 
             input_bindings.append(create_bindings(arch_flat_map, ir_flat_map))
+        # Check Early out
+        self.has_bindings = max(len(bs) for bs in input_bindings) > 0
+        if not self.has_bindings:
+            return
 
+        # Create output bindings
         p_arch_output_adt_t = push_modifiers(archmapper.peak_fc(SMTBit.get_family()).output_t)
         p_ir_output_adt_t = push_modifiers(self.peak_fc(SMTBit.get_family()).output_t)
         arch_flat_map = _create_flat_map(p_arch_output_adt_t, archmapper.output_forms[0][0].varmap)
@@ -125,8 +130,13 @@ class IRMapper(SMTMapper):
 
         #binding = [bidx]
         output_bindings = create_bindings(arch_flat_map, ir_flat_map)
-        form_var = archmapper.input_form_var
 
+        # Check Early out
+        self.has_bindings = len(output_bindings) > 0
+        if not self.has_bindings:
+            return
+
+        form_var = archmapper.input_form_var
         #Create the form_conditions (preconditions) based off of the arch_forms
         #[input_form_idx]
         form_conditions = []
@@ -181,10 +191,15 @@ class IRMapper(SMTMapper):
         self.output_bindings = output_bindings
         self.formula = smt.ForAll(forall_vars, formula.value)
 
+
+
     def solve(self,
         solver_name : str = 'z3',
         custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ):
+        if not self.has_bindings:
+            return MapperSolution(False, None, None)
+
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)
             is_solved = solver.solve()
