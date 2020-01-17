@@ -282,6 +282,10 @@ def create_bindings(
     arch_by_t = _sort_by_t(arch_flat)
     ir_by_t = _sort_by_t(ir_flat)
 
+    #check early out
+    if not all((ir_type in arch_by_t) for ir_type in ir_by_t):
+        return []
+
     possible_matching = OrderedDict()
     for arch_type, arch_paths in arch_by_t.items():
         ir_paths = ir_by_t.setdefault(arch_type, [])
