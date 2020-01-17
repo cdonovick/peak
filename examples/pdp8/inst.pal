@@ -1,0 +1,30 @@
+*200
+and A
+tad A
+isz A
+dca A
+jms A
+jmp A
+nop
+cla
+cma
+cll
+stl
+cml
+iac
+cia
+ral
+cll ral
+rtl
+rar
+cll rar
+rtr
+sza
+sna
+sma
+spa
+szl
+snl
+hlt
+A, 1
+$
