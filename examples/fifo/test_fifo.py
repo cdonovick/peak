@@ -1,15 +1,21 @@
 import random
 import pytest
-import examples.fifo.asm as asm
-from examples.fifo.isa import Word
-from examples.fifo.sim import gen_fifo
+import hwtypes
+from .import gen_fifo
 
-LOGN = 2
-N = 1 << LOGN
+# width of words in fifo
+WIDTH = 32
 
-FIFO = gen_fifo(Word, LOGN)
+# depth of fifo
+LOG_DEPTH = 2
+DEPTH = 1 << LOG_DEPTH
 
-def random_fifo(fifo, n, min=0, max=N):
+Word, Addr, asm, FIFO = gen_fifo(hwtypes.Bit.get_family(), WIDTH, DEPTH)
+
+print(Word.size)
+print(Addr.size)
+
+def random_fifo(fifo, n, min=0, max=DEPTH):
     enqueue = asm.enqueue(Word(0))
     dequeue = asm.dequeue()
     while True:
@@ -17,8 +23,8 @@ def random_fifo(fifo, n, min=0, max=N):
             fifo( asm.enqueue(Word(random.randint(0,15))) )
         elif fifo.fill() > min:
             fifo( asm.dequeue() )
-        assert 0 <= int(fifo.full()) <= N
-        if fifo.fill() == N:
+        assert 0 <= int(fifo.fill()) <= DEPTH
+        if fifo.fill() == DEPTH:
             assert fifo.full()
         if fifo.fill() == 0:
             assert fifo.empty()
@@ -37,7 +43,7 @@ def test_nop():
 def test_enqueue():
     fifo = FIFO()
     assert fifo.empty()
-    for i in range(N):
+    for i in range(DEPTH):
         assert not fifo.full()
         fifo(asm.enqueue(Word(i)))
         assert not fifo.empty()
@@ -57,12 +63,12 @@ def test_dequeue():
 
 def test_full():
     fifo = FIFO()
-    random_fifo(fifo, N, 0, N)
+    random_fifo(fifo, DEPTH, 0, DEPTH)
     assert fifo.full()
 
 def test_two():
     fifo = FIFO()
-    n = random.randint(0,N-2)
+    n = random.randint(0,DEPTH-2)
     random_fifo(fifo, n)
     fifo(asm.enqueue(Word(1)))
     fifo(asm.enqueue(Word(2)))
