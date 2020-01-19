@@ -7,6 +7,7 @@ from .assembler_abc import AssemblerMeta
 from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum, Sum, Product, Tuple
 from hwtypes import AbstractBitVector, AbstractBit
 from hwtypes.adt_meta import BoundMeta
+from hwtypes.modifiers import is_modified
 import abc
 
 
@@ -111,7 +112,8 @@ class AssembledADTMeta(BoundMeta):
             f'default_bv',
             f'tp.Optional[{cls.bv_type.__name__!r}[1]] = None',
         )
-
+        if is_modified(cls.adt_t):
+            raise TypeError(f"Cannot create Assembled ADT from a modified adt type {cls.adt_t}")
         if issubclass(cls.adt_t, Product):
             arg_strs = [(f'{k}', f'{v.__name__!r}')
                     for k, v in cls.adt_t.field_dict.items()]
