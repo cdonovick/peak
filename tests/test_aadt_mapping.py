@@ -75,6 +75,45 @@ def test_const():
     assert solution.solved
     assert (('const_value',), ('inst', 'imm')) in solution.ibinding
 
+#This will test the const modifier without the name_outputs
+def test_const_tuple():
+
+    #Testing out something like coreir const
+    @family_closure
+    def IR_fc(family):
+        Data = family.BitVector[16]
+        class IR(Peak):
+            def __call__(self, const_value : Const(Data)) -> Data:
+                return const_value
+        return update_peak(IR, family)
+
+    @family_closure
+    def Arch_fc(family):
+        Data = family.BitVector[16]
+        class Op(Enum):
+            add = 1
+            const = 2
+        class Inst(Product):
+            op = Op
+            imm = Data
+
+        class Arch(Peak):
+            def __call__(self, inst : Const(Inst), in0 : Data, in1 : Data) -> Data:
+                if inst.op == Op.add:
+                    return in0 + in1
+                else: #inst.op == Op.const
+                    return inst.imm
+        return update_peak(Arch, family)
+
+    arch_fc = Arch_fc
+    arch_bv = arch_fc(Bit.get_family())
+    arch_mapper = ArchMapper(arch_fc)
+    ir_fc = IR_fc
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    solution = ir_mapper.solve('z3')
+    assert solution.solved
+    assert (('const_value',), ('inst', 'imm')) in solution.ibinding
+
 def test_early_out_inputs():
     @family_closure
     def IR_fc(family):

@@ -1,7 +1,7 @@
 import typing as tp
 import itertools as it
 from peak import family_closure
-from hwtypes.adt import Product
+from hwtypes.adt import Product, Tuple
 from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
@@ -44,17 +44,20 @@ class SMTMapper:
             inputs = aadt_product_to_dict(input_form.value)
 
             #Construct output_aadt value
-            output = Peak_cls()(**inputs)
-            if isinstance(output, tuple):
-                ofields = {field:output[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
+            outputs = Peak_cls()(**inputs)
+            if not isinstance(outputs, tuple):
+                outputs = (outputs,)
+            if issubclass(stripped_output_t, Product):
+                ofields = {field:outputs[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
+                output_value = output_aadt_t.from_fields(**ofields)
             else:
-                ofields = {field:output for field in output_aadt_t.adt_t.field_dict}
-            output = output_aadt_t.from_fields(**ofields)
+                assert issubclass(stripped_output_t, Tuple)
+                output_value = output_aadt_t.from_fields(*outputs)
 
-            forms, output_varmap = SMTForms()(output_aadt_t, value=output)
+            forms, output_varmap = SMTForms()(output_aadt_t, value=output_value)
             #Check consistency of SMTForms
             for f in forms:
-                assert f.value == output
+                assert f.value == output_value
             output_forms.append(forms)
         num_input_forms = len(output_forms)
         num_output_forms = len(output_forms[0])

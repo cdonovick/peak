@@ -19,8 +19,6 @@ def gen_register(T, init=0):
                 if en:
                     self.value = value
                 else:
-                    # Bug in magma sequential syntax without default values, we
-                    # explicitly set it for now
                     self.value = self.value
                 return retvalue
         if family.Bit is m.Bit:
@@ -30,18 +28,17 @@ def gen_register(T, init=0):
 
 #Old inteface to gen_register
 def gen_register2(family, T, init=0):
+    Bit = family.Bit
     class Register(Peak):
         def __init__(self):
             self.value: T = init
 
-        def __call__(self, value: T, en: family.Bit) -> T:
+        def __call__(self, value : T, en : Bit) -> T:
             assert value is not None
             retvalue = self.value
             if en:
                 self.value = value
             else:
-                # Bug in magma sequential syntax without default values, we
-                # explicitly set it for now
                 self.value = self.value
             return retvalue
 

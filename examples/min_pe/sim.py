@@ -9,7 +9,7 @@ def PE_fc(family):
     class PE(Peak):
 
         @name_outputs(out=Word)
-        def __call__(self, inst: Inst):
+        def __call__(self, inst: Inst) -> Word:
             o0 = inst.operand_0
             if inst.operand_1[Word].match:
                 # arith op
@@ -28,5 +28,5 @@ def PE_fc(family):
                 else:
                     res = o0 | o1
                 return b.ite(~res, res)
-
     return update_peak(PE, family)
+
