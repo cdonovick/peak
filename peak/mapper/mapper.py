@@ -1,10 +1,11 @@
 import typing as tp
 import itertools as it
-from peak import Peak, family_closure
+from peak import family_closure
 from hwtypes.adt import Product
 from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
+from hwtypes.modifiers import strip_modifiers, push_modifiers
 from peak.assembler import Assembler, AssembledADT
 from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
@@ -30,10 +31,10 @@ class SMTMapper:
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
         Peak_cls = peak_fc(SMTBit.get_family())
-        input_t = Peak_cls.input_t
-        output_t = Peak_cls.output_t
-        input_aadt_t = AssembledADT[input_t, Assembler, SBV]
-        output_aadt_t = AssembledADT[output_t, Assembler, SBV]
+        stripped_input_t = strip_modifiers(Peak_cls.input_t)
+        stripped_output_t = strip_modifiers(Peak_cls.output_t)
+        input_aadt_t = AssembledADT[stripped_input_t, Assembler, SBV]
+        output_aadt_t = AssembledADT[stripped_output_t, Assembler, SBV]
 
         input_forms, input_varmap = SMTForms()(input_aadt_t)
 
@@ -81,6 +82,17 @@ class ArchMapper(SMTMapper):
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
 
+
+def _create_flat_map(adt_t, varmap):
+    flat_map = {}
+    for path in varmap:
+        T = adt_t
+        for field in path:
+            T = T.field_dict[field]
+        flat_map[path] = T
+    return flat_map
+
+
 class IRMapper(SMTMapper):
     def __init__(self, archmapper, ir_fc):
         super().__init__(ir_fc)
@@ -95,13 +107,36 @@ class IRMapper(SMTMapper):
         self.archmapper = archmapper
         arch_output_form = archmapper.output_forms[0]
 
-        #binding = [input_form_idx][bidx]
-        input_bindings = [create_bindings(af.varmap, ir_input_form.varmap) for af in archmapper.input_forms]
+        # Create input bindings
+        # binding = [input_form_idx][bidx]
+        input_bindings = []
+        p_arch_input_adt_t = push_modifiers(archmapper.peak_fc(SMTBit.get_family()).input_t)
+        p_ir_input_adt_t = push_modifiers(self.peak_fc(SMTBit.get_family()).input_t)
+        ir_flat_map = _create_flat_map(p_ir_input_adt_t, ir_input_form.varmap)
+        for af in archmapper.input_forms:
+            arch_flat_map = _create_flat_map(p_arch_input_adt_t, af.varmap)
+
+            input_bindings.append(create_bindings(arch_flat_map, ir_flat_map))
+        # Check Early out
+        self.has_bindings = max(len(bs) for bs in input_bindings) > 0
+        if not self.has_bindings:
+            return
+
+        # Create output bindings
+        p_arch_output_adt_t = push_modifiers(archmapper.peak_fc(SMTBit.get_family()).output_t)
+        p_ir_output_adt_t = push_modifiers(self.peak_fc(SMTBit.get_family()).output_t)
+        arch_flat_map = _create_flat_map(p_arch_output_adt_t, archmapper.output_forms[0][0].varmap)
+        ir_flat_map = _create_flat_map(p_ir_output_adt_t, ir_output_form.varmap)
 
         #binding = [bidx]
-        output_bindings = create_bindings(archmapper.output_forms[0][0].varmap, ir_output_form.varmap)
-        form_var = archmapper.input_form_var
+        output_bindings = create_bindings(arch_flat_map, ir_flat_map)
 
+        # Check Early out
+        self.has_bindings = len(output_bindings) > 0
+        if not self.has_bindings:
+            return
+
+        form_var = archmapper.input_form_var
         #Create the form_conditions (preconditions) based off of the arch_forms
         #[input_form_idx]
         form_conditions = []
@@ -156,10 +191,15 @@ class IRMapper(SMTMapper):
         self.output_bindings = output_bindings
         self.formula = smt.ForAll(forall_vars, formula.value)
 
+
+
     def solve(self,
         solver_name : str = 'z3',
         custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ):
+        if not self.has_bindings:
+            return MapperSolution(False, None, None)
+
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)
             is_solved = solver.solve()
@@ -167,7 +207,7 @@ class IRMapper(SMTMapper):
 
 def _bv_input_aadt_t(fc):
     bv = fc(Bit.get_family())
-    input_aadt_t = AssembledADT[bv.input_t, Assembler, BitVector]
+    input_aadt_t = AssembledADT[strip_modifiers(bv.input_t), Assembler, BitVector]
     return input_aadt_t
 
 class MapperSolution:
