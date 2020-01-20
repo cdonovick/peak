@@ -15,21 +15,28 @@ Word, Addr, asm, FIFO = gen_fifo(hwtypes.Bit.get_family(), WIDTH, DEPTH)
 print(Word.size)
 print(Addr.size)
 
+# enqueue and dequeue until fifo has n elements in it
 def random_fifo(fifo, n, min=0, max=DEPTH):
-    enqueue = asm.enqueue(Word(0))
-    dequeue = asm.dequeue()
+    #enqueue = asm.enqueue(Word(0))
+    #dequeue = asm.dequeue()
+    assert 0 <= n <= DEPTH
     while True:
-        if fifo.fill() < max:
-            fifo( asm.enqueue(Word(random.randint(0,15))) )
-        elif fifo.fill() > min:
-            fifo( asm.dequeue() )
         assert 0 <= int(fifo.fill()) <= DEPTH
+        if fifo.fill() == n:
+            break
+        if fifo.full() == min:
+            fifo( asm.enqueue(Word(random.randint(0,15))) )
+        elif fifo.fill() == max:
+            fifo( asm.dequeue() )
+        else:
+            if random.randint(0,1):
+                fifo( asm.enqueue(Word(random.randint(0,15))) )
+            else:
+                fifo( asm.dequeue() )
         if fifo.fill() == DEPTH:
             assert fifo.full()
         if fifo.fill() == 0:
             assert fifo.empty()
-        if fifo.fill() == n:
-            break
     
 
 def test_nop():
@@ -63,16 +70,13 @@ def test_dequeue():
 
 def test_full():
     fifo = FIFO()
-    random_fifo(fifo, DEPTH, 0, DEPTH)
+    random_fifo(fifo, DEPTH)
     assert fifo.full()
 
 def test_two():
     fifo = FIFO()
-    n = random.randint(0,DEPTH-2)
-    random_fifo(fifo, n)
     fifo(asm.enqueue(Word(1)))
     fifo(asm.enqueue(Word(2)))
-    random_fifo(fifo, n+2, n, n+2)
     assert fifo(asm.dequeue()) == Word(1)
     assert fifo(asm.dequeue()) == Word(2)
 
