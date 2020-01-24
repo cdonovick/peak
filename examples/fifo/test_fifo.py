@@ -12,9 +12,6 @@ DEPTH = 1 << LOG_DEPTH
 
 Word, Addr, asm, FIFO = gen_fifo(hwtypes.Bit.get_family(), WIDTH, DEPTH)
 
-print(Word.size)
-print(Addr.size)
-
 # enqueue and dequeue until fifo has n elements in it
 def random_fifo(fifo, n, min=0, max=DEPTH):
     #enqueue = asm.enqueue(Word(0))
