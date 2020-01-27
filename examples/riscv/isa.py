@@ -1,9 +1,10 @@
 from hwtypes import SIntVector, UIntVector, BitVector, Bit
-from hwtypes.adt import Enum, Sum, Product
+from hwtypes.adt import Enum, Product, TaggedUnion
 from hwtypes.modifiers import new
 from peak.bitfield import bitfield, tag
 
 WIDTH = 32
+
 Byte = new(BitVector, 8, name="Byte")
 Half = new(BitVector, 16, name="Half")
 Word = new(BitVector, 32, name="Word")
@@ -33,8 +34,10 @@ class ST(Product):
 
 class SW(ST): pass
 
-@tag({LW: 0, SW:1})
-class Memory(Sum[LW, SW]): pass
+#@tag({LW: 0, SW:1})
+class Memory(TaggedUnion):
+    lw = LW
+    sw = SW
 
 
 class _Branch(Product):
@@ -49,8 +52,14 @@ class BGE(_Branch): pass
 class BLTU(_Branch): pass
 class BGEU(_Branch): pass
 
-@tag({BEQ: 0, BNE:1, BLT:2, BGE:3, BLTU:4, BGEU:5})
-class Branch(Sum[BEQ, BNE, BLT, BGE, BLTU, BGEU]): pass
+#@tag({BEQ: 0, BNE:1, BLT:2, BGE:3, BLTU:4, BGEU:5})
+class Branch(TaggedUnion):
+    beq = BEQ
+    bne = BNE
+    blt = BLT
+    bge = BGE
+    bltu = BLTU
+    bgeu = BGEU
     
 
 class _ALUR(Product):
@@ -58,14 +67,20 @@ class _ALUR(Product):
     rs1 = RS1
     rs2 = RS2
 
+class Add(_ALUR): pass
+class Sub(_ALUR): pass
 class And(_ALUR): pass
 class Or(_ALUR): pass
 class XOr(_ALUR): pass
-class Add(_ALUR): pass
-class Sub(_ALUR): pass
 
-@tag({And: 0, Or:1, XOr:2, Add:3, Sub:4})
-class ALUR(Sum[And, Or, XOr, Add, Sub]): pass
+#@tag({And: 0, Or:1, XOr:2, Add:3, Sub:4})
+class ALUR(TaggedUnion):
+    and_ = And
+    or_ = Or
+    xor = XOr
+    add = Add
+    sub = Sub
+
 
 class _ALUI(Product):
     rd = RD
@@ -77,17 +92,27 @@ class OrI(_ALUI): pass
 class XOrI(_ALUI): pass
 class AddI(_ALUI): pass
 
-@tag({AndI: 0, OrI:1, XOrI:2, AddI:3})
-class ALUI(Sum[AndI, OrI, XOrI, AddI]): pass
+#@tag({AndI: 0, OrI:1, XOrI:2, AddI:3})
+class ALUI(TaggedUnion):
+    andi = AndI
+    ori = OrI
+    xori = XOrI
+    addi = AddI
 
 @tag({ALUR: 0, ALUI:1})
-class ALU(Sum[ALUR, ALUI]): pass
+class ALU(TaggedUnion):
+    alur = ALUR
+    alui = ALUI
 
 class LUI(Product):
     rd = RD
     imm = Immed20
 
-@tag({Memory: 0, Branch:1, ALU:2, LUI:3})
-class Inst(Sum[Memory, Branch, ALU, LUI]): pass
+#@tag({Memory: 0, Branch:1, ALU:2, LUI:3})
+class Inst(TaggedUnion):
+   memory = Memory
+   branch = Branch
+   alu = ALU
+   lui = LUI
 
 # Missing shift and set instructions

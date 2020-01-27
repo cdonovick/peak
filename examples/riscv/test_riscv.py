@@ -23,11 +23,11 @@ testb20s = [random20() for i in range(NVALUES)]
 
 
 @pytest.mark.parametrize("op", [
+    inst('add',  lambda x, y: x+y),
+    inst('sub',  lambda x, y: x-y),
     inst('and_', lambda x, y: x&y),
     inst('or_',  lambda x, y: x|y),
     inst('xor',  lambda x, y: x^y),
-    inst('add',  lambda x, y: x+y),
-    inst('sub',  lambda x, y: x-y),
 ])
 @pytest.mark.parametrize("a", testa32s)
 @pytest.mark.parametrize("b", testb32s)
@@ -42,10 +42,11 @@ def test_alu_reg(op,a,b):
     assert riscv.peak_reg(rd) == op.func(a,b)
 
 @pytest.mark.parametrize("op", [
+    inst('addi',  lambda x, y: x+y),
+    #inst('subi',  lambda x, y: x-y),
     inst('andi', lambda x, y: x&y),
     inst('ori',  lambda x, y: x|y),
     inst('xori',  lambda x, y: x^y),
-    inst('addi',  lambda x, y: x+y),
 ])
 @pytest.mark.parametrize("a", testa32s)
 @pytest.mark.parametrize("b", testb12s)
@@ -95,10 +96,10 @@ def test_sw(data):
 @pytest.mark.parametrize("op", [
     inst('beq', lambda x, y: x==y),
     inst('bne', lambda x, y: x!=y),
-    inst('bltu',  lambda x, y: x<y),
-    inst('bgeu',  lambda x, y: x>=y),
     inst('blt',  lambda x, y: isa.SInt32(x)<isa.SInt32(y)),
     inst('bge',  lambda x, y: isa.SInt32(x)>=isa.SInt32(y)),
+    inst('bltu',  lambda x, y: x<y),
+    inst('bgeu',  lambda x, y: x>=y),
 ])
 @pytest.mark.parametrize("a", testa32s)
 @pytest.mark.parametrize("b", testb32s)

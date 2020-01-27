@@ -18,71 +18,129 @@ class R32I(Peak):
         pc = self.pc(0,0)
         inst = self.read_mem(pc)
         pc = pc + 4
-        type, inst = inst.match()
 
-        if type == ALU:
-            type, inst = inst.match()
-            if   type == ALUR:
-                type, inst = inst.match()
-                rs1 = self.read_reg(inst.rs1)
-                rs2 = self.read_reg(inst.rs2)
-                if   type == Add:
-                    rd = rs1 + rs2
-                elif type == Sub:
-                    rd = rs1 - rs2
-                elif type == And:
-                    rd = rs1 & rs2
-                elif type == Or:
-                    rd = rs1 | rs2
-                elif type == XOr:
-                    rd = rs1 ^ rs2
-                self.write_reg(inst.rd, rd)
-            elif type == ALUI:
-                type, inst = inst.match()
-                rs1 = self.read_reg(inst.rs1)
-                imm = inst.imm.sext(20)
-                if   type == AddI:
-                    rd = rs1 + imm
-                elif type == AndI:
-                    rd = rs1 & imm
-                elif type == OrI:
-                    rd = rs1 | imm
-                elif type == XOrI:
-                    rd = rs1 ^ imm
-                self.write_reg(inst.rd, rd)
-        elif type == LUI:
-            imm = inst.imm.zext(12) << 12 # 20-bit immediate
-            self.write_reg(inst.rd, imm)
-        elif type == Memory:
-            type, inst = inst.match()
-            rs1 = self.read_reg(inst.rs1)
-            imm = inst.imm.sext(20) 
-            if   type == LW:
+        if inst.alu.match:
+            alu = inst.alu.value
+            if   alu.alur.match:
+                alur = alu.alur.value
+                if   alur.add.match:
+                    add = alur.add.value
+                    rs1 = self.read_reg(add.rs1)
+                    rs2 = self.read_reg(add.rs2)
+                    rd = add.rd
+                    res = rs1 + rs2
+                elif alur.sub.match:
+                    sub = alur.sub.value
+                    rs1 = self.read_reg(sub.rs1)
+                    rs2 = self.read_reg(sub.rs2)
+                    rd = sub.rd
+                    res = rs1 - rs2
+                elif alur.and_.match:
+                    and_ = alur.and_.value
+                    rs1 = self.read_reg(and_.rs1)
+                    rs2 = self.read_reg(and_.rs2)
+                    rd = and_.rd
+                    res = rs1 & rs2
+                elif alur.or_.match:
+                    or_ = alur.or_.value
+                    rs1 = self.read_reg(or_.rs1)
+                    rs2 = self.read_reg(or_.rs2)
+                    rd = or_.rd
+                    res = rs1 | rs2
+                elif alur.xor.match:
+                    xor = alur.xor.value
+                    rs1 = self.read_reg(xor.rs1)
+                    rs2 = self.read_reg(xor.rs2)
+                    rd = xor.rd
+                    res = rs1 ^ rs2
+                self.write_reg(rd, res)
+            elif alu.alui.match:
+                alui = alu.alui.value
+                if   alui.addi.match:
+                    add = alui.addi.value
+                    rs1 = self.read_reg(add.rs1)
+                    imm = add.imm.sext(20)
+                    rd = add.rd
+                    res = rs1 + imm
+                elif alui.andi.match:
+                    andi = alui.andi.value
+                    rs1 = self.read_reg(andi.rs1)
+                    imm = andi.imm.sext(20)
+                    rd = andi.rd
+                    res = rs1 & imm
+                elif alui.ori.match:
+                    ori = alui.ori.value
+                    rs1 = self.read_reg(ori.rs1)
+                    imm = ori.imm.sext(20)
+                    rd = ori.rd
+                    res = rs1 | imm
+                elif alui.xori.match:
+                    xori = alui.xori.value
+                    rs1 = self.read_reg(xori.rs1)
+                    imm = xori.imm.sext(20)
+                    rd = xori.rd
+                    res = rs1 ^ imm
+                self.write_reg(rd, res)
+        elif inst.lui.match:
+            lui = inst.lui.value
+            imm = lui.imm.zext(12) << 12 # 20-bit immediate
+            self.write_reg(lui.rd, imm)
+        elif inst.memory.match:
+            mem = inst.memory.value
+            if   mem.lw.match:
+                lw = mem.lw.value
+                rs1 = self.read_reg(lw.rs1)
+                imm = lw.imm.sext(20) 
                 addr = rs1 + imm
                 data = self.read_mem(addr)
-                self.write_reg(inst.rd, data)
-            elif type == SW:
+                self.write_reg(lw.rd, data)
+            elif mem.sw.match:
+                sw = mem.sw.value
+                rs1 = self.read_reg(sw.rs1)
+                imm = sw.imm.sext(20) 
+                data = self.read_reg(sw.rs2)
                 addr = rs1 + imm
-                data = self.read_reg(inst.rs2)
                 self.write_mem(addr, data)
-        elif type == Branch:
-            type, inst = inst.match()
-            rs1 = self.read_reg(inst.rs1)
-            rs2 = self.read_reg(inst.rs2)
-            if   type == BEQ:
+        elif inst.branch.match:
+            branch = inst.branch.value
+            if   branch.beq.match:
+                beq = branch.beq.value
+                rs1 = self.read_reg(beq.rs1)
+                rs2 = self.read_reg(beq.rs2)
+                imm = beq.imm
                 res = rs1 == rs2
-            elif type == BNE:
+            elif branch.bne.match:
+                bne = branch.bne.value
+                rs1 = self.read_reg(bne.rs1)
+                rs2 = self.read_reg(bne.rs2)
+                imm = bne.imm
                 res = rs1 != rs2
-            elif type == BLT:
+            elif branch.blt.match:
+                blt = branch.blt.value
+                rs1 = self.read_reg(blt.rs1)
+                rs2 = self.read_reg(blt.rs2)
+                imm = blt.imm
                 res = SInt32(rs1) < SInt32(rs2) 
-            elif type == BGE: 
+            elif branch.bge.match:
+                bge = branch.bge.value
+                rs1 = self.read_reg(bge.rs1)
+                rs2 = self.read_reg(bge.rs2)
+                imm = bge.imm
                 res = SInt32(rs1) >= SInt32(rs2) 
-            elif type == BLTU:
+            elif branch.bltu.match:
+                bltu = branch.bltu.value
+                rs1 = self.read_reg(bltu.rs1)
+                rs2 = self.read_reg(bltu.rs2)
+                imm = bltu.imm
                 res = rs1 < rs2
-            elif type == BGEU:
+            elif branch.bgeu.match:
+                bgeu = branch.bgeu.value
+                rs1 = self.read_reg(bgeu.rs1)
+                rs2 = self.read_reg(bgeu.rs2)
+                imm = bgeu.imm
                 res = rs1 >= rs2
             if res:
-                offset = inst.imm.sext(20) << 1
+                offset = imm.sext(20) << 1
                 pc = pc - 4 + offset # pc-4 because pc = pc + 4, see above
         self.pc(pc,1)
 
