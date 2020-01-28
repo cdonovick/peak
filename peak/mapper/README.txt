@@ -94,16 +94,116 @@ For example
      c = Bit
      d = Bit
      e = BV[8]
+     i = Const(BV[4]) #This represent the instruction
+
+Note that that ArchInput.i is labeled as a constant type. This indicates a compile-time constant like an instruction op code or an immediate value
 
  This has two valid bindings
  1:
    ('a',)  <=> ('c',)
    ('b',)  <=> ('e',)
-   Unbound <=> ('d',)
+   Unbound(Bit) <=> ('d',)
+   Constant(BV[4]) <=> ('i',)
  2:
    ('a',)  <=> ('d',)
    ('b',)  <=> ('e',)
-   Unbound <=> ('c',)
+   Unbound(Bit) <=> ('c',)
+   Constant(BV[4]) <=> ('i',)
 
 
-To be continued...
+Another way to think of a Binding is as a function from ArchInput to IRInput. This is the appropriate directionality 
+as IR must always be able to be constructed from the Arch, but the other way around might not be true
+For example in this case, the function for input binding 1 would be:
+
+def InputBinding1(ai : ArchInput) -> IRInput:
+  return IRInput(a=ai.c, b=ai.e)
+
+
+----------------Finding Rewrite Rules---------------
+
+Given a function IR :: IRInput -> IROutput
+and a function Arch :: ArchInput -> ArchOutput,
+
+The goal is to solve the following problem:
+
+Find InputBinding, OutputBinding, and any Constant values in the bindings
+  ST ForALL archIn : ArchInput,
+    let irIn = InputBinding(archIn)
+    let irOut = IR(irIn)
+    let archOut = Arch(archIn)
+    assert OutputBinding(archOut) == irOut
+
+
+The following is a more concrete (yet still simple) example of how to explicitly construct the SMT formula
+
+Given the functions 
+IR :: IRInput -> IROutput
+Arch :: ArchInput -> ArchOutput
+with the following Types
+
+class IRInput(Product):
+     a = Bit
+     b = BV[8]
+
+class ArchInput(Product):
+     c = Bit
+     d = Bit
+     e = BV[8]
+     i = Const(BV[4]) #This represent the instruction
+
+IROutput = ArchOutput = Tuple[BV[8]]
+
+This would produce the following possible input bindings:
+ 1:
+   ('a',)  <=> ('c',)
+   ('b',)  <=> ('e',)
+   Unbound(Bit) <=> ('d',)
+   Constant(BV[4]) <=> ('i',)
+ 2:
+   ('a',)  <=> ('d',)
+   ('b',)  <=> ('e',)
+   Unbound(Bit) <=> ('c',)
+   Constant(BV[4]) <=> ('i',)
+
+Along with the corresponding functions 
+  InputBinding1 :: ArchInput -> IRInput
+  InputBinding2 :: ArchInput -> IRInput
+
+And a single Output Binding:
+ 1:
+    (0,) <=> (0,)
+
+Along with the single function
+  OutputBinding1 :: ArchOutput -> IROutput
+
+
+We start by creating a unique Free Variable for each leaf node of the ArchInput type
+('c',) : C = SMTBit()
+('d',) : D = SMTBit()
+('e',) : E = SMTBitVector[8]()
+('i',) : I = SMTBitVector[4]()
+
+along with a Free variable to choose which inputbinding it is 
+  Bi = SMTBitVector[2]()
+and which outputbinding it is
+  Bo = SMTBitVector[1]()
+
+
+We then construct the formula in the following way:
+let archIn = ArchInput(c=C,d=D,e=E,i=I)
+let archOut = Arch(archIn)
+let irIn1 = InputBinding1(archIn)
+let irOut1 = IR(irIn1)
+let irIn2 = InputBinding2(archIn)
+let irOut2 = IR(irIn2)
+Exists(I, B) such that ForAll(C, D, E)
+    ( (Bi==1) & (Bo==1) & (irOut1 == OutputBinding1(archOut)) ) 
+  | ( (Bi==2) & (Bo==1) & (irOut2 == OutputBinding1(archOut)) )
+
+
+If there were 4 input bindings and 2 output bindings, the number of ORed terms would be 4*2 == 8
+
+Unfortunately, this is still not the full story. If any Input or Output type has more than one Form (defined earlier), 
+each Product in the final Sum of Products gets more terms identifying which form it belongs to.
+
+TODO define above statment more explicitly
