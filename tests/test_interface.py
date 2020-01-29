@@ -1,5 +1,5 @@
 from examples.pe1 import PE, Inst, Bit, Data
-from hwtypes.adt import Product
+from hwtypes.adt import Product, Sum
 from hwtypes import BitVector, SMTBitVector
 from peak import Peak, name_outputs, family_closure
 import pytest
@@ -41,13 +41,23 @@ def test_family_closure():
             return 5
         cls = fc(Bit.get_family())
 
-    #family_closure needs to return only a peak class
+    #family_closure needs to return only a single peak class
     with pytest.warns(Warning):
         @family_closure
         def fc(family):
             class A(Peak): pass
-            return A, 5
-        cls, val = fc(Bit.get_family())
+            return A, A
+        cls, _ = fc(Bit.get_family())
+
+    #family closure can return other objects, as long as there is only one peak class
+    with pytest.warns(None) as record:
+        @family_closure
+        def fc(family):
+            S = Sum[int,str]
+            class A(Peak): pass
+            return A, S
+        cls, _ = fc(Bit.get_family())
+    assert len(record)==0
 
     @family_closure
     def PE_fc(family):
@@ -66,3 +76,17 @@ def test_family_closure():
 
         #Test storing the family closure in the Peak class
         assert PE_fc(family)._fc_ is PE_fc
+
+def test_unsafe():
+    def fc(family):
+        class A(Peak, unsafe=True):
+            def __call__(self, val):
+                return val
+    with pytest.warns(None) as record:
+        fc(Bit.get_family())
+    assert len(record) == 0
+
+
+
+
+
