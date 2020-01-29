@@ -1,15 +1,16 @@
 from .isa import ISA_fc
-from hwtypes import Product, Sum, Enum, Tuple, SMTBit
-from peak import Peak, name_outputs, family_closure, update_peak
+from peak import Peak, name_outputs, family_closure, assemble, Tuple_fc
 
 @family_closure
 def PE_fc(family):
     Word, Bit, Inst  = ISA_fc(family)
-    T = Tuple[Word, Bit]
+    T = Tuple_fc(family)[Word, Bit]
+
+    @assemble(family, locals(), globals())
     class PE(Peak):
 
         @name_outputs(out=Word)
-        def __call__(self, inst: Inst):
+        def __call__(self, inst: Inst) -> Word:
             o0 = inst.operand_0
             if inst.operand_1[Word].match:
                 # arith op
@@ -28,5 +29,5 @@ def PE_fc(family):
                 else:
                     res = o0 | o1
                 return b.ite(~res, res)
+    return PE
 
-    return update_peak(PE, family)

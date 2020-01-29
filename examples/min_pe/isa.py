@@ -1,5 +1,5 @@
-from hwtypes import Product, Sum, Enum, Tuple
 from hwtypes import new_instruction
+from hwtypes.adt import Product, Sum, Tuple, Enum
 from functools import lru_cache
 
 @lru_cache(None)

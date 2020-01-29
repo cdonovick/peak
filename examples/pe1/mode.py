@@ -13,7 +13,7 @@ class Mode(Enum):
 
 
 def gen_register_mode(family: TypeFamily, T, init=0):
-    class RegisterMode(Peak):
+    class RegisterMode(Peak, unsafe=True):
         def __init__(self):
             self.register: T = gen_register(T, init)(family)()
 

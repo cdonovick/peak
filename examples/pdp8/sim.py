@@ -7,7 +7,7 @@ ONE = Bit(1)
 MAX_MEMORY = 4096
 
 
-class PDP8(Peak):
+class PDP8(Peak, unsafe=True):
 
     def __init__(self, mem):
         family = Bit.get_family()
@@ -83,7 +83,6 @@ class PDP8(Peak):
                 if opr1.rar: # rotate right
                     acc = self.acc(0,0).concat(BitVector[1](self.lnk(0,0)))
                     res = acc.bvror(2 if opr1.twice else 1)
-                    print('rar', res)
                     self.acc(res[0:WIDTH], 1)
                     self.lnk(res[WIDTH], 1)
             elif opr.opr2.match:
@@ -175,4 +174,4 @@ class PDP8(Peak):
         return int(self.mem(Word(addr),0,0))
 
     def poke_mem(self, addr, value):
-        return int(self.mem(Word(addr),Word(value),wen=1))
+        return int(self.mem(Word(addr),Word(value),wen=Bit(1)))
