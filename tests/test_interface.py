@@ -53,7 +53,7 @@ def test_family_closure():
     with pytest.warns(None) as record:
         @family_closure
         def fc(family):
-            S = Sum[int,str]
+            S = Sum[int, str]
             class A(Peak): pass
             return A, S
         cls, _ = fc(Bit.get_family())

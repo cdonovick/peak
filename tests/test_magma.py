@@ -20,21 +20,21 @@ def test_assemble():
     #verify BV works
     PE_bv = PE_fc(Bit.get_family())
     vals = [Bit(0), Bit(1)]
-    for i0,i1 in itertools.product(vals,vals):
+    for i0, i1 in itertools.product(vals, vals):
         assert PE_bv()(i0, i1) == i0 & i1
 
     #verify SMT works
     PE_smt = PE_fc(SMTBit.get_family())
     vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
-    for i0,i1 in itertools.product(vals,vals):
+    for i0, i1 in itertools.product(vals, vals):
         assert PE_smt()(i0, i1) == i0 & i1
 
     #verify magma works
     PE_magma = PE_fc(magma.get_family())
     print(PE_magma)
     tester = fault.Tester(PE_magma)
-    vals = [0,1]
-    for i0, i1 in itertools.product(vals,vals):
+    vals = [0, 1]
+    for i0, i1 in itertools.product(vals, vals):
         tester.circuit.in0 = i0
         tester.circuit.in1 = i1
         tester.eval()
@@ -71,7 +71,7 @@ def test_enum():
     PE_bv, Op = PE_fc(Bit.get_family())
     vals = [Bit(0), Bit(1)]
     for op in Op.enumerate():
-        for i0,i1 in itertools.product(vals,vals):
+        for i0, i1 in itertools.product(vals, vals):
             res = PE_bv()(op, i0, i1)
             gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
             assert res == gold
@@ -82,7 +82,7 @@ def test_enum():
     vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
     for op in Op.enumerate():
         op = Op_aadt(op)
-        for i0,i1 in itertools.product(vals,vals):
+        for i0, i1 in itertools.product(vals, vals):
             res = PE_smt()(op, i0, i1)
             gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
             assert res == gold
@@ -90,9 +90,9 @@ def test_enum():
     # verify magma works
     PE_magma, Op = PE_fc(magma.get_family())
     tester = fault.Tester(PE_magma)
-    vals = [0,1]
+    vals = [0, 1]
     for op in (Op.And, Op.Or):
-        for i0, i1 in itertools.product(vals,vals):
+        for i0, i1 in itertools.product(vals, vals):
             gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
             tester.circuit.op = int(op)
             tester.circuit.in0 = i0
