@@ -38,5 +38,4 @@ def test_family_closure():
         return PE
 
     assert isinstance(PE_fc, family_closure)
-    assert PE_fc(Bit.get_family())._fc_ is PE_fc
     assert PE_fc(Bit.get_family()) is PE_fc(Bit.get_family())
