@@ -25,58 +25,56 @@ def name_outputs(**outputs):
     return decorator
 
 def gen_input_t(call_fn):
-    try:
-        input_t = call_fn._input_t
-    except:
-        #construct input_t
-        arg_offset = 1 if call_fn.__name__ == "__call__" else 0
-        peak_inputs = OrderedDict()
-        num_inputs = call_fn.__code__.co_argcount
-        input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
-        in_types = call_fn.__annotations__
-        in_type_keys = set(in_types.keys())
-        # Remove return annotation if it exists
-        if "return" in in_type_keys:
-            in_type_keys.remove("return")
-        if set(input_names) != set(in_type_keys):
-            raise ValueError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_type_keys)}")
-        for name in input_names:
-            input_type= in_types[name]
-            peak_inputs[name] = in_types[name]
+    if hasattr(call_fn, "_input_t"):
+        return call_fn
 
-        #Just set input_t to None if there are no inputs
-        if len(peak_inputs) == 0:
-            input_t = None #Empty 
-        else:
-            input_t = Product.from_fields("Input", peak_inputs)
+    #construct input_t
+    arg_offset = 1 if call_fn.__name__ == "__call__" else 0
+    peak_inputs = OrderedDict()
+    num_inputs = call_fn.__code__.co_argcount
+    input_names = call_fn.__code__.co_varnames[arg_offset:num_inputs]
+    in_types = call_fn.__annotations__
+    in_type_keys = set(in_types.keys())
+    # Remove return annotation if it exists
+    if "return" in in_type_keys:
+        in_type_keys.remove("return")
+    if set(input_names) != set(in_type_keys):
+        raise ValueError(f"Missing type annotations on inputs: {set(input_names)} != {set(in_type_keys)}")
+    for name in input_names:
+        input_type= in_types[name]
+        peak_inputs[name] = in_types[name]
+
+    #Just set input_t to None if there are no inputs
+    if len(peak_inputs) == 0:
+        input_t = None #Empty 
+    else:
+        input_t = Product.from_fields("Input", peak_inputs)
 
     call_fn._input_t = input_t
     return call_fn
 
 def gen_output_t(call_fn):
+    if hasattr(call_fn, "_output_t"):
+        return call_fn
+
     try:
-        output_t = call_fn._output_t
-    except:
-        try:
-            output_types = call_fn.__annotations__['return']
-        except KeyError:
-            raise ValueError(f"Missing output type annotations on __call__ {call_fn}")
-        except AttributeError:
-            raise ValueError(f"Missing definition for __call__ {call_fn}")
-        if output_types is None:
-            output_t = None
-        else:
-            if not isinstance(output_types, tuple):
-                output_types = (output_types,)
-            output_t = Tuple[output_types]
+        output_types = call_fn.__annotations__['return']
+    except KeyError:
+        raise ValueError(f"Missing output type annotations on __call__ {call_fn}")
+    except AttributeError:
+        raise ValueError(f"Missing definition for __call__ {call_fn}")
+    if output_types is None:
+        output_t = None
+    else:
+        if not isinstance(output_types, tuple):
+            output_types = (output_types,)
+        output_t = Tuple[output_types]
     call_fn._output_t = output_t
     return call_fn
 
 def typecheck(call_fn):
-    try:
-        output_t = call_fn._output_t
-    except AttributeError:
-        raise ValueError("Need to use gen_output_t")
+    if not hasattr(call_fn, "_output_t"):
+        raise ValueError("Need to use gen_output_t for typechecking")
 
     @functools.wraps(call_fn)
     def call_wrapper(*args, **kwargs):
