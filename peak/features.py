@@ -75,7 +75,7 @@ def gen_output_t(call_fn):
 def typecheck(call_fn):
     if not hasattr(call_fn, "_output_t"):
         raise ValueError("Need to use gen_output_t for typechecking")
-
+    output_t = call_fn._output_t
     @functools.wraps(call_fn)
     def call_wrapper(*args, **kwargs):
         results = call_fn(*args, **kwargs)
