@@ -103,10 +103,6 @@ class family_closure:
         if key in self.cache:
             return self.cache[key]
         res = self.fc(family, *args, **kwargs)
-        try:
-            res._fc_ = self
-        except AttributeError:
-            pass
         self.cache[key] = res
         return res
 
