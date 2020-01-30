@@ -77,7 +77,7 @@ class Pico(Peak):
         self.C = gen_register2(family, Bit, ZERO)()
         self.V = gen_register2(family, Bit, ZERO)()
 
-    def __call__(self):
+    def __call__(self) -> None:
         pc = self.PC(0, 0)
         inst = self.mem(pc)
 #        type, inst = inst.match()

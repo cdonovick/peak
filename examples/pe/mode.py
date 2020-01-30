@@ -20,7 +20,7 @@ def gen_register_mode(family: TypeFamily, T, init=0):
         def reset(self):
             self.register.reset()
 
-        def __call__(self, mode: Mode, const, value, clk_en: Bit):
+        def __call__(self, mode: Mode, const: T, value: T, clk_en: Bit) -> T:
             if mode == Mode.CONST:
                 self.register(value, False)
                 return const

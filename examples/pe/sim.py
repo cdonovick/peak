@@ -20,11 +20,11 @@ def gen_pe(num_inputs):
             self.bit2 = gen_register_mode(family, Bit)()
 
         def __call__(self, inst: Inst, \
-                        data, \
+                        data: Data, \
                         bit0: Bit = Bit(0), \
                         bit1: Bit = Bit(0), \
                         bit2: Bit = Bit(0), \
-                        clk_en: Bit = Bit(1)):
+                        clk_en: Bit = Bit(1)) -> (Data, Bit, Bit) :
 
             # LUT part of the instruction
             lutinst = inst.lut

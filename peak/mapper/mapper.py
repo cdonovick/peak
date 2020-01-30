@@ -1,7 +1,7 @@
 import typing as tp
 import itertools as it
 from peak import family_closure
-from hwtypes.adt import Product
+from hwtypes.adt import Product, Tuple
 from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
@@ -14,7 +14,8 @@ from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import smt_binding_to_bv_binding
 from .utils import pretty_print_binding
-
+import inspect
+from peak import Peak
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -26,13 +27,31 @@ from functools import partial, reduce
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
 
+
+#Helper function to search for the one peak class
+def _get_peak_cls(fc_out):
+    clss = []
+    if not isinstance(fc_out, tuple):
+        fc_out = (fc_out,)
+    for cls in fc_out:
+        if inspect.isclass(cls) and issubclass(cls, Peak):
+            clss.append(cls)
+    if len(clss) == 1:
+        return clss[0]
+    raise ValueError(f"Need to return one Peak class instead of {len(clss)} Peak classes: {fc_out}")
+
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
-        Peak_cls = peak_fc(SMTBit.get_family())
-        stripped_input_t = strip_modifiers(Peak_cls.input_t)
-        stripped_output_t = strip_modifiers(Peak_cls.output_t)
+        Peak_cls = _get_peak_cls(peak_fc(SMTBit.get_family()))
+        try:
+            input_t = Peak_cls.input_t
+            output_t = Peak_cls.output_t
+        except AttributeError:
+            raise ValueError("Need to use gen_input_t and gen_output_t")
+        stripped_input_t = strip_modifiers(input_t)
+        stripped_output_t = strip_modifiers(output_t)
         input_aadt_t = AssembledADT[stripped_input_t, Assembler, SBV]
         output_aadt_t = AssembledADT[stripped_output_t, Assembler, SBV]
 
@@ -44,17 +63,20 @@ class SMTMapper:
             inputs = aadt_product_to_dict(input_form.value)
 
             #Construct output_aadt value
-            output = Peak_cls()(**inputs)
-            if isinstance(output, tuple):
-                ofields = {field:output[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
+            outputs = Peak_cls()(**inputs)
+            if not isinstance(outputs, tuple):
+                outputs = (outputs,)
+            if issubclass(stripped_output_t, Product):
+                ofields = {field:outputs[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
+                output_value = output_aadt_t.from_fields(**ofields)
             else:
-                ofields = {field:output for field in output_aadt_t.adt_t.field_dict}
-            output = output_aadt_t.from_fields(**ofields)
+                assert issubclass(stripped_output_t, Tuple)
+                output_value = output_aadt_t.from_fields(*outputs)
 
-            forms, output_varmap = SMTForms()(output_aadt_t, value=output)
+            forms, output_varmap = SMTForms()(output_aadt_t, value=output_value)
             #Check consistency of SMTForms
             for f in forms:
-                assert f.value == output
+                assert f.value == output_value
             output_forms.append(forms)
         num_input_forms = len(output_forms)
         num_output_forms = len(output_forms[0])

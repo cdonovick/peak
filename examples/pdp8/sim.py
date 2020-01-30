@@ -18,7 +18,7 @@ class PDP8(Peak):
         self.lnk = gen_register2(family, Bit, ZERO)()
         self.running = gen_register2(family,Bit,ONE)()
 
-    def __call__(self):
+    def __call__(self) -> None:
         if not self.is_running():
             return
         # phase 0
@@ -83,7 +83,6 @@ class PDP8(Peak):
                 if opr1.rar: # rotate right
                     acc = self.acc(0,0).concat(BitVector[1](self.lnk(0,0)))
                     res = acc.bvror(2 if opr1.twice else 1)
-                    print('rar', res)
                     self.acc(res[0:WIDTH], 1)
                     self.lnk(res[WIDTH], 1)
             elif opr.opr2.match:
@@ -175,4 +174,4 @@ class PDP8(Peak):
         return int(self.mem(Word(addr),0,0))
 
     def poke_mem(self, addr, value):
-        return int(self.mem(Word(addr),Word(value),wen=1))
+        return int(self.mem(Word(addr),Word(value),wen=Bit(1)))
