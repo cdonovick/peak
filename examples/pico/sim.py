@@ -64,7 +64,7 @@ def cond(code, Z, N, C, V):
     elif code == Cond.Always:
         return Bit(1)
 
-class Pico(Peak, unsafe=True):
+class Pico(Peak):
 
     def __init__(self, mem):
         family = Bit.get_family()
@@ -77,7 +77,7 @@ class Pico(Peak, unsafe=True):
         self.C = gen_register2(family, Bit, ZERO)()
         self.V = gen_register2(family, Bit, ZERO)()
 
-    def __call__(self):
+    def __call__(self) -> None:
         pc = self.PC(0, 0)
         inst = self.mem(pc)
 #        type, inst = inst.match()

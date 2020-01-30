@@ -2,7 +2,8 @@ from collections import namedtuple
 import typing as tp
 from hwtypes.adt import Product
 from hwtypes import AbstractBitVector, AbstractBit, BitVector, Bit
-from .peak import Peak, name_outputs, family_closure
+from .peak import Peak
+from .features import name_outputs, family_closure
 import itertools as it
 from hwtypes.adt_util import rebind_type
 

@@ -1,4 +1,5 @@
-from .peak import Peak, assemble, family_closure, name_outputs
+from .peak import Peak
+from .features import assemble, family_closure, name_outputs
 from hwtypes import BitVector
 import magma as m
 from hwtypes.adt_util import rebind_type
@@ -35,7 +36,7 @@ def gen_register(T, init=0):
 #Old inteface to gen_register
 def gen_register2(family, T, init=0):
     Bit = family.Bit
-    class Register(Peak, unsafe=True):
+    class Register(Peak):
         def __init__(self):
             self.value: T = init
 

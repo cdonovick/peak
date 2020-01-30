@@ -7,7 +7,7 @@ ONE = Bit(1)
 MAX_MEMORY = 4096
 
 
-class PDP8(Peak, unsafe=True):
+class PDP8(Peak):
 
     def __init__(self, mem):
         family = Bit.get_family()
@@ -18,7 +18,7 @@ class PDP8(Peak, unsafe=True):
         self.lnk = gen_register2(family, Bit, ZERO)()
         self.running = gen_register2(family,Bit,ONE)()
 
-    def __call__(self):
+    def __call__(self) -> None:
         if not self.is_running():
             return
         # phase 0

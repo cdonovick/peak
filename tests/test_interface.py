@@ -27,37 +27,6 @@ def test_outputs():
         assert otype == expected_types[i]
 
 def test_family_closure():
-    #family_closure needs single argument
-    with pytest.warns(Warning):
-        @family_closure
-        def fc(family, otherarg):
-            class A(Peak): pass
-            return A
-
-    #family_closure needs to return a peak class
-    with pytest.warns(Warning):
-        @family_closure
-        def fc(family):
-            return 5
-        cls = fc(Bit.get_family())
-
-    #family_closure needs to return only a single peak class
-    with pytest.warns(Warning):
-        @family_closure
-        def fc(family):
-            class A(Peak): pass
-            return A, A
-        cls, _ = fc(Bit.get_family())
-
-    #family closure can return other objects, as long as there is only one peak class
-    with pytest.warns(None) as record:
-        @family_closure
-        def fc(family):
-            S = Sum[int, str]
-            class A(Peak): pass
-            return A, S
-        cls, _ = fc(Bit.get_family())
-    assert len(record)==0
 
     @family_closure
     def PE_fc(family):
@@ -69,24 +38,5 @@ def test_family_closure():
         return PE
 
     assert isinstance(PE_fc, family_closure)
-
-    for family in (BitVector.get_family(), SMTBitVector.get_family()):
-        #Test caching
-        assert PE_fc(family) is PE_fc(family)
-
-        #Test storing the family closure in the Peak class
-        assert PE_fc(family)._fc_ is PE_fc
-
-def test_unsafe():
-    def fc(family):
-        class A(Peak, unsafe=True):
-            def __call__(self, val):
-                return val
-    with pytest.warns(None) as record:
-        fc(Bit.get_family())
-    assert len(record) == 0
-
-
-
-
-
+    assert PE_fc(Bit.get_family())._fc_ is PE_fc
+    assert PE_fc(Bit.get_family()) is PE_fc(Bit.get_family())

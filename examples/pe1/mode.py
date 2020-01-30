@@ -13,14 +13,14 @@ class Mode(Enum):
 
 
 def gen_register_mode(family: TypeFamily, T, init=0):
-    class RegisterMode(Peak, unsafe=True):
+    class RegisterMode(Peak):
         def __init__(self):
             self.register: T = gen_register(T, init)(family)()
 
         def reset(self):
             self.register.reset()
 
-        def __call__(self, mode: Mode, const, value, clk_en: Bit):
+        def __call__(self, mode: Mode, const: T, value: T, clk_en: Bit) -> T:
             if mode == Mode.CONST:
                 self.register(value, False)
                 return const

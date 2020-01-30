@@ -1,6 +1,8 @@
 from peak import Peak, family_closure, assemble, Enum_fc
 from peak.assembler import Assembler, AssembledADT
-from hwtypes import Bit, SMTBit, SMTBitVector
+from hwtypes import Bit, SMTBit, SMTBitVector, BitVector
+from examples.demo_pes.pe6 import PE_fc
+
 import fault
 import magma
 import itertools
@@ -11,11 +13,11 @@ def test_assemble():
         Bit = family.Bit
 
         @assemble(family, locals(), globals())
-        class PE(Peak):
+        class PESimple(Peak, typecheck=True):
             def __call__(self, in0: Bit, in1: Bit) -> Bit:
                 return in0 & in1
 
-        return PE
+        return PESimple
 
     #verify BV works
     PE_bv = PE_fc(Bit.get_family())
@@ -101,5 +103,17 @@ def test_enum():
             tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
-
+def test_composition():
+    PE_magma, Inst = PE_fc(magma.get_family())
+    tester = fault.Tester(PE_magma)
+    for choice, in0, in1 in itertools.product([1], range(3), range(3)):
+        gold = (in0 + in1) if choice else (in0 ^ in1)
+        tester.circuit.inst[0] = int(Inst.op0.Xor)
+        tester.circuit.inst[1] = int(Inst.op1.Add)
+        tester.circuit.inst[2] = choice
+        tester.circuit.data0 = in0
+        tester.circuit.data1 = in1
+        tester.eval()
+        tester.circuit.O.expect(gold)
+    tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
