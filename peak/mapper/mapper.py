@@ -14,7 +14,8 @@ from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import smt_binding_to_bv_binding
 from .utils import pretty_print_binding
-
+import inspect
+from peak import Peak
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -26,13 +27,31 @@ from functools import partial, reduce
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
 
+
+#Helper function to search for the one peak class
+def _get_peak_cls(fc_out):
+    clss = []
+    if not isinstance(fc_out, tuple):
+        fc_out = (fc_out,)
+    for cls in fc_out:
+        if inspect.isclass(cls) and issubclass(cls, Peak):
+            clss.append(cls)
+    if len(clss) == 1:
+        return clss[0]
+    raise ValueError(f"Need to return one Peak class instead of {len(clss)} Peak classes: {fc_out}")
+
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
-        Peak_cls = peak_fc(SMTBit.get_family())
-        stripped_input_t = strip_modifiers(Peak_cls.input_t)
-        stripped_output_t = strip_modifiers(Peak_cls.output_t)
+        Peak_cls = _get_peak_cls(peak_fc(SMTBit.get_family()))
+        try:
+            input_t = Peak_cls.input_t
+            output_t = Peak_cls.output_t
+        except AttributeError:
+            raise ValueError("Need to use gen_input_t and gen_output_t")
+        stripped_input_t = strip_modifiers(input_t)
+        stripped_output_t = strip_modifiers(output_t)
         input_aadt_t = AssembledADT[stripped_input_t, Assembler, SBV]
         output_aadt_t = AssembledADT[stripped_output_t, Assembler, SBV]
 
