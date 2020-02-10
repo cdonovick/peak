@@ -14,12 +14,9 @@ class Inst(Product):
         e1 = 1
 
 class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
-    def _bases_from_idx(cls, idx):
-        return super()._bases_from_idx(idx[:-1])
-
     def _to_magma_(cls):
         assembler = cls.assembler_t(cls.adt_t)
-        return cls.bv_type[assembler.width].qualify(cls.fields[3])
+        return cls.bv_type[assembler.width]
 
     def _from_magma_(cls, T):
         if T.undirected_t is not cls._to_magma_().undirected_t:
@@ -27,26 +24,20 @@ class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
 
         for d in (m.Direction):
             if  T.is_oriented(d):
-                return cls.unbound_t[(*cls.fields[:-1], d)]
+                return cls.unbound_t[cls.adt_t, cls.assembler_t, cls.bv_type.qualify(d)]
         raise TypeError('Something weird happened')
 
     def _from_magma_value_(cls, value):
-        if not value.is_oriented(cls.fields[3]):
-            raise TypeError('value is not properly oriented')
         return cls(value)
 
 
 class MAADT(AssembledADT, m.MagmaProtocol, metaclass=MAADTMeta):
     def _get_magma_value_(self):
-        cls = type(self)
-        direction = cls.fields[3]
-        T = cls.bv_type[self._value_.size].qualify(direction) 
         return self._value_
-        return T(self._value_)
 
 
 AInst = AssembledADT[Inst, Assembler,  m.Bits]
-MAInst = MAADT[Inst, Assembler, m.Bits, m.Direction.Undirected]
+MAInst = MAADT[Inst, Assembler, m.Bits]
 
 @m.syntax.sequential.sequential
 class Foo:
