@@ -12,6 +12,7 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
             WrappedIO.append(m.Flip(type(value)))
 
     def wire_inst_fields(wrapper_inst, pe_inst, layout):
+        # import pdb; pdb.set_trace()
         if isinstance(wrapper_inst, m.Product):
             for key, value in layout.items():
                 begin = value[0]
@@ -23,11 +24,26 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
             for key, value in layout.items():
                 begin = value[0]
                 end = value[1]
-                region = wrapper_inst[begin:end]
-                field = getattr(pe_inst, key)
-                if issubclass(type(field), m.Digital):
-                    region = m.bit(region)
-                m.wire(region, field)
+                # import pdb; pdb.set_trace()
+                if begin != end:
+                    region = wrapper_inst[begin:end]
+                    field = getattr(pe_inst, key)
+                    if issubclass(type(field), m.Digital):
+                        region = m.bit(region)
+                    if isinstance(field, m.Tuple):
+                        begin_idx = 0
+                        end_idx = 0
+                        for idx in range(len(field)):
+
+                            if isinstance(field[idx], m.Bit):
+                                m.wire(region[begin_idx], field[idx])
+                                begin_idx += 1
+                            else:
+                                end_idx += len(field[idx])
+                                m.wire(region[begin_idx : end_idx], field[idx])
+                                begin_idx += len(field[idx])
+                    else:
+                        m.wire(region, field)
 
     class WrappedPE(m.Circuit):
         IO = WrappedIO
