@@ -124,9 +124,7 @@ def assemble(family, locals, globals, assembler=Assembler):
             call._output_t = output_t
             peak_cls.__call__ = call
         elif family is magma.get_family():
-            #Weirdly need to inject m=mamga into globals
-            _globals = {**globals, "m":magma}
-            env = SymbolTable(locals, _globals)
+            env = SymbolTable(locals, globals)
             peak_cls = magma.circuit.sequential(peak_cls, env=env)
         return peak_cls
     return decorator
