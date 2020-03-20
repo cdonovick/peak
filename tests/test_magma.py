@@ -1,7 +1,9 @@
-from peak import Peak, family_closure, assemble, Enum_fc
+from peak import Peak, family_closure, assemble, Enum_fc, Tuple_fc
 from peak.assembler import Assembler, AssembledADT
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector
 from examples.demo_pes.pe6 import PE_fc
+import ast_tools
+from ast_tools.passes import begin_rewrite, end_rewrite, loop_unroll
 
 import fault
 import magma
@@ -116,4 +118,61 @@ def test_composition():
         tester.eval()
         tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
+
+def test_tuple():
+    def gen(num_outputs):
+        @family_closure
+        def PE_fc(family):
+            Bit = family.Bit
+            Tuple = Tuple_fc(family)
+            OutT = Tuple[(Bit for _ in range(num_outputs))]
+            if family is not magma.get_family():
+                OutT = AssembledADT[OutT, Assembler, family.BitVector]
+                OutT_constructor = OutT.from_fields
+            else:
+                OutT_constructor = OutT
+            @assemble(family, locals(), globals())
+            class PESimple(Peak, typecheck=True):
+                @end_rewrite()
+                @loop_unroll()
+                @begin_rewrite()
+                def __call__(self, in0: Bit, in1: Bit) -> OutT:
+                    ret = in0 & in1
+                    outputs = []
+                    for _ in ast_tools.macros.unroll(range(num_outputs)):
+                        outputs.append(ret)
+                    return OutT_constructor(*outputs)
+
+            return PESimple
+        return PE_fc
+
+    PE_fc = gen(2)
+
+    #verify BV works
+    PE_bv = PE_fc(Bit.get_family())
+    vals = [Bit(0), Bit(1)]
+    for i0, i1 in itertools.product(vals, vals):
+        ret = PE_bv()(i0, i1)
+        assert ret[0] == i0 & i1
+
+    #verify SMT works
+    PE_smt = PE_fc(SMTBit.get_family())
+    vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
+    for i0, i1 in itertools.product(vals, vals):
+        assert PE_smt()(i0, i1)[0] == i0 & i1
+
+    #verify magma works
+    PE_magma = PE_fc(magma.get_family())
+    print(PE_magma)
+    tester = fault.Tester(PE_magma)
+    vals = [0, 1]
+    for i0, i1 in itertools.product(vals, vals):
+        ret = i0 & i1
+        tester.circuit.in0 = i0
+        tester.circuit.in1 = i1
+        tester.eval()
+        tester.circuit.O.expect((ret<<1)| ret )
+    tester.compile_and_run("verilator", flags=["-Wno-fatal"])
+
+
 
