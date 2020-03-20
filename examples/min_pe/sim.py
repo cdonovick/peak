@@ -1,10 +1,12 @@
+from hwtypes import Tuple
+
 from .isa import ISA_fc
-from peak import Peak, name_outputs, family_closure, assemble, Tuple_fc
+from peak import Peak, name_outputs, family_closure, assemble
 
 @family_closure
 def PE_fc(family):
     Word, Bit, Inst  = ISA_fc(family)
-    T = Tuple_fc(family)[Word, Bit]
+    T = Tuple[Word, Bit]
 
     @assemble(family, locals(), globals())
     class PE(Peak):
