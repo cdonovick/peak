@@ -1,16 +1,17 @@
+import abc
 from collections import Counter
 from functools import reduce
 import itertools as it
 import typing as tp
 
-from .assembler_abc import AssemblerMeta
 from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum, Sum, Product, Tuple
 from hwtypes import AbstractBitVector, AbstractBit
 from hwtypes.adt_meta import BoundMeta
 from hwtypes.modifiers import is_modified
-import abc
 
+import magma as m
 
+from .assembler_abc import AssemblerMeta
 from .assembler_util import _issubclass
 
 class _MISSING: pass
@@ -160,15 +161,13 @@ def from_fields(cls, {sig}) -> {cls.__name__!r}:
         exec(from_fields, env, env)
         cls.from_fields = env['from_fields']
 
-    def _name_cb(cls, idx):
+    def _name_from_idx(cls, idx):
         return f'{cls.__name__}[{", ".join(map(repr, idx))}]'
 
     def __getitem__(cls, key: tp.Tuple[BoundMeta, AssemblerMeta, AbstractBitVectorMeta]):
         if cls.is_bound:
             val = cls.adt_t[key]
-            return cls.unbound_t[val, cls.assembler_t, cls.bv_type]
-        elif len(key) != 3:
-            raise TypeError('AssembledADTs must be bound to a BoundMeta, AssemblerMeta, BitVector')
+            return cls.unbound_t[(val, *cls.fields[1:])]
         else:
             adt_t = key[0]
             if (_issubclass(adt_t, AbstractBitVector)
@@ -176,16 +175,13 @@ def from_fields(cls, {sig}) -> {cls.__name__!r}:
                 # Bit of a hack but don't bother wrapping Bits/Bitvectors
                 # Removes the issue of adding __operators__
                 return adt_t
-            for name in RESERVED_NAMES:
-                if hasattr(adt_t, name):
-                    raise TypeError(adt_t, type(adt_t), name)
             T = super().__getitem__(key)
             return T
 
     def __getattr__(cls, attr):
         val = getattr(cls.adt_t, attr, _MISSING)
         if val is not _MISSING:
-            return cls.unbound_t[val, cls.assembler_t, cls.bv_type]
+            return cls.unbound_t[(val, *cls.fields[1:])]
         else:
             raise AttributeError(attr)
 
@@ -222,7 +218,6 @@ def from_fields(cls, {sig}) -> {cls.__name__!r}:
     @property
     def bv_type(cls):
         return cls.fields[2]
-
 
 
 class AssembledADT(metaclass=AssembledADTMeta):
@@ -332,3 +327,32 @@ class AssembledADTRecursor:
     def product(self):
         return
 
+class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
+    def _bases_from_idx(cls, idx):
+        return super()._bases_from_idx(idx[:-1])
+
+    def _to_magma_(cls):
+        assembler = cls.assembler_t(cls.adt_t)
+        return cls.bv_type[assembler.width].qualify(cls.fields[3])
+
+    def _qualify_magma_(cls, d):
+        return cls.unbound_t[(*cls.fields[:-1], d)]
+
+    def _flip_magma_(cls):
+        d = cls.fields[3]
+        if d == m.Direction.In:
+            return cls.unbound_t[(*cls.fields[:-1], m.Direction.Out)]
+        elif d == m.Direction.Out:
+            return cls.unbound_t[(*cls.fields[:-1], m.Direction.In)]
+        else:
+            return cls
+
+    def _from_magma_value_(cls, value):
+        if not value.is_oriented(cls.fields[3]):
+            raise TypeError('value is not properly oriented')
+        return cls(value)
+
+
+class MagmaADT(AssembledADT, m.MagmaProtocol, metaclass=MAADTMeta):
+    def _get_magma_value_(self):
+        return self._value_

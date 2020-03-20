@@ -16,7 +16,6 @@ def test_automapper():
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
     expect_not_found = ('Mul', 'Shftr', 'Shftl')
     for ir_name, ir_fc in IR.instructions.items():
-        print(ir_name)
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
         solution = ir_mapper.solve('z3')
         if not solution.solved:
