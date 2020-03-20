@@ -6,7 +6,7 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
     WrappedIO = []
     for key, value in PE.interface.ports.items():
         WrappedIO.append(key)
-        if type(value) == m.Out(inst_type):
+        if isinstance(value, m.Out(inst_type)):
             WrappedIO.append(m.In(m.Bits[width]))
         else:
             WrappedIO.append(m.Flip(type(value)))
@@ -35,7 +35,7 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
         def definition(io):
             pe = PE()
             for key, value in PE.interface.ports.items():
-                if type(value) == m.Out(inst_type):
+                if isinstance(value, m.Out(inst_type)):
                     wire_inst_fields(getattr(io, key), getattr(pe, key),
                                      layout)
                 elif value.is_output():
