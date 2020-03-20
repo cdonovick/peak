@@ -132,7 +132,7 @@ def test_tuple():
             else:
                 OutT_constructor = OutT
             @assemble(family, locals(), globals())
-            class PESimple(Peak, typecheck=True):
+            class PETuple(Peak, typecheck=True):
                 @end_rewrite()
                 @loop_unroll()
                 @begin_rewrite()
@@ -143,7 +143,7 @@ def test_tuple():
                         outputs.append(ret)
                     return OutT_constructor(*outputs)
 
-            return PESimple
+            return PETuple
         return PE_fc
 
     PE_fc = gen(2)
