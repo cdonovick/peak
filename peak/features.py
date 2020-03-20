@@ -1,11 +1,16 @@
 from collections import OrderedDict
-from hwtypes.adt import Product, Tuple
 import functools
+
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
 from ast_tools.stack import SymbolTable
+
 from hwtypes import SMTBit
-from peak.assembler import Assembler
+from hwtypes import is_adt_type
+from hwtypes.adt import Product, Tuple
+
+from peak.assembler import Assembler, MagmaADT
+
 import magma
 
 def name_outputs(**outputs):
@@ -46,7 +51,7 @@ def gen_input_t(call_fn):
 
     #Just set input_t to None if there are no inputs
     if len(peak_inputs) == 0:
-        input_t = None #Empty 
+        input_t = None #Empty
     else:
         input_t = Product.from_fields("Input", peak_inputs)
 
@@ -125,9 +130,13 @@ def assemble(family, locals, globals, assembler=Assembler):
             peak_cls.__call__ = call
         elif family is magma.get_family():
             env = SymbolTable(locals, globals)
+            call = peak_cls.__call__
+            annotations = {}
+            for arg, t in call.__annotations__.items():
+                if is_adt_type(t):
+                    t = MagmaADT[t, Assembler, magma.Bits, magma.Direction.Undirected]
+                annotations[arg] = t
+            call.__annotations__ = annotations
             peak_cls = magma.circuit.sequential(peak_cls, env=env)
         return peak_cls
     return decorator
-
-
-
