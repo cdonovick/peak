@@ -1,7 +1,10 @@
-from peak import Peak, family_closure, assemble, Enum_fc
+import pytest
+
+from peak import Peak, family_closure, assemble
 from peak.assembler import Assembler, AssembledADT
-from hwtypes import Bit, SMTBit, SMTBitVector, BitVector
+from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
 from examples.demo_pes.pe6 import PE_fc
+from examples.demo_pes.pe6.sim import Inst
 
 import fault
 import magma
@@ -33,7 +36,6 @@ def test_assemble():
 
     #verify magma works
     PE_magma = PE_fc(magma.get_family())
-    print(PE_magma)
     tester = fault.Tester(PE_magma)
     vals = [0, 1]
     for i0, i1 in itertools.product(vals, vals):
@@ -46,19 +48,14 @@ def test_assemble():
 
 def test_enum():
 
-    def Op_fc(family):
-        Enum = Enum_fc(family)
-        class Op(Enum):
-            And=1
-            Or=2
-        return Op
+    class Op(Enum):
+        And=1
+        Or=2
 
     @family_closure
     def PE_fc(family):
 
         Bit = family.Bit
-        Op = Op_fc(family)
-
         @assemble(family, locals(), globals())
         class PE_Enum(Peak):
             def __call__(self, op: Op, in0: Bit, in1: Bit) -> Bit:
@@ -67,10 +64,10 @@ def test_enum():
                 else: #op == Op.Or
                     return in0 | in1
 
-        return PE_Enum, Op
+        return PE_Enum
 
     # verify BV works
-    PE_bv, Op = PE_fc(Bit.get_family())
+    PE_bv = PE_fc(Bit.get_family())
     vals = [Bit(0), Bit(1)]
     for op in Op.enumerate():
         for i0, i1 in itertools.product(vals, vals):
@@ -79,7 +76,7 @@ def test_enum():
             assert res == gold
 
     # verify BV works
-    PE_smt, Op = PE_fc(SMTBit.get_family())
+    PE_smt  = PE_fc(SMTBit.get_family())
     Op_aadt = AssembledADT[Op, Assembler, SMTBitVector]
     vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
     for op in Op.enumerate():
@@ -90,27 +87,41 @@ def test_enum():
             assert res == gold
 
     # verify magma works
-    PE_magma, Op = PE_fc(magma.get_family())
+    asm = Assembler(Op)
+    PE_magma = PE_fc(magma.get_family())
     tester = fault.Tester(PE_magma)
     vals = [0, 1]
     for op in (Op.And, Op.Or):
         for i0, i1 in itertools.product(vals, vals):
             gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
-            tester.circuit.op = int(op)
+            tester.circuit.op = int(asm.assemble(op))
             tester.circuit.in0 = i0
             tester.circuit.in1 = i1
             tester.eval()
             tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
+
 def test_composition():
-    PE_magma, Inst = PE_fc(magma.get_family())
+    PE_magma = PE_fc(magma.get_family())
+    PE_py = PE_fc(BitVector.get_family())()
     tester = fault.Tester(PE_magma)
-    for choice, in0, in1 in itertools.product([1], range(3), range(3)):
-        gold = (in0 + in1) if choice else (in0 ^ in1)
-        tester.circuit.inst[0] = int(Inst.op0.Xor)
-        tester.circuit.inst[1] = int(Inst.op1.Add)
-        tester.circuit.inst[2] = choice
+    Op = Inst.op0
+    assert Op is Inst.op1
+    asm = Assembler(Inst)
+    for op0, op1, choice, in0, in1 in itertools.product(
+            Inst.op0.enumerate(),
+            Inst.op1.enumerate(),
+            (Bit(0), Bit(1)),
+            range(4),
+            range(4),
+        ):
+        in0 = BitVector[16](in0)
+        in1 = BitVector[16](in1)
+        inst =Inst(op0=op0, op1=op1, choice=choice)
+        gold = PE_py(inst=inst, data0=in0, data1=in1)
+
+        tester.circuit.inst = asm.assemble(inst)
         tester.circuit.data0 = in0
         tester.circuit.data1 = in1
         tester.eval()

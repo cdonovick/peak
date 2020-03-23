@@ -5,7 +5,7 @@ from collections import OrderedDict
 def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
     WrappedIO = OrderedDict()
     for key, value in PE.interface.ports.items():
-        if type(value) == m.Out(inst_type):
+        if isinstance(value, m.Out(inst_type)):
             vtype = m.In(m.Bits[width])
         else:
             vtype = m.Flip(type(value))

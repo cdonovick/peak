@@ -1,4 +1,4 @@
-from .isa import Op_fc
+from .isa import Op
 from peak import Peak, assemble, family_closure
 
 @family_closure
@@ -6,7 +6,6 @@ def ALU_fc(family):
     Bit = family.Bit
     Data = family.BitVector[16]
     SData = family.Signed[16]
-    Op = Op_fc(family)
 
     @assemble(family, locals(), globals())
     class ALU(Peak):

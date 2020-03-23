@@ -1,19 +1,17 @@
-from .isa import Op_fc
-from .alu import ALU_fc
-from peak import Peak, assemble, family_closure, Product_fc
-
+from hwtypes import Product, Bit
 from hwtypes import TypeFamily
+
+from .isa import Op
+from .alu import ALU_fc
+from peak import Peak, assemble, family_closure
+
+class Inst(Product):
+    op0=Op
+    op1=Op
+    choice=Bit
 
 @family_closure
 def PE_fc(family : TypeFamily):
-    Bit = family.Bit
-    Product = Product_fc(family)
-    Op = Op_fc(family)
-    class Inst(Product):
-        op0=Op
-        op1=Op
-        choice=Bit
-
     Bit = family.Bit
     Data = family.BitVector[16]
 
@@ -34,4 +32,4 @@ def PE_fc(family : TypeFamily):
             else:
                 return data0
 
-    return PE, Inst
+    return PE
