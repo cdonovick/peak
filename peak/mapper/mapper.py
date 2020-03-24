@@ -188,13 +188,11 @@ class IRMapper(SMTMapper):
 
 
         def check_constrain_constant_bv(ir_path, arch_path):
-            is_en = archmapper.constrain_constant_bv is not None
-            is_unbound = ir_path is Unbound
             arch_t = arch_input_flat_map[arch_path]
-            is_const = issubclass(arch_t, Const)
-            is_bv = issubclass(arch_t, SBV)
-            ret = is_en and is_unbound and is_const and is_bv
-            return ret
+            return (archmapper.constrain_constant_bv is not None) and \
+                    (ir_path is Unbound) and \
+                    issubclass(arch_t, Const) and \
+                    issubclass(arch_t, SBV)
 
         constraints = []
         #Build the constraint
