@@ -16,8 +16,6 @@ def test_automapper():
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
     expect_not_found = ('Mul', 'Shftr', 'Shftl')
     for ir_name, ir_fc in IR.instructions.items():
-        if ir_name is not "Add":
-            continue
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
         solution = ir_mapper.solve('z3')
         if not solution.solved:
@@ -208,31 +206,3 @@ def test_constrain_constant_bv(opts):
     if solution.solved:
         pretty_print_binding(solution.ibinding)
     assert solution.solved == solved
-
-#@pytest.mark.parametrize("opts", (
-#    (None, False),
-#    (4, True)))
-#def test_set_unbound_bv(opts):
-#
-#    arch_fc = PE_fc
-#    arch_bv = arch_fc(Bit.get_family())
-#    arch_mapper = ArchMapper(
-#        arch_fc,
-#        constrain_constant_bv=(0,),
-#        set_unbound_bv=opts[0])
-#
-#    @family_closure
-#    def ir_fc(family):
-#        Data = family.BitVector[8]
-#        @assemble(family, locals(), globals())
-#        class IR(Peak):
-#            @name_outputs(out=Data)
-#            def __call__(self, in0: Data):
-#                return in0 + 4
-#        return IR
-#    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
-#    assert ir_mapper.has_bindings
-#    solution = ir_mapper.solve('z3')
-#    if solution.solved:
-#        pretty_print_binding(solution.ibinding)
-#    assert solution.solved == opts[1]

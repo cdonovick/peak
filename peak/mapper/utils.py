@@ -11,7 +11,6 @@ from hwtypes.adt_util import rebind_type
 import pysmt.shortcuts as smt
 import typing as tp
 from hwtypes.adt_util import rebind_type
-from hwtypes.modifiers import strip_modifiers, push_modifiers, wrap_modifier, unwrap_modifier
 
 class Match: pass
 class Unbound: pass

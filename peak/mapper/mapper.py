@@ -196,15 +196,6 @@ class IRMapper(SMTMapper):
             ret = is_en and is_unbound and is_const and is_bv
             return ret
 
-        def check_set_unbound_bv(ir_path, arch_path):
-            is_en = archmapper.set_unbound_bv is not None
-            is_unbound = ir_path is Unbound
-            arch_t = arch_input_flat_map[arch_path]
-            is_not_const = not issubclass(arch_t, Const)
-            is_bv = issubclass(arch_t, SBV)
-            ret = is_en and is_unbound and is_not_const and is_bv
-            return ret
-
         constraints = []
         #Build the constraint
         for fi, ibindings in enumerate(input_bindings):
@@ -215,16 +206,8 @@ class IRMapper(SMTMapper):
                 submap = []
                 const_constraints = []
                 for ir_path, arch_path in ibinding:
-                    #if ir_path is Unbound:
-                    #    continue
-                    #ir_var = self.input_varmap[ir_path]
-                    #arch_var = archmapper.input_varmap[arch_path]
                     arch_var = archmapper.input_varmap[arch_path]
-                    if check_set_unbound_bv(ir_path, arch_path):
-                        #replace the arch_value with a constant
-                        ir_var = type(arch_var)(archmapper.set_unbound_bv)
-                        assert 0
-                    elif check_constrain_constant_bv(ir_path, arch_path):
+                    if check_constrain_constant_bv(ir_path, arch_path):
                         width = arch_var.size
                         const_constraint = or_reduce((arch_var == val for val in archmapper.constrain_constant_bv if val < 2**width))
                         const_constraints.append(const_constraint)
@@ -239,7 +222,6 @@ class IRMapper(SMTMapper):
                 for bo, obinding in enumerate(output_bindings):
                     bo_match = (ob_var == 2**bo)
                     conditions = list(form_conditions[fi]) + [bi_match, bo_match] + const_constraints
-                    #conditions = list(form_conditions[fi]) + [bi_match, bo_match]
                     for ir_path, arch_path in obinding:
                         if ir_path is Unbound:
                             continue
