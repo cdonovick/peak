@@ -8,14 +8,14 @@ def PE_fc(family):
     Word, Bit, Inst  = ISA_fc(family)
     T = Tuple[Word, Bit]
     UInt = family.Unsigned
-    UData = UInt[16]
+    UData = UInt[Word.size]
 
 
     @assemble(family, locals(), globals())
     class PE(Peak):
 
         @name_outputs(out=Word)
-        def __call__(self, inst: Inst) -> Word:
+        def __call__(self, inst: Inst) -> (Word, Bit):
             o0 = inst.operand_0
             if inst.operand_1[Word].match:
                 # arith op
@@ -33,6 +33,6 @@ def PE_fc(family):
                     res = o0 & o1
                 else:
                     res = o0 | o1
-                return b.ite(~res, res)
+                return b.ite(~res, res),  Bit(0)
     return PE
 

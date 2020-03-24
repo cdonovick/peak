@@ -5,7 +5,7 @@ from functools import lru_cache
 @lru_cache(None)
 def ISA_fc(family):
     Word = family.BitVector[8]
-    Bit  = family.BitVector[1]
+    Bit  = family.Bit
 
     class Inst(Product):
         class Opcode(Enum):
