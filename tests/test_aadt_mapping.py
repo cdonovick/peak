@@ -22,7 +22,6 @@ def test_automapper():
             assert ir_name in expect_not_found
             continue
         assert ir_name in expect_found
-        #pretty_print_binding(solution.ibinding)
         #verify the mapping works
         ir_bv = ir_fc(Bit.get_family())
         for _ in range(num_test_vectors):
