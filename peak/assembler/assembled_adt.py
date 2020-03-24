@@ -194,7 +194,7 @@ def from_fields(cls, {sig}) -> {cls.__name__!r}:
             return super().__eq__(other)
         elif isinstance(other, BoundMeta) or isinstance(other, Enum):
             return cls.bv_type.get_family().Bit(cls.adt_t == other)
-        elif isinstance(other, BitVector) and isinstance(cls.adt_t, Enum):
+        elif isinstance(other, AbstractBitVector) and isinstance(cls.adt_t, Enum):
             assembler = cls.assembler(type(cls.adt_t))
             opcode = assembler.assemble(cls.adt, cls.bv_type)
             return opcode == other

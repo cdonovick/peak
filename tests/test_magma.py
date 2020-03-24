@@ -2,6 +2,7 @@ import pytest
 
 from peak import Peak, family_closure, assemble
 from peak.assembler import Assembler, AssembledADT
+from peak.rtl_utils import wrap_with_disassembler
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
@@ -100,6 +101,24 @@ def test_enum():
             tester.eval()
             tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
+
+def test_wrap_with_disassembler():
+    class HashableDict(dict):
+        def __hash__(self):
+            return hash(tuple(sorted(self.keys())))
+
+    PE_magma = PE_fc(magma.get_family())
+    instr_type = PE_fc(Bit.get_family()).input_t.field_dict['inst']
+    asm = Assembler(instr_type)
+    instr_magma_type = type(PE_magma.interface.ports['inst'])
+    PE_wrapped = wrap_with_disassembler(
+        PE_magma,
+        asm.disassemble,
+        asm.width,
+        HashableDict(asm.layout),
+        instr_magma_type
+    )
+
 
 
 def test_composition():

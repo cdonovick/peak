@@ -1,15 +1,15 @@
 import magma as m
-
+from collections import OrderedDict
 
 @m.cache_definition
 def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
-    WrappedIO = []
+    WrappedIO = OrderedDict()
     for key, value in PE.interface.ports.items():
-        WrappedIO.append(key)
         if isinstance(value, m.Out(inst_type)):
-            WrappedIO.append(m.In(m.Bits[width]))
+            vtype = m.In(m.Bits[width])
         else:
-            WrappedIO.append(m.Flip(type(value)))
+            vtype = m.Flip(type(value))
+        WrappedIO[key] = vtype
 
     def wire_inst_fields(wrapper_inst, pe_inst, layout):
         if isinstance(wrapper_inst, m.Product):
@@ -30,16 +30,14 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
                 m.wire(region, field)
 
     class WrappedPE(m.Circuit):
-        IO = WrappedIO
-        @classmethod
-        def definition(io):
-            pe = PE()
-            for key, value in PE.interface.ports.items():
-                if isinstance(value, m.Out(inst_type)):
-                    wire_inst_fields(getattr(io, key), getattr(pe, key),
-                                     layout)
-                elif value.is_output():
-                    getattr(pe, key) <= getattr(io, key)
-                else:
-                    getattr(io, key) <= getattr(pe, key)
+        io = m.IO(**WrappedIO)
+        pe = PE()
+        for key, value in PE.interface.ports.items():
+            if type(value) == m.Out(inst_type):
+                wire_inst_fields(getattr(io, key), getattr(pe, key),
+                                 layout)
+            elif value.is_output():
+                m.wire(getattr(pe, key), getattr(io, key))
+            else:
+                m.wire(getattr(io, key), getattr(pe, key))
     return WrappedPE
