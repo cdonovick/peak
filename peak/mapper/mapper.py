@@ -1,11 +1,11 @@
 import typing as tp
 import itertools as it
-from peak import family_closure
+from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
 from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
-from hwtypes.modifiers import strip_modifiers, push_modifiers
+from hwtypes.modifiers import strip_modifiers, push_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
 from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
@@ -14,6 +14,7 @@ from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import smt_binding_to_bv_binding
 from .utils import pretty_print_binding
+from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
 
@@ -96,23 +97,30 @@ class SMTMapper:
 
 
 class ArchMapper(SMTMapper):
-    def __init__(self, arch_fc):
+    def __init__(self, arch_fc, *, constrain_constant_bv=None, set_unbound_bv=None):
         super().__init__(arch_fc)
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
+        self.constrain_constant_bv = constrain_constant_bv
+        self.set_unbound_bv = set_unbound_bv
 
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
 
 
-def _create_flat_map(adt_t, varmap):
-    flat_map = {}
-    for path in varmap:
-        T = adt_t
-        for field in path:
-            T = T.field_dict[field]
-        flat_map[path] = T
-    return flat_map
+#Return a map from clean path to modified types
+def _create_flat_map(adt_t, path=(), mods=[]):
+    #remove modifiers from this level
+    adt_t, new_mods = unwrap_modifier(adt_t)
+    mods = new_mods + mods
+    flatmap = {}
+    if isinstance(adt_t, (AttrSyntax, GetitemSyntax)) and not isinstance(adt_t, EnumMeta):
+        for n, sub_adt_t in adt_t.field_dict.items():
+            sub_flatmap = _create_flat_map(sub_adt_t, path+(n,), mods)
+            flatmap.update(sub_flatmap)
+    else:
+        flatmap[path] = wrap_modifier(adt_t, mods)
+    return flatmap
 
 
 class IRMapper(SMTMapper):
@@ -132,26 +140,27 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        p_arch_input_adt_t = push_modifiers(archmapper.peak_fc(SMTBit.get_family()).input_t)
-        p_ir_input_adt_t = push_modifiers(self.peak_fc(SMTBit.get_family()).input_t)
-        ir_flat_map = _create_flat_map(p_ir_input_adt_t, ir_input_form.varmap)
-        for af in archmapper.input_forms:
-            arch_flat_map = _create_flat_map(p_arch_input_adt_t, af.varmap)
+        arch_input_flat_map = _create_flat_map(archmapper.peak_fc(SMTBit.get_family()).input_t)
 
-            input_bindings.append(create_bindings(arch_flat_map, ir_flat_map))
+        ir_flat_map = _create_flat_map(self.peak_fc(SMTBit.get_family()).input_t)
+        #Verify all paths are the same
+        assert set(ir_flat_map.keys()) == set(self.input_varmap.keys())
+        for af in archmapper.input_forms:
+            #Verify all paths of form is subset of all paths
+            assert set(arch_input_flat_map.keys()).issuperset(set(af.varmap.keys()))
+            form_arch_input_flat_map = {p:T for p, T in arch_input_flat_map.items() if p in af.varmap}
+            input_bindings.append(create_bindings(form_arch_input_flat_map, ir_flat_map))
         # Check Early out
         self.has_bindings = max(len(bs) for bs in input_bindings) > 0
         if not self.has_bindings:
             return
 
         # Create output bindings
-        p_arch_output_adt_t = push_modifiers(archmapper.peak_fc(SMTBit.get_family()).output_t)
-        p_ir_output_adt_t = push_modifiers(self.peak_fc(SMTBit.get_family()).output_t)
-        arch_flat_map = _create_flat_map(p_arch_output_adt_t, archmapper.output_forms[0][0].varmap)
-        ir_flat_map = _create_flat_map(p_ir_output_adt_t, ir_output_form.varmap)
+        arch_output_flat_map = _create_flat_map(archmapper.peak_fc(SMTBit.get_family()).output_t)
+        ir_flat_map = _create_flat_map(self.peak_fc(SMTBit.get_family()).output_t)
 
         #binding = [bidx]
-        output_bindings = create_bindings(arch_flat_map, ir_flat_map)
+        output_bindings = create_bindings(arch_output_flat_map, ir_flat_map)
 
         # Check Early out
         self.has_bindings = len(output_bindings) > 0
@@ -177,6 +186,14 @@ class IRMapper(SMTMapper):
         max_output_bindings = len(output_bindings)
         ob_var = SBV[max_output_bindings]()
 
+
+        def check_constrain_constant_bv(ir_path, arch_path):
+            arch_t = arch_input_flat_map[arch_path]
+            return (archmapper.constrain_constant_bv is not None) and \
+                    (ir_path is Unbound) and \
+                    issubclass(arch_t, Const) and \
+                    issubclass(arch_t, SBV)
+
         constraints = []
         #Build the constraint
         for fi, ibindings in enumerate(input_bindings):
@@ -185,16 +202,24 @@ class IRMapper(SMTMapper):
                 bi_match = (ib_var == 2**bi)
                 #Build substitution map
                 submap = []
+                const_constraints = []
                 for ir_path, arch_path in ibinding:
-                    if ir_path is Unbound:
-                        continue
-                    ir_var = self.input_varmap[ir_path]
                     arch_var = archmapper.input_varmap[arch_path]
-                    submap.append((arch_var, ir_var))
+                    if check_constrain_constant_bv(ir_path, arch_path):
+                        width = arch_var.size
+                        const_constraint = or_reduce((arch_var == val for val in archmapper.constrain_constant_bv if val < 2**width))
+                        const_constraints.append(const_constraint)
+                        continue
 
+                    elif ir_path is Unbound:
+                        continue
+                    else:
+                        ir_var = self.input_varmap[ir_path]
+
+                    submap.append((arch_var, ir_var))
                 for bo, obinding in enumerate(output_bindings):
                     bo_match = (ob_var == 2**bo)
-                    conditions = list(form_conditions[fi]) + [bi_match, bo_match]
+                    conditions = list(form_conditions[fi]) + [bi_match, bo_match] + const_constraints
                     for ir_path, arch_path in obinding:
                         if ir_path is Unbound:
                             continue
