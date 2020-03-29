@@ -281,7 +281,6 @@ def create_bindings(
 ):
     arch_by_t = _sort_by_t(arch_flat)
     ir_by_t = _sort_by_t(ir_flat)
-
     #check early out
     if not all((ir_type in arch_by_t) for ir_type in ir_by_t):
         return []
@@ -330,4 +329,3 @@ def pretty_print_binding(binding):
     for ir_path, arch_path in binding:
         print(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
     print(")")
-
