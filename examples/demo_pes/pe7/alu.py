@@ -13,12 +13,8 @@ def ALU_fc(family):
             data0, data1 = SData(data0), SData(data1)
             if inst == Op.Add:
                 res = data0 + data1
-            elif inst == Op.And:
+            else:
                 res = data0 & data1
-            elif inst == Op.Xor:
-                res = data0 ^ data1
-            else: #inst == Op.Shft:
-                res = data0.bvshl(data1)
 
             return res
 
