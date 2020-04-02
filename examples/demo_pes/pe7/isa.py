@@ -1,4 +1,4 @@
-from hwtypes import Enum
+from magma import Enum
 
 class Op(Enum):
     Add  = 0
