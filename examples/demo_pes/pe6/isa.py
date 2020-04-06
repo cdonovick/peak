@@ -1,12 +1,8 @@
-from peak import Enum_fc
-from functools import lru_cache
+from hwtypes import Enum
 
-@lru_cache(None)
-def Op_fc(family):
-    Enum = Enum_fc(family)
-    class Op(Enum):
-        Add  = 1
-        And  = 2
-        Xor  = 4
-        Shft = 8
-    return Op
+class Op(Enum):
+    Add  = 1
+    And  = 2
+    Xor  = 4
+    Shft = 8
+

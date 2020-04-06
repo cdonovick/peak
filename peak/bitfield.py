@@ -44,9 +44,9 @@ def instkey(inst):
     t = type(inst)
     if hasattr(t, 'tags'):
         # depreciated
-        i = t.tags[type(inst.value)]
+        i = t.tags[type(inst._value_)]
     else:
-        i = list(t.fields).index(type(inst.value))
+        i = list(t.fields).index(type(inst._value_))
     return i
 
 def bitfield(i):
@@ -60,7 +60,7 @@ def encode(inst, reverse=False):
     bitfield = getattr(inst, 'bitfield', 0)
     if isinstance(inst, (AbstractBit, AbstractBitVector, Enum)):
         # depreciated
-        word = inst.value if isinstance(inst,Enum) else int(inst)
+        word = inst._value_ if isinstance(inst,Enum) else int(inst)
     else:
         typeinst = type(inst)
         if isinstance(inst,Product):
@@ -84,10 +84,10 @@ def encode(inst, reverse=False):
             if reverse: # tag is on the left, value is on the right
                 pos = size(typeinst) - sumsize(typeinst)
                 # depreciated
-                word = (tag << pos) | encode(inst.value, reverse)
+                word = (tag << pos) | encode(inst._value_, reverse)
             else: # tag is on the right, value is on the left
                 pos = sumsize(typeinst)
-                word = (encode(inst.value) << pos) | tag
+                word = (encode(inst._value_) << pos) | tag
         else:
             raise ValueError(inst)
     return word << bitfield
