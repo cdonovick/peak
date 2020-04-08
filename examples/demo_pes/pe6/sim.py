@@ -3,7 +3,9 @@ from hwtypes import TypeFamily
 
 from .isa import Op
 from .alu import ALU_fc
-from peak import Peak, assemble, family_closure
+from peak import Peak, family_closure
+from peak.family import AbstractFamily
+
 
 class Inst(Product):
     op0=Op
@@ -11,13 +13,13 @@ class Inst(Product):
     choice=Bit
 
 @family_closure
-def PE_fc(family : TypeFamily):
+def PE_fc(family: AbstractFamily):
     Bit = family.Bit
     Data = family.BitVector[16]
 
     ALU = ALU_fc(family)
 
-    @assemble(family, locals(), globals())
+    @family.assemble(locals(), globals())
     class PE(Peak):
         def __init__(self):
             self.alu0 : ALU = ALU()

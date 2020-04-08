@@ -1,5 +1,6 @@
 from hwtypes import BitVector, SIntVector, overflow
 from peak import Peak, name_outputs
+import peak
 from .mode import Mode, gen_register_mode
 from .lut import Bit, LUT, lut
 from .cond import Cond, cond
@@ -85,6 +86,7 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
         else:
             res, res_p = ~a, Bit(0)
     else:
+        A
         raise NotImplementedError(alu)
 
     Z = res == Bit(0)
@@ -97,7 +99,7 @@ class PE(Peak):
     def __init__(self):
         # Declare PE state
 
-        family = Data.get_family()
+        family = peak.family.PyFamily()
         # Data registers
         self.rega = gen_register_mode(family, Data)()
         self.regb = gen_register_mode(family, Data)()

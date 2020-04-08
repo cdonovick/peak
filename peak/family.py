@@ -3,6 +3,7 @@ import functools as ft
 
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
+from ast_tools import SymbolTable
 import hwtypes
 import magma as m
 
@@ -58,7 +59,7 @@ class _AsmFamily(AbstractFamily):
         return deco
 
     def get_adt_t(self, adt_t):
-        if not hwtypes.is_adt_type(t):
+        if not hwtypes.is_adt_type(adt_t):
             raise TypeError(f'expected adt_t not {adt_t}')
 
         return self._aadt_t[(adt_t, self._assembler, self.BitVector, *self._asm_extras)]
@@ -187,6 +188,6 @@ class MagmaFamily(_AsmFamily):
         _asm_deco = super().assemble(locals, globals)
         def deco(cls):
             cls = _asm_deco(cls)
-            cls = magma.circuit.sequential(cls, env=env)
+            cls = m.circuit.sequential(cls, env=env)
             return cls
         return deco
