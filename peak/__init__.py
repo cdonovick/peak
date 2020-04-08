@@ -7,3 +7,4 @@ from .features import name_outputs, gen_input_t, gen_output_t, typecheck, assemb
 
 from .rtl_utils import wrap_with_disassembler
 
+from . import family
