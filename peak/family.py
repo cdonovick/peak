@@ -82,6 +82,7 @@ class _RewriterFamily(AbstractFamily):
             for dec in self._passes:
                 call = dec(call)
             call = end_rewrite()(call)
+            cls.__call__ = call
             return cls
         return deco
 
