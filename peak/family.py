@@ -13,6 +13,22 @@ from .assembler import AssembledADT, MagmaADT
 __ALL__ = ['PyFamily', 'SMTFamily', 'MagmaFamily']
 
 class AbstractFamily(metaclass=ABCMeta):
+    def __eq__(self, other):
+        if isinstance(other, type(self)):
+            return True
+        else:
+            return NotImplemented
+
+    def __ne__(self, other):
+        eq = (self == other)
+        if eq is NotImplemented:
+            return NotImplemented
+        else:
+            return not eq
+
+    def __hash__(self):
+        return 0
+
     @property
     @abstractmethod
     def Bit(self): pass
@@ -43,8 +59,8 @@ class _AsmFamily(AbstractFamily):
     '''
     def  __init__(self, assembler, aadt_t, *asm_extras):
         self._assembler = assembler
-        self._asm_extras = asm_extras
         self._aadt_t = aadt_t
+        self._asm_extras = asm_extras
 
     def assemble(self, locals, globals):
         def deco(cls):
@@ -63,6 +79,19 @@ class _AsmFamily(AbstractFamily):
             raise TypeError(f'expected adt_t not {adt_t}')
 
         return self._aadt_t[(adt_t, self._assembler, self.BitVector, *self._asm_extras)]
+
+    def __eq__(self, other):
+        if isinstance(other, type(self)):
+            return (self._assembler == other._assembler
+                    and self._aadt_t == other._aadt_t
+                    and self._asm_extras == other._asm_extras)
+        else:
+            return NotImplemented
+
+    def __hash__(self):
+        return 2*hash(self._assembler) + 3*hash(self._aadt_t) + 5*hash(self._asm_extras)
+
+    __ne__ = AbstractFamily.__ne__
 
 class _RewriterFamily(AbstractFamily):
     '''
@@ -86,12 +115,22 @@ class _RewriterFamily(AbstractFamily):
             return cls
         return deco
 
+    def __eq__(self, other):
+        if isinstance(other, type(self)):
+            return self._passes == other._passes
+        else:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash(self._passes)
+
+    __ne__ = AbstractFamily.__ne__
+
 class PyFamily(AbstractFamily):
     '''
     Pure python family
     Doesn't perform any transformation or do anything special
     '''
-
     @property
     def Bit(self):
         return hwtypes.Bit
@@ -116,6 +155,7 @@ class PyFamily(AbstractFamily):
     def get_adt_t(self, adt_t):
         return adt_t
 
+# Strategically put _AsmFamily first so eq dispatches to it
 class SMTFamily(_AsmFamily, _RewriterFamily):
     '''
     Rewrites __call__ to ssa
