@@ -1,5 +1,6 @@
 from hwtypes import BitVector, SIntVector
 from peak import Peak
+from peak.family import PyFamily
 from .mode import gen_register_mode
 from .cond import cond
 from .lut import lut
@@ -10,7 +11,7 @@ def gen_pe(num_inputs):
     class PE(Peak):
 
         def __init__(self):
-            family = Data.get_family()
+            family = PyFamily()
             # Data registers
             self.data = [(gen_register_mode(family, Data)()) for i in range(num_inputs)]
 

@@ -54,25 +54,12 @@ class AbstractFamily(metaclass=ABCMeta):
 
 class _AsmFamily(AbstractFamily):
     '''
-    Family that swaps out annotations on __call__ with assembled variants
-    Also defines get_adt_t as the assembled version
+    Defines get_adt_t as the assembled version
     '''
     def  __init__(self, assembler, aadt_t, *asm_extras):
         self._assembler = assembler
         self._aadt_t = aadt_t
         self._asm_extras = asm_extras
-
-    def assemble(self, locals, globals):
-        def deco(cls):
-            call = cls.__call__
-            annotations = {}
-            for arg, t in call.__annotations__.items():
-                if hwtypes.is_adt_type(t):
-                    t = self.get_adt_t(t)
-                annotations[arg] = t
-            call.__annotations__ = annotations
-            return cls
-        return deco
 
     def get_adt_t(self, adt_t):
         if not hwtypes.is_adt_type(adt_t):
@@ -185,12 +172,11 @@ class SMTFamily(_AsmFamily, _RewriterFamily):
         return hwtypes.SMTUIntVector
 
     def assemble(self, locals, globals):
-        _asm_deco = _AsmFamily.assemble(self, locals, globals)
         _rew_deco = _RewriterFamily.assemble(self, locals, globals)
         def deco(cls):
             input_t = cls.__call__._input_t
             output_t = cls.__call__._output_t
-            cls = _asm_deco(_rew_deco(cls))
+            cls = _rew_deco(cls)
             cls.__call__._input_t = input_t
             cls.__call__._output_t = output_t
             return cls
@@ -226,9 +212,14 @@ class MagmaFamily(_AsmFamily):
 
     def assemble(self, locals, globals):
         env = SymbolTable(locals, globals)
-        _asm_deco = super().assemble(locals, globals)
         def deco(cls):
-            cls = _asm_deco(cls)
+            call = cls.__call__
+            annotations = {}
+            for arg, t in call.__annotations__.items():
+                if hwtypes.is_adt_type(t):
+                    t = self.get_adt_t(t)
+                annotations[arg] = t
+            call.__annotations__ = annotations
             cls = m.circuit.sequential(cls, env=env)
             return cls
         return deco
