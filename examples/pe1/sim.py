@@ -86,7 +86,6 @@ def alu(alu:ALU, signed:Signed, a:Data, b:Data, d:Bit):
         else:
             res, res_p = ~a, Bit(0)
     else:
-        A
         raise NotImplementedError(alu)
 
     Z = res == Bit(0)
