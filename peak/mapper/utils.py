@@ -11,6 +11,7 @@ from hwtypes.adt_util import rebind_type
 import pysmt.shortcuts as smt
 import typing as tp
 from hwtypes.adt_util import rebind_type
+from peak import family
 
 class Match: pass
 class Unbound: pass
@@ -255,7 +256,7 @@ def solved_to_bv(var, solver):
 def smt_binding_to_bv_binding(binding):
     ret_binding = []
     for ir_path, arch_path in binding:
-        arch_path = tuple(rebind_type(t, Bit.get_family()) for t in arch_path)
+        arch_path = tuple(rebind_type(t, family.PyFamily()) for t in arch_path)
         ret_binding.append((ir_path, arch_path))
     return ret_binding
 
