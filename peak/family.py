@@ -219,18 +219,19 @@ class MagmaFamily(_AsmFamily):
         return m.UInt
 
     def assemble(self, locals, globals):
+        def adtify(t_):
+            if hwtypes.is_adt_type(t_):
+                return self.get_adt_t(t_)
+            elif isinstance(t_, tuple):
+                return tuple(adtify(t__) for t__ in t_)
+            else:
+                return t_
         env = SymbolTable(locals, globals)
         def deco(cls):
             call = cls.__call__
             annotations = {}
-            adtify = lambda t_: self.get_adt_t(t_) if hwtypes.is_adt_type(t_) else t_
             for arg, t_ in call.__annotations__.items():
-                #return could be a tuple
-                if isinstance(t_, tuple):
-                    t_ = tuple(adtify(t__) for t__ in t_)
-                else:
-                    t_ = adtify(t_)
-                annotations[arg] = t_
+                annotations[arg] = adtify(t_)
             call.__annotations__ = annotations
             cls = m.circuit.sequential(cls, env=env)
             return cls
