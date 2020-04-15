@@ -17,7 +17,6 @@ def test_Enum():
     def PE_fc(family):
         Bit = family.Bit
         Ec = family.get_constructor(E)
-        print(Ec, type(Ec))
         @family.assemble(locals(), globals())
         class PEEnum(Peak, typecheck=True):
             def __call__(self, sel: Bit) -> E:
