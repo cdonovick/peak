@@ -206,5 +206,3 @@ def test_tuple_input():
             tester.eval()
             tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
-
-test_tuple_input()
