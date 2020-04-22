@@ -4,7 +4,7 @@ from peak import Peak, family_closure
 from peak.assembler import Assembler, AssembledADT
 from peak.rtl_utils import wrap_with_disassembler
 from peak import family
-from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
+from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum, Tuple
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
 
@@ -148,3 +148,63 @@ def test_composition():
         tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
+def test_tuple_input():
+
+    class Op(Enum):
+        And=1
+        Or=2
+
+    @family_closure
+    def PE_fc(family):
+
+        Bit = family.Bit
+        input_t = Tuple[Bit, Bit]
+
+        @family.assemble(locals(), globals())
+        class PE_Enum(Peak):
+            def __call__(self, op: Op, inputs: input_t) -> Bit:
+                if op == Op.And:
+                    return inputs[0] & inputs[1]
+                else: #op == Op.Or
+                    return inputs[0] | inputs[1]
+
+        return PE_Enum
+
+    # verify BV works
+    input_t = Tuple[Bit, Bit]
+    PE_bv = PE_fc(family.PyFamily())
+    vals = [Bit(0), Bit(1)]
+    for op in Op.enumerate():
+        for i0, i1 in itertools.product(vals, vals):
+            res = PE_bv()(op, input_t(i0, i1))
+            gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
+            assert res == gold
+
+    # verify BV works
+    input_t = Tuple[SMTBit, SMTBit]
+    PE_smt  = PE_fc(family.SMTFamily())
+    Op_aadt = AssembledADT[Op, Assembler, SMTBitVector]
+    vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
+    for op in Op.enumerate():
+        op = Op_aadt(op)
+        for i0, i1 in itertools.product(vals, vals):
+            res = PE_smt()(op, input_t(i0, i1))
+            gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
+            assert res == gold
+
+    # verify magma works
+    input_t = Tuple[Bit, Bit]
+    asm = Assembler(Op)
+    PE_magma = PE_fc(family.MagmaFamily())
+    tester = fault.Tester(PE_magma)
+    vals = [0, 1]
+    for op in (Op.And, Op.Or):
+        for i0, i1 in itertools.product(vals, vals):
+            gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
+            tester.circuit.op = int(asm.assemble(op))
+            tester.circuit.inputs = (i0, i1)
+            tester.eval()
+            tester.circuit.O.expect(gold)
+    tester.compile_and_run("verilator", flags=["-Wno-fatal"])
+
+test_tuple_input()
