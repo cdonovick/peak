@@ -110,33 +110,3 @@ class family_closure:
         res = self.fc(family, *args, **kwargs)
         self.cache[key] = res
         return res
-
-# Decorator for Peak classes to enable magma compilation and SMT mapping
-def assemble(family, locals, globals, assembler=Assembler):
-    def decorator(peak_cls):
-        if family is SMTBit.get_family():
-            call = peak_cls.__call__
-            input_t = call._input_t
-            output_t = call._output_t
-            for dec in (
-                begin_rewrite(),
-                ssa(),
-                bool_to_bit(),
-                if_to_phi(family.Bit.ite),
-                end_rewrite()):
-                call = dec(call)
-            call._input_t = input_t
-            call._output_t = output_t
-            peak_cls.__call__ = call
-        elif family is magma.get_family():
-            env = SymbolTable(locals, globals)
-            call = peak_cls.__call__
-            annotations = {}
-            for arg, t in call.__annotations__.items():
-                if is_adt_type(t):
-                    t = MagmaADT[t, Assembler, magma.Bits, magma.Direction.Undirected]
-                annotations[arg] = t
-            call.__annotations__ = annotations
-            peak_cls = magma.circuit.sequential(peak_cls, env=env)
-        return peak_cls
-    return decorator

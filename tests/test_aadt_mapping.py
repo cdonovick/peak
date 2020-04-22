@@ -2,7 +2,8 @@ from hwtypes import Bit, BitVector
 from hwtypes.adt import Enum, Product
 from peak.mapper.utils import pretty_print_binding
 from peak.mapper import ArchMapper
-from peak import Const, family_closure, Peak, name_outputs, assemble
+from peak import Const, family_closure, Peak, name_outputs
+from peak import family
 from examples.sum_pe.sim import PE_fc
 from examples.smallir import gen_SmallIR
 import pytest
@@ -11,7 +12,7 @@ num_test_vectors = 16
 def test_automapper():
     IR = gen_SmallIR(8)
     arch_fc = PE_fc
-    arch_bv = arch_fc(Bit.get_family())
+    arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
     expect_not_found = ('Mul', 'Shftr', 'Shftl')
@@ -23,7 +24,7 @@ def test_automapper():
             continue
         assert ir_name in expect_found
         #verify the mapping works
-        ir_bv = ir_fc(Bit.get_family())
+        ir_bv = ir_fc(family.PyFamily())
         for _ in range(num_test_vectors):
             ir_vals = {path:BitVector.random(8) for path in solution.ir_bounded}
             ir_inputs = solution.build_ir_input(ir_vals)
@@ -39,7 +40,7 @@ def test_const():
     def IR_fc(family):
         Data = family.BitVector[16]
 
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class IR(Peak):
             @name_outputs(out=Data)
             def __call__(self, const_value : Const(Data)):
@@ -56,7 +57,7 @@ def test_const():
             op = Op
             imm = Data
 
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class Arch(Peak):
             @name_outputs(out=Data)
             def __call__(self, inst : Const(Inst), in0 : Data, in1 : Data):
@@ -67,7 +68,7 @@ def test_const():
         return Arch
 
     arch_fc = Arch_fc
-    arch_bv = arch_fc(Bit.get_family())
+    arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     ir_fc = IR_fc
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
@@ -82,7 +83,7 @@ def test_const_tuple():
     @family_closure
     def IR_fc(family):
         Data = family.BitVector[16]
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class IR(Peak):
             def __call__(self, const_value : Const(Data)) -> Data:
                 return const_value
@@ -98,7 +99,7 @@ def test_const_tuple():
             op = Op
             imm = Data
 
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class Arch(Peak):
             def __call__(self, inst : Const(Inst), in0 : Data, in1 : Data) -> Data:
                 if inst.op == Op.add:
@@ -108,7 +109,7 @@ def test_const_tuple():
         return Arch
 
     arch_fc = Arch_fc
-    arch_bv = arch_fc(Bit.get_family())
+    arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     ir_fc = IR_fc
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
@@ -121,7 +122,7 @@ def test_early_out_inputs():
     def IR_fc(family):
         Data = family.BitVector[16]
 
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class IR(Peak):
             @name_outputs(out=Data)
             def __call__(self, const_value : Const(Data)):
@@ -131,7 +132,7 @@ def test_early_out_inputs():
     @family_closure
     def Arch_fc(family):
         Data = family.BitVector[16]
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class Arch(Peak):
             @name_outputs(out=Data)
             def __call__(self, in0 : Data, in1 : Data):
@@ -139,7 +140,7 @@ def test_early_out_inputs():
         return Arch
 
     arch_fc = Arch_fc
-    arch_bv = arch_fc(Bit.get_family())
+    arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     ir_fc = IR_fc
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
@@ -151,7 +152,7 @@ def test_early_out_outputs():
     @family_closure
     def IR_fc(family):
         Data = family.BitVector[16]
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class IR(Peak):
             @name_outputs(out=Data)
             def __call__(self, in_: Data):
@@ -162,7 +163,7 @@ def test_early_out_outputs():
     def Arch_fc(family):
         Data = family.BitVector[16]
         Bit = family.Bit
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class Arch(Peak):
             @name_outputs(out=Bit)
             def __call__(self, in_ : Data):
@@ -170,7 +171,7 @@ def test_early_out_outputs():
         return Arch
 
     arch_fc = Arch_fc
-    arch_bv = arch_fc(Bit.get_family())
+    arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     ir_fc = IR_fc
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
@@ -187,13 +188,13 @@ def test_constrain_constant_bv(opts):
     constraint = opts[0]
     solved = opts[1]
     arch_fc = PE_fc
-    arch_bv = arch_fc(Bit.get_family())
+    arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc, constrain_constant_bv=constraint)
 
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[8]
-        @assemble(family, locals(), globals())
+        @family.assemble(locals(), globals())
         class IR(Peak):
             @name_outputs(out=Data)
             def __call__(self, in0: Data, in1: Data):

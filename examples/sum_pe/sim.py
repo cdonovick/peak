@@ -1,14 +1,14 @@
 from hwtypes import Tuple
 
 from .isa import ISA_fc
-from peak import Peak, name_outputs, family_closure, assemble, Const
+from peak import Peak, name_outputs, family_closure, Const
 
 
 @family_closure
 def PE_fc(family):
     Inst, Operand0T, Operand1T, Word, T = ISA_fc(family)
 
-    @assemble(family, locals(), globals())
+    @family.assemble(locals(), globals())
     class PE(Peak):
 
         @name_outputs(out=Word)

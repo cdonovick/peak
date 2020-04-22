@@ -17,6 +17,7 @@ from .utils import pretty_print_binding
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
+from peak import family
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -45,7 +46,7 @@ class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
-        Peak_cls = _get_peak_cls(peak_fc(SMTBit.get_family()))
+        Peak_cls = _get_peak_cls(peak_fc(family.SMTFamily()))
         try:
             input_t = Peak_cls.input_t
             output_t = Peak_cls.output_t
@@ -140,9 +141,9 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        arch_input_flat_map = _create_flat_map(archmapper.peak_fc(SMTBit.get_family()).input_t)
+        arch_input_flat_map = _create_flat_map(archmapper.peak_fc(family.SMTFamily()).input_t)
 
-        ir_flat_map = _create_flat_map(self.peak_fc(SMTBit.get_family()).input_t)
+        ir_flat_map = _create_flat_map(self.peak_fc(family.SMTFamily()).input_t)
         #Verify all paths are the same
         assert set(ir_flat_map.keys()) == set(self.input_varmap.keys())
         for af in archmapper.input_forms:
@@ -156,8 +157,8 @@ class IRMapper(SMTMapper):
             return
 
         # Create output bindings
-        arch_output_flat_map = _create_flat_map(archmapper.peak_fc(SMTBit.get_family()).output_t)
-        ir_flat_map = _create_flat_map(self.peak_fc(SMTBit.get_family()).output_t)
+        arch_output_flat_map = _create_flat_map(archmapper.peak_fc(family.SMTFamily()).output_t)
+        ir_flat_map = _create_flat_map(self.peak_fc(family.SMTFamily()).output_t)
 
         #binding = [bidx]
         output_bindings = create_bindings(arch_output_flat_map, ir_flat_map)
@@ -253,7 +254,7 @@ class IRMapper(SMTMapper):
             return MapperSolution(is_solved, solver, self)
 
 def _bv_input_aadt_t(fc):
-    bv = fc(Bit.get_family())
+    bv = fc(family.PyFamily())
     input_aadt_t = AssembledADT[strip_modifiers(bv.input_t), Assembler, BitVector]
     return input_aadt_t
 

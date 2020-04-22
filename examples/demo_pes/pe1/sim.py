@@ -2,14 +2,16 @@ import typing as  tp
 import operator
 from .isa import *
 import functools as ft
-from peak import name_outputs, Peak
+from peak import name_outputs, Peak, family_closure
+from peak.family import AbstractFamily
 
-from hwtypes import TypeFamily
 
-def gen_alu(family : TypeFamily):
+@family_closure
+def gen_alu(family : AbstractFamily):
     Bit = family.Bit
     Data = family.BitVector[DATAWIDTH]
 
+    @family.assemble(locals(), globals())
     class Alu(Peak):
         @name_outputs(res=Data,flag_out=Bit)
         def __call__(self, inst : INST, data0 : Data, data1 : Data):
