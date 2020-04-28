@@ -18,6 +18,7 @@ before_install:
 - cd coreir_release && sudo make install && cd ..
 - pip install -U pip
 install:
+- pip install -e git://github.com/leonardt/fault.git@protocol-value#egg=fault
 - pip install pytest-cov fault mantle
 - pip install python-coveralls
 - pip install -e .
