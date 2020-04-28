@@ -30,6 +30,8 @@ Form = namedtuple("Form", ["value", "path_dict", "varmap"])
 class SMTForms(AssembledADTRecursor):
     def __call__(self, aadt_t, path=(), value=None) -> (tp.List[Form], tp.Mapping["path", SMTBitVector]):
         if value is not None:
+            print(value)
+            print(aadt_t)
             assert isinstance(value, aadt_t)
         return super().__call__(aadt_t, path=path, value=value)
 

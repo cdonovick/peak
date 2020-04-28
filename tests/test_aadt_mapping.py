@@ -2,7 +2,6 @@ from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import  AssembledADT
 from hwtypes import Bit, BitVector
 from hwtypes.adt import Enum, Product
-from peak.mapper.utils import pretty_print_binding
 from peak.mapper import ArchMapper, RewriteRule
 from peak import Const, family_closure, Peak, name_outputs
 from peak import family
@@ -58,11 +57,11 @@ def test_custom_rr():
 
         @family.assemble(locals(), globals())
         class Arch(Peak):
-            def __call__(self, inst : Const(Inst), a: Data, b: Data) -> Data:
+            def __call__(self, inst : Const(Inst), a: Data, b: Data) -> (Data, Data):
                 if inst == Inst.add:
-                    return a + b
+                    return a + b, a
                 else: #inst == Inst.sub
-                    return a - b
+                    return a - b, a
         return Arch, Inst
 
 
@@ -98,7 +97,7 @@ def test_custom_rr():
     arch_inputs = rr.build_arch_input(ir_vals, family.PyFamily())
     ir_bv = ir_fc(family.PyFamily())
     arch_bv = arch_fc(family.PyFamily())
-    assert ir_bv()(**ir_inputs) != arch_bv()(**arch_inputs)
+    assert ir_bv()(**ir_inputs) != arch_bv()(**arch_inputs)[0]
 
 
 #This will test the const modifier

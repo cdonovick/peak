@@ -13,7 +13,6 @@ from .utils import create_bindings
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import rebind_binding
-from .utils import pretty_print_binding
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
@@ -29,7 +28,6 @@ from functools import partial, reduce
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
 
-
 #Helper function to search for the one peak class
 def _get_peak_cls(fc_out):
     clss = []
@@ -41,6 +39,19 @@ def _get_peak_cls(fc_out):
     if len(clss) == 1:
         return clss[0]
     raise ValueError(f"Need to return one Peak class instead of {len(clss)} Peak classes: {fc_out}")
+
+
+# Wraps the oututs to be of type output_t
+def wrap_outputs(outputs, output_aadt):
+    output_t = output_aadt.adt_t
+    if not isinstance(outputs, tuple):
+        outputs = (outputs,)
+    if issubclass(output_t, Product):
+        ofields = {field:outputs[i] for i, field in enumerate(output_aadt.adt_t.field_dict)}
+        return output_aadt.from_fields(**ofields)
+    else:
+        assert issubclass(output_t, Tuple)
+        return output_aadt.from_fields(*outputs)
 
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
@@ -54,8 +65,8 @@ class SMTMapper:
             raise ValueError("Need to use gen_input_t and gen_output_t")
         stripped_input_t = strip_modifiers(input_t)
         stripped_output_t = strip_modifiers(output_t)
-        input_aadt_t = AssembledADT[stripped_input_t, Assembler, SBV]
-        output_aadt_t = AssembledADT[stripped_output_t, Assembler, SBV]
+        input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
+        output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
 
         input_forms, input_varmap = SMTForms()(input_aadt_t)
 
@@ -66,14 +77,7 @@ class SMTMapper:
 
             #Construct output_aadt value
             outputs = Peak_cls()(**inputs)
-            if not isinstance(outputs, tuple):
-                outputs = (outputs,)
-            if issubclass(stripped_output_t, Product):
-                ofields = {field:outputs[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
-                output_value = output_aadt_t.from_fields(**ofields)
-            else:
-                assert issubclass(stripped_output_t, Tuple)
-                output_value = output_aadt_t.from_fields(*outputs)
+            output_value = wrap_outputs(outputs, output_aadt_t)
 
             forms, output_varmap = SMTForms()(output_aadt_t, value=output_value)
             #Check consistency of SMTForms
@@ -174,6 +178,20 @@ class RewriteRule:
         #create dict of input values
         return aadt_product_to_dict(input_val)
 
+    def parse_ir_output(self, outputs):
+        output_t = self.ir_fc(family.SMTFamily()).output_t
+        output_aadt = family.SMTFamily().get_adt_t(output_t)
+        output_value = wrap_outputs(outputs, output_aadt)
+        _, values = SMTForms()(output_aadt, value=output_value)
+        return values
+
+    def parse_arch_output(self, outputs):
+        output_t = self.arch_fc(family.SMTFamily()).output_t
+        output_aadt = family.SMTFamily().get_adt_t(output_t)
+        output_value = wrap_outputs(outputs, output_aadt)
+        _, values = SMTForms()(output_aadt, value=output_value)
+        return values
+
     # Returns a counterexample if found, otherwise None
     def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
         # create free variable for each ir_val
@@ -183,7 +201,17 @@ class RewriteRule:
         arch_inputs = self.build_arch_input(ir_vars, family.SMTFamily())
         ir = self.ir_fc(family.SMTFamily())()
         arch = self.arch_fc(family.SMTFamily())()
-        formula = ir(**ir_inputs) != arch(**arch_inputs)
+        ir_out_values = self.parse_ir_output(ir(**ir_inputs))
+        arch_out_values = self.parse_arch_output(arch(**arch_inputs))
+
+        outputs = []
+        for ir_path, arch_path in self.obinding:
+            if ir_path not in ir_out_values:
+                raise ValueError(f"{ir_path} is not valid")
+            if arch_path not in arch_out_values:
+                raise ValueError(f"{arch_path} is not valid")
+            outputs.append(ir_out_values[ir_path] != arch_out_values[arch_path])
+        formula = or_reduce(outputs)
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(formula.value)
             verified = not solver.solve()
@@ -195,7 +223,7 @@ class RewriteRule:
 def _free_var_from_t(T):
     if issubclass(T, SBV):
         return T()
-    aadt_t = AssembledADT[T, Assembler, family.SMTFamily()]
+    aadt_t = family.SMTFamily().get_adt_t(T)
     adt_t, assembler_t, bv_t = aadt_t.fields
     assembler = assembler_t(adt_t)
     return bv_t[assembler.width]()
