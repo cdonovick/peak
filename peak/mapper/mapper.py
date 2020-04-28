@@ -12,8 +12,7 @@ from .utils import Unbound, Match
 from .utils import create_bindings
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
-from .utils import smt_binding_to_bv_binding
-from .utils import pretty_print_binding
+from .utils import rebind_binding
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
@@ -29,7 +28,6 @@ from functools import partial, reduce
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
 
-
 #Helper function to search for the one peak class
 def _get_peak_cls(fc_out):
     clss = []
@@ -41,6 +39,19 @@ def _get_peak_cls(fc_out):
     if len(clss) == 1:
         return clss[0]
     raise ValueError(f"Need to return one Peak class instead of {len(clss)} Peak classes: {fc_out}")
+
+
+# Wraps the oututs to be of type output_t
+def wrap_outputs(outputs, output_aadt):
+    output_t = output_aadt.adt_t
+    if not isinstance(outputs, tuple):
+        outputs = (outputs,)
+    if issubclass(output_t, Product):
+        ofields = {field:outputs[i] for i, field in enumerate(output_aadt.adt_t.field_dict)}
+        return output_aadt.from_fields(**ofields)
+    else:
+        assert issubclass(output_t, Tuple)
+        return output_aadt.from_fields(*outputs)
 
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
@@ -54,8 +65,8 @@ class SMTMapper:
             raise ValueError("Need to use gen_input_t and gen_output_t")
         stripped_input_t = strip_modifiers(input_t)
         stripped_output_t = strip_modifiers(output_t)
-        input_aadt_t = AssembledADT[stripped_input_t, Assembler, SBV]
-        output_aadt_t = AssembledADT[stripped_output_t, Assembler, SBV]
+        input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
+        output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
 
         input_forms, input_varmap = SMTForms()(input_aadt_t)
 
@@ -66,14 +77,7 @@ class SMTMapper:
 
             #Construct output_aadt value
             outputs = Peak_cls()(**inputs)
-            if not isinstance(outputs, tuple):
-                outputs = (outputs,)
-            if issubclass(stripped_output_t, Product):
-                ofields = {field:outputs[i] for i, field in enumerate(output_aadt_t.adt_t.field_dict)}
-                output_value = output_aadt_t.from_fields(**ofields)
-            else:
-                assert issubclass(stripped_output_t, Tuple)
-                output_value = output_aadt_t.from_fields(*outputs)
+            output_value = wrap_outputs(outputs, output_aadt_t)
 
             forms, output_varmap = SMTForms()(output_aadt_t, value=output_value)
             #Check consistency of SMTForms
@@ -123,6 +127,106 @@ def _create_flat_map(adt_t, path=(), mods=[]):
         flatmap[path] = wrap_modifier(adt_t, mods)
     return flatmap
 
+
+class RewriteRule:
+    def __init__(self, ibinding, obinding, ir_fc, arch_fc):
+        #Contains all the ir paths that are bound to arch paths
+        ir_bounded = set()
+        for ir_path, arch_path in ibinding:
+            if isinstance(ir_path, tuple):
+                ir_bounded.add(ir_path)
+            elif not isinstance(ir_path, BitVector):
+                raise ValueError(f"{ir_path} is not valid for binding")
+
+        #These are PyFamily bindings
+        self.ibinding = ibinding
+        self.obinding = obinding
+        self.ir_bounded = ir_bounded
+        self.ir_fc = ir_fc
+        self.arch_fc = arch_fc
+
+    def build_ir_input(self, ir_inputs : tp.Mapping["path", BitVector], family):
+        ir_binding = [(val, path) for path, val in ir_inputs.items()]
+        ir_input_aadt_t = _input_aadt_t(self.ir_fc, family)
+        complete_binding = SimplifyBinding()(ir_input_aadt_t, ir_binding)
+        #internally verify entire binding was simplified to a constant
+        assert len(complete_binding)==1
+        assert complete_binding[0][1] is ()
+        input_val = complete_binding[0][0]
+
+        #create dict of input values
+        return aadt_product_to_dict(input_val)
+
+    def build_arch_input(self, ir_inputs : tp.Mapping["path", BitVector], family):
+        arch_bindings = {}
+        complete_binding = []
+        ibinding = rebind_binding(self.ibinding, family)
+        for ir_path, arch_path in ibinding:
+            if isinstance(ir_path, tuple):
+                if ir_path not in ir_inputs:
+                    raise ValueError(f"{ir_path} must be in ir_inputs")
+                complete_binding.append((ir_inputs[ir_path], arch_path))
+            else:
+                complete_binding.append((ir_path, arch_path))
+        arch_input_aadt_t = _input_aadt_t(self.arch_fc, family)
+        complete_binding = SimplifyBinding()(arch_input_aadt_t, complete_binding)
+        #internally verify entire binding was simplified to a constant
+        assert len(complete_binding)==1
+        assert complete_binding[0][1] is ()
+        input_val = complete_binding[0][0]
+
+        #create dict of input values
+        return aadt_product_to_dict(input_val)
+
+    def parse_ir_output(self, outputs):
+        output_t = self.ir_fc(family.SMTFamily()).output_t
+        output_aadt = family.SMTFamily().get_adt_t(output_t)
+        output_value = wrap_outputs(outputs, output_aadt)
+        _, values = SMTForms()(output_aadt, value=output_value)
+        return values
+
+    def parse_arch_output(self, outputs):
+        output_t = self.arch_fc(family.SMTFamily()).output_t
+        output_aadt = family.SMTFamily().get_adt_t(output_t)
+        output_value = wrap_outputs(outputs, output_aadt)
+        _, values = SMTForms()(output_aadt, value=output_value)
+        return values
+
+    # Returns a counterexample if found, otherwise None
+    def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
+        # create free variable for each ir_val
+        ir_path_types = _create_flat_map(strip_modifiers(self.ir_fc(family.SMTFamily()).input_t))
+        ir_vars = {path:_free_var_from_t(ir_path_types[path]) for path in self.ir_bounded}
+        ir_inputs = self.build_ir_input(ir_vars, family.SMTFamily())
+        arch_inputs = self.build_arch_input(ir_vars, family.SMTFamily())
+        ir = self.ir_fc(family.SMTFamily())()
+        arch = self.arch_fc(family.SMTFamily())()
+        ir_out_values = self.parse_ir_output(ir(**ir_inputs))
+        arch_out_values = self.parse_arch_output(arch(**arch_inputs))
+
+        outputs = []
+        for ir_path, arch_path in self.obinding:
+            if ir_path not in ir_out_values:
+                raise ValueError(f"{ir_path} is not valid")
+            if arch_path not in arch_out_values:
+                raise ValueError(f"{arch_path} is not valid")
+            outputs.append(ir_out_values[ir_path] != arch_out_values[arch_path])
+        formula = or_reduce(outputs)
+        with smt.Solver(solver_name, logic=BV) as solver:
+            solver.add_assertion(formula.value)
+            verified = not solver.solve()
+            if verified:
+                return None
+            else:
+                return {path: solved_to_bv(var, solver) for path, var in ir_vars.items()}
+
+def _free_var_from_t(T):
+    if issubclass(T, SBV):
+        return T()
+    aadt_t = family.SMTFamily().get_adt_t(T)
+    adt_t, assembler_t, bv_t = aadt_t.fields
+    assembler = assembler_t(adt_t)
+    return bv_t[assembler.width]()
 
 class IRMapper(SMTMapper):
     def __init__(self, archmapper, ir_fc):
@@ -244,94 +348,51 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         custom_enumeration : tp.Mapping[type, tp.Callable] = {}
-    ):
+    ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
-            return MapperSolution(False, None, None)
+            return None
 
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)
             is_solved = solver.solve()
-            return MapperSolution(is_solved, solver, self)
+            if not is_solved:
+                return None
+            return rr_from_solver(solver, self)
 
-def _bv_input_aadt_t(fc):
-    bv = fc(family.PyFamily())
-    input_aadt_t = AssembledADT[strip_modifiers(bv.input_t), Assembler, BitVector]
+def _input_aadt_t(fc, family):
+    bv = fc(family)
+    input_aadt_t = AssembledADT[strip_modifiers(bv.input_t), Assembler, family.BitVector]
     return input_aadt_t
 
-class MapperSolution:
-    def __init__(self, is_solved, solver, irmapper):
-        self.solved = is_solved
-        if not is_solved:
-            return
-        im = irmapper
-        am = irmapper.archmapper
 
-        arch_input_form_val = log2(int(solved_to_bv(am.input_form_var, solver)))
-        ib_val = log2(int(solved_to_bv(im.ib_var, solver)))
-        ob_val = log2(int(solved_to_bv(im.ob_var, solver)))
+def rr_from_solver(solver, irmapper):
+    im = irmapper
+    am = irmapper.archmapper
 
-        ibinding = im.input_bindings[arch_input_form_val][ib_val]
-        obinding = im.output_bindings[ob_val]
+    arch_input_form_val = log2(int(solved_to_bv(am.input_form_var, solver)))
+    ib_val = log2(int(solved_to_bv(im.ib_var, solver)))
+    ob_val = log2(int(solved_to_bv(im.ob_var, solver)))
 
-        #extract, simplify, and convert constants to BV in the input binding 
-        bv_ibinding = []
-        #Contains all the ir paths that are bound to arch paths
-        ir_bounded = set()
-        for ir_path, arch_path in ibinding:
-            if ir_path is Unbound:
-                var = am.input_varmap[arch_path]
-                bv_val = solved_to_bv(var, solver)
-                ir_path = bv_val
-            else:
-                ir_bounded.add(ir_path)
-            bv_ibinding.append((ir_path, arch_path))
+    ibinding = im.input_bindings[arch_input_form_val][ib_val]
+    obinding = im.output_bindings[ob_val]
 
-        bv_ibinding = smt_binding_to_bv_binding(bv_ibinding)
+    #extract, simplify, and convert constants to BV in the input binding 
+    bv_ibinding = []
+    for ir_path, arch_path in ibinding:
+        if ir_path is Unbound:
+            var = am.input_varmap[arch_path]
+            bv_val = solved_to_bv(var, solver)
+            ir_path = bv_val
+        bv_ibinding.append((ir_path, arch_path))
 
-        arch_input_aadt_t = _bv_input_aadt_t(am.peak_fc)
+    bv_ibinding = rebind_binding(bv_ibinding, family.PyFamily())
 
-        bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
-        bv_ibinding = _strip_aadt(bv_ibinding)
+    arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
 
-        self.ibinding = bv_ibinding
-        self.obinding = obinding
-        self.ir_bounded = ir_bounded
+    bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
+    bv_ibinding = _strip_aadt(bv_ibinding)
+    return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
-        self.im = im
-        self.am = am
-
-    def build_ir_input(self, ir_inputs : tp.Mapping["path", BitVector]):
-        ir_binding = [(val, path) for path, val in ir_inputs.items()]
-
-        ir_input_aadt_t = _bv_input_aadt_t(self.im.peak_fc)
-        complete_binding = SimplifyBinding()(ir_input_aadt_t, ir_binding)
-        #internally verify entire binding was simplified to a constant
-        assert len(complete_binding)==1
-        assert complete_binding[0][1] is ()
-        input_val = complete_binding[0][0]
-
-        #create dict of input values
-        return aadt_product_to_dict(input_val)
-
-    def build_arch_input(self, ir_inputs : tp.Mapping["path", BitVector]):
-        arch_bindings = {}
-        complete_binding = []
-        for ir_path, arch_path in self.ibinding:
-            if isinstance(ir_path, tuple):
-                if ir_path not in ir_inputs:
-                    raise ValueError(f"{ir_path} must be in ir_inputs")
-                complete_binding.append((ir_inputs[ir_path], arch_path))
-            else:
-                complete_binding.append((ir_path, arch_path))
-        arch_input_aadt_t = _bv_input_aadt_t(self.am.peak_fc)
-        complete_binding = SimplifyBinding()(arch_input_aadt_t, complete_binding)
-        #internally verify entire binding was simplified to a constant
-        assert len(complete_binding)==1
-        assert complete_binding[0][1] is ()
-        input_val = complete_binding[0][0]
-
-        #create dict of input values
-        return aadt_product_to_dict(input_val)
 
 def _strip_aadt(binding):
     ret_binding = []

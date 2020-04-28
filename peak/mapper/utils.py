@@ -252,11 +252,17 @@ def solved_to_bv(var, solver):
     else:
         return BitVector[var.size](solver_value)
 
-#returns a binding where all aadt values are changed to binding
-def smt_binding_to_bv_binding(binding):
+#returns a binding where all aadt values are changed to family
+def rebind_binding(binding, _family):
     ret_binding = []
     for ir_path, arch_path in binding:
-        arch_path = tuple(rebind_type(t, family.PyFamily()) for t in arch_path)
+        arch_path = tuple(rebind_type(t, _family) for t in arch_path)
+        if isinstance(ir_path, family.PyFamily().BitVector):
+            ir_path = _family.BitVector[ir_path.size](ir_path.value)
+        elif isinstance(ir_path, family.SMTFamily().BitVector):
+            if not ir_path._value_.is_constant():
+                raise ValueError("Cannot convert non-const SMT var to Py")
+            ir_path = _family.BitVector[ir_path.size](ir_path._value_.constant_value())
         ret_binding.append((ir_path, arch_path))
     return ret_binding
 
