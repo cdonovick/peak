@@ -1,7 +1,7 @@
 import pytest
 
 from peak import Peak, family_closure
-from peak.assembler import Assembler, AssembledADT
+from peak.assembler import Assembler, AssembledADT, MagmaADT
 from peak.rtl_utils import wrap_with_disassembler
 from peak import family
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum, Tuple
@@ -161,14 +161,14 @@ def test_tuple_input():
         input_t = Tuple[Bit, Bit]
 
         @family.assemble(locals(), globals())
-        class PE_Enum(Peak):
+        class PE_Enum_tuple(Peak):
             def __call__(self, op: Op, inputs: input_t) -> Bit:
                 if op == Op.And:
                     return inputs[0] & inputs[1]
                 else: #op == Op.Or
                     return inputs[0] | inputs[1]
 
-        return PE_Enum
+        return PE_Enum_tuple
 
     # verify BV works
     input_t = Tuple[Bit, Bit]
@@ -193,16 +193,16 @@ def test_tuple_input():
             assert res == gold
 
     # verify magma works
-    input_t = Tuple[Bit, Bit]
+    input_t = MagmaADT[Tuple[Bit, Bit], Assembler, magma.Bits]
     asm = Assembler(Op)
     PE_magma = PE_fc(family.MagmaFamily())
     tester = fault.Tester(PE_magma)
-    vals = [0, 1]
+    vals = [Bit(0), Bit(1)]
     for op in (Op.And, Op.Or):
         for i0, i1 in itertools.product(vals, vals):
             gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
             tester.circuit.op = int(asm.assemble(op))
-            tester.circuit.inputs = (i0, i1)
+            tester.circuit.inputs = input_t(Tuple[Bit, Bit](i0, i1))
             tester.eval()
             tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
