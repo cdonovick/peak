@@ -51,6 +51,8 @@ class AbstractFamily(metaclass=ABCMeta):
     @abstractmethod
     def get_adt_t(self, adt_t): pass
 
+    @abstractmethod
+    def get_constructor(self, adt_t): pass
 
 class _AsmFamily(AbstractFamily):
     '''
@@ -66,6 +68,9 @@ class _AsmFamily(AbstractFamily):
             raise TypeError(f'expected adt_t not {adt_t}')
 
         return self._aadt_t[(adt_t, self._assembler, self.BitVector, *self._asm_extras)]
+
+    def get_constructor(self, adt_t):
+        return self.get_adt_t(adt_t).from_fields
 
     def __eq__(self, other):
         if isinstance(other, type(self)):
@@ -142,6 +147,9 @@ class PyFamily(AbstractFamily):
     def get_adt_t(self, adt_t):
         return adt_t
 
+    def get_constructor(self, adt_t):
+        return adt_t
+
 # Strategically put _AsmFamily first so eq dispatches to it
 class SMTFamily(_AsmFamily, _RewriterFamily):
     '''
@@ -211,14 +219,19 @@ class MagmaFamily(_AsmFamily):
         return m.UInt
 
     def assemble(self, locals, globals):
+        def adtify(t_):
+            if hwtypes.is_adt_type(t_):
+                return self.get_adt_t(t_)
+            elif isinstance(t_, tuple):
+                return tuple(adtify(t__) for t__ in t_)
+            else:
+                return t_
         env = SymbolTable(locals, globals)
         def deco(cls):
             call = cls.__call__
             annotations = {}
-            for arg, t in call.__annotations__.items():
-                if hwtypes.is_adt_type(t):
-                    t = self.get_adt_t(t)
-                annotations[arg] = t
+            for arg, t_ in call.__annotations__.items():
+                annotations[arg] = adtify(t_)
             call.__annotations__ = annotations
             cls = m.circuit.sequential(cls, env=env)
             return cls

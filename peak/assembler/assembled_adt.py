@@ -25,7 +25,7 @@ RESERVED_NAMES = frozenset({
 })
 
 #Given a layout specification and field values, construct a bitvector using concatenation
-def _create_from_layout(width, layout, field_bvs, default_bv : AbstractBitVector[1]):
+def _create_from_layout(width, layout, field_bvs, bv_type: AbstractBitVector, default_value: int):
     if layout.keys() != field_bvs.keys():
         raise ValueError('layout does not match field_bvs')
     ranges = sorted(layout.values())
@@ -37,13 +37,14 @@ def _create_from_layout(width, layout, field_bvs, default_bv : AbstractBitVector
             for r0, r1 in zip(ranges, ranges[1:])):
         raise ValueError('invalid layout')
 
-    slots = [default_bv for i in range(width)]
+    slots = [bv_type[1](default_value) for i in range(width)]
     for field_name, (low, hi) in layout.items():
         # need to add None to keep the indexing consistent
         slots[low:hi] = field_bvs[field_name], *(None for _ in range(low+1, hi))
-    bv = reduce(type(default_bv).concat, (s for s in slots if s is not None))
+    bv = reduce(bv_type.concat, (s for s in slots if s is not None))
     assert bv.size == width
-    return bv
+    #Need to cast to bv_type since magma's concats do not return bv_type
+    return bv_type[width](bv)
 
 
 def _as_bv(v):
@@ -66,7 +67,7 @@ def _tuple_builder(cls, *args, default_bv):
     assembler = cls.assembler_t(adt_t)
     fields = {i: _as_bv(cls[i](v)) for i, v in enumerate(args)}
     bv_value = _create_from_layout(
-            assembler.width, assembler.layout, fields, default_bv)
+            assembler.width, assembler.layout, fields, cls.bv_type, default_bv)
     return cls(bv_value)
 
 
@@ -77,7 +78,7 @@ def _product_builder(cls, *, default_bv, **kwargs):
 
     fields = {k: _as_bv(getattr(cls, k)(v)) for k, v in kwargs.items()}
     bv_value = _create_from_layout(
-            assembler.width, assembler.layout, fields, default_bv)
+            assembler.width, assembler.layout, fields, cls.bv_type, default_bv)
     return cls(bv_value)
 
 
@@ -100,7 +101,7 @@ def _sum_builder(cls, T, value, *, tag_bv, default_bv):
     }
 
     bv_value = _create_from_layout(
-            assembler.width, layout, fields, default_bv)
+            assembler.width, layout, fields, cls.bv_type, default_bv)
     return cls(bv_value)
 
 
@@ -111,7 +112,7 @@ class AssembledADTMeta(BoundMeta):
         assembler = cls.assembler_t(cls.adt_t)
         default_bv_arg = (
             f'default_bv',
-            f'tp.Optional[{cls.bv_type.__name__!r}[1]] = None',
+            f'tp.Optional[int] = 0',
         )
         if is_modified(cls.adt_t):
             raise TypeError(f"Cannot create Assembled ADT from a modified adt type {cls.adt_t}")
@@ -129,6 +130,11 @@ class AssembledADTMeta(BoundMeta):
             sig = ', '.join(map(': '.join, sig_args))
             builder_args = ', '.join(k[0] for k in arg_strs)
             builder = _tuple_builder
+        elif issubclass(cls.adt_t, Enum):
+            sig = f"value, {default_bv_arg[0]}: {default_bv_arg[1]}"
+            builder_args = "value"
+            def builder(cls, v, default_bv):
+                return cls(v)
         elif issubclass(cls.adt_t, Sum):
             value_types = ', '.join(
                 map(
@@ -152,9 +158,6 @@ class AssembledADTMeta(BoundMeta):
         from_fields = f'''
 @classmethod
 def from_fields(cls, {sig}) -> {cls.__name__!r}:
-    if default_bv is None:
-        default_bv = cls.bv_type[1](0)
-
     return builder(cls, {builder_args}, default_bv=default_bv)
 '''
         env = dict(builder=builder, tp=tp)
@@ -224,13 +227,12 @@ class AssembledADT(metaclass=AssembledADTMeta):
     def __init__(self, adt):
         cls = type(self)
         self._assembler_ = assembler = cls.assembler_t(cls.adt_t)
-
         if isinstance(adt, cls):
             self._value_ =  adt._value_
         elif isinstance(adt, cls.adt_t):
             self._value_ = assembler.assemble(adt, cls.bv_type)
         elif not isinstance(adt, cls.bv_type[assembler.width]):
-            raise TypeError(f'expected {cls.bv_type[assembler.width]} or {cls.adt_t} not {adt}')
+            raise TypeError(f'expected {cls.bv_type[assembler.width]} or {cls.adt_t} not {adt}:{type(adt)}')
         else:
             self._value_ = adt
 
