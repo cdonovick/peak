@@ -51,17 +51,22 @@ def test_custom_rr():
     @family_closure
     def PE_fc(family):
         Data = family.BitVector[16]
-        class Inst(Enum):
-            add = 1
-            sub = 2
-
+        class Inst(Product):
+            class Op(Enum):
+                add = 1
+                sub = 2
+            sel=family.Bit
         @family.assemble(locals(), globals())
         class Arch(Peak):
             def __call__(self, inst : Const(Inst), a: Data, b: Data) -> (Data, Data):
-                if inst == Inst.add:
-                    return a + b, a
+                if inst.Op == Inst.Op.add:
+                    ret = a + b
                 else: #inst == Inst.sub
-                    return a - b, a
+                    ret = a - b
+                if inst.sel:
+                    return ret, ret
+                else:
+                    return ~ret, ~ret
         return Arch, Inst
 
 
@@ -76,7 +81,8 @@ def test_custom_rr():
     input_binding = [
         (("in0",), ("a",)),
         (("in1",), ("b",)),
-        (Inst_adt(Inst_bv.add)._value_, ("inst",)),
+        (Inst_adt.Op(Inst_bv.Op.add)._value_, ("inst", "Op",)),
+        (Bit(1), ("inst", "sel",)),
     ]
     rr = RewriteRule(input_binding, output_binding, ir_fc, arch_fc)
     assert rr.verify() is None
@@ -85,7 +91,8 @@ def test_custom_rr():
     input_binding = [
         (("in0",), ("a",)),
         (("in1",), ("b",)),
-        (Inst_adt(Inst_bv.sub)._value_, ("inst",)),
+        (Inst_adt.Op(Inst_bv.Op.sub)._value_, ("inst", "Op",)),
+        (Bit(0), ("inst", "sel",)),
     ]
     rr = RewriteRule(input_binding, output_binding, ir_fc, arch_fc)
     counter_example = rr.verify()

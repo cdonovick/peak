@@ -252,17 +252,29 @@ def solved_to_bv(var, solver):
     else:
         return BitVector[var.size](solver_value)
 
+def rebind_value(val, _family):
+    if isinstance(val, family.PyFamily().BitVector):
+        return _family.BitVector[val.size](val.value)
+    elif isinstance(val, family.PyFamily().Bit):
+        return _family.Bit(val)
+    elif isinstance(val, family.SMTFamily().BitVector):
+        if not val._value_.is_constant():
+            raise ValueError("Cannot convert non-const SMT var to Py")
+        return _family.BitVector[val.size](val._value_.constant_value())
+    elif isinstance(val, family.SMTFamily().Bit):
+        if not val._value_.is_constant():
+            raise ValueError("Cannot convert non-const SMT var to Py")
+        return _family.Bit(val._value_.constant_value())
+    else:
+        raise ValueError(f"Cannot rebind value: {val}")
+
 #returns a binding where all aadt values are changed to family
 def rebind_binding(binding, _family):
     ret_binding = []
     for ir_path, arch_path in binding:
         arch_path = tuple(rebind_type(t, _family) for t in arch_path)
-        if isinstance(ir_path, family.PyFamily().BitVector):
-            ir_path = _family.BitVector[ir_path.size](ir_path.value)
-        elif isinstance(ir_path, family.SMTFamily().BitVector):
-            if not ir_path._value_.is_constant():
-                raise ValueError("Cannot convert non-const SMT var to Py")
-            ir_path = _family.BitVector[ir_path.size](ir_path._value_.constant_value())
+        if not isinstance(ir_path, tuple):
+            ir_path = rebind_value(ir_path, _family)
         ret_binding.append((ir_path, arch_path))
     return ret_binding
 
