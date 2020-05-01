@@ -135,6 +135,8 @@ class RewriteRule:
         for ir_path, arch_path in ibinding:
             if isinstance(ir_path, tuple):
                 ir_bounded.add(ir_path)
+            elif isinstance(ir_path, Bit):
+                ir_path = BitVector[1](ir_path)
             elif not isinstance(ir_path, BitVector):
                 raise ValueError(f"{ir_path} is not valid for binding")
 
