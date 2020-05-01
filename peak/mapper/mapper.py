@@ -135,7 +135,7 @@ class RewriteRule:
         for ir_path, arch_path in ibinding:
             if isinstance(ir_path, tuple):
                 ir_bounded.add(ir_path)
-            elif not isinstance(ir_path, BitVector):
+            elif not isinstance(ir_path, (BitVector, Bit)):
                 raise ValueError(f"{ir_path} is not valid for binding")
 
         #These are PyFamily bindings
