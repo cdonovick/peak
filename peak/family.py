@@ -49,6 +49,9 @@ class AbstractFamily(metaclass=ABCMeta):
     def assemble(self, locals, globals): pass
 
     @abstractmethod
+    def assemble_function(self, locals, globals): pass
+
+    @abstractmethod
     def get_adt_t(self, adt_t): pass
 
     @abstractmethod
@@ -92,18 +95,25 @@ class _RewriterFamily(AbstractFamily):
     def __init__(self, passes=()):
         self._passes = passes
 
-    def assemble(self, locals, globals):
+
+    def assemble_function(self, locals, globals):
         env = SymbolTable(locals, globals)
+        def deco(f):
+            if not self._passes:
+                return f
+            # only rewrite if necesarry
+            f = begin_rewrite(env=env)(f)
+            for dec in self._passes:
+                f = dec(f)
+            f = end_rewrite()(f)
+            return f
+        return deco
+
+    def assemble(self, locals, globals):
         def deco(cls):
             if not self._passes:
                 return cls
-            # only rewrite if necesarry
-            call = cls.__call__
-            call = begin_rewrite(env=env)(call)
-            for dec in self._passes:
-                call = dec(call)
-            call = end_rewrite()(call)
-            cls.__call__ = call
+            cls.__call__ = self.assemble_function(locals, globals)(cls.__call__)
             return cls
         return deco
 
@@ -138,6 +148,11 @@ class PyFamily(AbstractFamily):
     @property
     def Unsigned(self):
         return hwtypes.UIntVector
+
+    def assemble_function(self, locals, globals):
+        def deco(f):
+            return f
+        return deco
 
     def assemble(self, locals, globals):
         def deco(cls):
@@ -217,6 +232,25 @@ class MagmaFamily(_AsmFamily):
     @property
     def Unsigned(self):
         return m.UInt
+
+    def assemble_function(self, locals, globals):
+        def adtify(t_):
+            if hwtypes.is_adt_type(t_):
+                return self.get_adt_t(t_)
+            elif isinstance(t_, tuple):
+                return tuple(adtify(t__) for t__ in t_)
+            else:
+                return t_
+        env = SymbolTable(locals, globals)
+        def deco(f):
+            annotations = {}
+            for arg, t_ in f.__annotations__.items():
+                annotations[arg] = adtify(t_)
+                env[arg] = annotations[arg]
+            f.__annotations__ = annotations
+            f = m.circuit.combinational(f, env=env)
+            return f
+        return deco
 
     def assemble(self, locals, globals):
         def adtify(t_):
