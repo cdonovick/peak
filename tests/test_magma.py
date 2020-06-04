@@ -1,6 +1,5 @@
 import pytest
-
-from peak import Peak, family_closure
+from peak import Peak, family_closure, Const
 from peak.assembler import Assembler, AssembledADT
 from peak.rtl_utils import wrap_with_disassembler
 from peak import family
@@ -60,7 +59,7 @@ def test_enum():
         Bit = family.Bit
         @family.assemble(locals(), globals())
         class PE_Enum(Peak):
-            def __call__(self, op: Op, in0: Bit, in1: Bit) -> Bit:
+            def __call__(self, op: Const(Op), in0: Bit, in1: Bit) -> Bit:
                 if op == Op.And:
                     return in0 & in1
                 else: #op == Op.Or
