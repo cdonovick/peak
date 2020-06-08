@@ -65,6 +65,8 @@ class _AsmFamily(AbstractFamily):
         self._asm_extras = asm_extras
 
     def get_adt_t(self, adt_t):
+        if issubclass(adt_t, (self.Bit, self.BitVector)):
+            return adt_t
         if not hwtypes.is_adt_type(adt_t):
             raise TypeError(f'expected adt_t not {adt_t}')
 
