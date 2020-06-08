@@ -404,7 +404,6 @@ def _input_aadt_t(fc, family):
     return input_aadt_t
 
 
-#TODO This will need to be changed
 def rr_from_solver(solver, irmapper):
     im = irmapper
     am = irmapper.archmapper
@@ -429,7 +428,7 @@ def rr_from_solver(solver, irmapper):
 
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
 
-    #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
+    bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = _strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
