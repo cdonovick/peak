@@ -3,9 +3,9 @@ from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
 from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
-from hwtypes.modifiers import strip_modifiers, push_modifiers, wrap_modifier, unwrap_modifier
+from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
-from .utils import SMTForms, SimplifyBinding, pretty_print_binding
+from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
 from .utils import create_bindings
 from .utils import aadt_product_to_dict
@@ -424,9 +424,7 @@ def rr_from_solver(solver, irmapper):
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
 
-    print("I1")
-    pretty_print_binding(ibinding)
-    #extract, simplify, and convert constants to BV in the input binding 
+    #extract, simplify, and convert constants to BV in the input binding
     bv_ibinding = []
     for ir_path, arch_path in ibinding:
         if ir_path is Unbound:
@@ -435,11 +433,7 @@ def rr_from_solver(solver, irmapper):
             ir_path = bv_val
         bv_ibinding.append((ir_path, arch_path))
 
-    print("I2")
-    pretty_print_binding(bv_ibinding)
     bv_ibinding = rebind_binding(bv_ibinding, family.PyFamily())
-    print("I3")
-    pretty_print_binding(bv_ibinding)
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
 
     bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
