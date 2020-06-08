@@ -5,7 +5,7 @@ from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
 from hwtypes.modifiers import strip_modifiers, push_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
-from .utils import SMTForms, SimplifyBinding
+from .utils import SMTForms, SimplifyBinding, pretty_print_binding
 from .utils import Unbound, Match
 from .utils import create_bindings
 from .utils import aadt_product_to_dict
@@ -266,6 +266,13 @@ class IRMapper(SMTMapper):
         input_bindings = []
         arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=family.SMTFamily())
 
+        #Removes any invalid bindings
+        def constraint_filter(binding):
+            for ir_path, arch_path in binding:
+                if arch_path in archmapper.path_constraints and ir_path is not Unbound:
+                    return False
+            return True
+
         ir_path_to_adt = self.path_to_adt(input=True, family=family.SMTFamily())
         #Verify all paths are the same
         assert set(ir_path_to_adt.keys()) == set(self.input_varmap.keys())
@@ -273,7 +280,9 @@ class IRMapper(SMTMapper):
             #Verify all paths of form is subset of all paths
             assert set(arch_input_path_to_adt.keys()).issuperset(set(af.varmap.keys()))
             form_arch_input_path_to_adt = {p:T for p, T in arch_input_path_to_adt.items() if p in af.varmap}
-            input_bindings.append(create_bindings(form_arch_input_path_to_adt, ir_path_to_adt, unbound_paths=archmapper.path_constraints.keys()))
+            bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
+            bindings = list(filter(constraint_filter, bindings))
+            input_bindings.append(bindings)
         # Check Early out
         self.has_bindings = max(len(bs) for bs in input_bindings) > 0
         if not self.has_bindings:
@@ -415,6 +424,8 @@ def rr_from_solver(solver, irmapper):
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
 
+    print("I1")
+    pretty_print_binding(ibinding)
     #extract, simplify, and convert constants to BV in the input binding 
     bv_ibinding = []
     for ir_path, arch_path in ibinding:
@@ -424,8 +435,11 @@ def rr_from_solver(solver, irmapper):
             ir_path = bv_val
         bv_ibinding.append((ir_path, arch_path))
 
+    print("I2")
+    pretty_print_binding(bv_ibinding)
     bv_ibinding = rebind_binding(bv_ibinding, family.PyFamily())
-
+    print("I3")
+    pretty_print_binding(bv_ibinding)
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
 
     bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
