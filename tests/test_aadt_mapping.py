@@ -5,9 +5,10 @@ from hwtypes.adt import Enum, Product
 from peak.mapper import ArchMapper, RewriteRule
 from peak import Const, family_closure, Peak, name_outputs
 from peak import family
-from examples.sum_pe.sim import PE_fc
+from examples.sum_pe.sim import PE_fc, ISA_fc
 from examples.smallir import gen_SmallIR
 import pytest
+from peak.mapper.utils import pretty_print_binding
 
 num_test_vectors = 16
 def test_automapper():
@@ -18,6 +19,9 @@ def test_automapper():
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
     expect_not_found = ('Mul', 'Shftr', 'Shftl')
     for ir_name, ir_fc in IR.instructions.items():
+        if ir_name in ('Not', 'Neg'):
+            #Not implemented yet
+            continue
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
         rewrite_rule = ir_mapper.solve('z3')
         if rewrite_rule is None:
@@ -255,26 +259,10 @@ def test_early_out_outputs():
     assert not ir_mapper.has_bindings
 
 
-@pytest.mark.parametrize("opts", (
-    (None, True),
-    ((0, 1, 2), False),
-    ((4, 5), True)))
-def test_constrain_constant_bv(opts):
-    constraint = opts[0]
-    solved = opts[1]
+def run_constraint_test(ir_fc, constraints, solved):
     arch_fc = PE_fc
     arch_bv = arch_fc(family.PyFamily())
-    arch_mapper = ArchMapper(arch_fc, constrain_constant_bv=constraint)
-
-    @family_closure
-    def ir_fc(family):
-        Data = family.BitVector[8]
-        @family.assemble(locals(), globals())
-        class IR(Peak):
-            @name_outputs(out=Data)
-            def __call__(self, in0: Data, in1: Data):
-                return in0 + in1 + 4 #inst.offset should be 4
-        return IR
+    arch_mapper = ArchMapper(arch_fc, path_constraints=constraints)
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
     assert ir_mapper.has_bindings
     rr = ir_mapper.solve('z3')
@@ -282,3 +270,63 @@ def test_constrain_constant_bv(opts):
         assert not solved
     else:
         assert solved
+
+def test_const_constraint():
+    @family_closure
+    def ir_fc(family):
+        Data = family.BitVector[8]
+
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in0: Data, in1: Data):
+                return in0 + in1 + 4  # inst.offset should be 4
+
+        return IR
+
+    isa = ISA_fc(family.SMTFamily())
+
+    for constraint, solved in (
+        (4, True),
+        ((4, 5), True),
+        (5, False),
+        ((3, 5), False),
+    ):
+        constraints = {("inst", isa.ArithOp, 1): constraint}
+        run_constraint_test(ir_fc, constraints=constraints, solved=solved)
+
+    OpT = isa.Op
+    for constraint, solved in (
+        (OpT.A, True),
+        ((OpT.A, OpT.B), True),
+        (OpT.B, False),
+    ):
+        constraints = {("inst", isa.ArithOp, 0): constraint}
+        run_constraint_test(ir_fc, constraints=constraints, solved=solved)
+
+def test_non_const_constraint():
+    @family_closure
+    def ir_fc(family):
+        Data = family.BitVector[8]
+
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in0: Data):
+                return in0
+
+        return IR
+
+    isa = ISA_fc(family.SMTFamily())
+    OpT = isa.Op
+    for in0_constraint, solved in (
+        (-5, True),
+        (-4, False),
+        ((-5, -4), False),
+    ):
+        constraints = {
+            ("inst", isa.ArithOp, 0): OpT.A,  # Const
+            ("inst", isa.ArithOp, 1): 5,  # Const
+            ("in0",): in0_constraint,  # Not Const
+        }
+        run_constraint_test(ir_fc, constraints=constraints, solved=solved)
