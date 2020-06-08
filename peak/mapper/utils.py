@@ -295,9 +295,11 @@ def _sort_by_t(path2t : tp.Mapping[tuple, "adt"]) ->tp.Mapping["adt", tp.List[tu
     return t2path
 
 def create_bindings(
-    arch_flat : Product,
-    ir_flat : Product,
+    arch_flat: dict,
+    ir_flat: dict,
+    unbound_paths = (),
 ):
+    arch_flat = {path:adt for path, adt in arch_flat.items() if path not in unbound_paths}
     arch_by_t = _sort_by_t(arch_flat)
     ir_by_t = _sort_by_t(ir_flat)
     #check early out
