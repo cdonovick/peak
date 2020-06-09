@@ -1,11 +1,9 @@
 import typing as tp
-import itertools as it
 from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
-from hwtypes import SMTBit
 from hwtypes import SMTBitVector as SBV
 from hwtypes import Bit, BitVector
-from hwtypes.modifiers import strip_modifiers, push_modifiers, wrap_modifier, unwrap_modifier
+from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
 from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
@@ -20,10 +18,9 @@ from peak import family
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
-from collections import OrderedDict
 
 import operator
-from functools import partial, reduce
+from functools import partial, reduce, lru_cache
 
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
@@ -52,6 +49,20 @@ def wrap_outputs(outputs, output_aadt):
     else:
         assert issubclass(output_t, Tuple)
         return output_aadt.from_fields(*outputs)
+
+#Return a map from clean path to modified types
+def _create_path_to_adt(adt_t, path=(), mods=[]):
+    #remove modifiers from this level
+    adt_t, new_mods = unwrap_modifier(adt_t)
+    mods = new_mods + mods
+    flatmap = {}
+    if isinstance(adt_t, (AttrSyntax, GetitemSyntax)) and not isinstance(adt_t, EnumMeta):
+        for n, sub_adt_t in adt_t.field_dict.items():
+            sub_flatmap = _create_path_to_adt(sub_adt_t, path+(n,), mods)
+            flatmap.update(sub_flatmap)
+    else:
+        flatmap[path] = wrap_modifier(adt_t, mods)
+    return flatmap
 
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
@@ -100,32 +111,40 @@ class SMTMapper:
         self.num_input_forms = num_input_forms
         self.input_varmap = input_varmap
 
+    @lru_cache(None)
+    def path_to_adt(self, input, family, strip=False):
+        cls = self.peak_fc(family)
+        adt = cls.input_t if input else cls.output_t
+        if strip:
+            adt = strip_modifiers(adt)
+        return _create_path_to_adt(adt)
 
 class ArchMapper(SMTMapper):
-    def __init__(self, arch_fc, *, constrain_constant_bv=None, set_unbound_bv=None):
+    def __init__(self, arch_fc, *, path_constraints= {}):
         super().__init__(arch_fc)
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
-        self.constrain_constant_bv = constrain_constant_bv
-        self.set_unbound_bv = set_unbound_bv
+
+        #Verify that all the path_constraints are valid
+        path_constraints = {path: (c if isinstance(c, tuple) else (c,)) for path, c in path_constraints.items()}
+        path_to_adt = self.path_to_adt(input=True, family=family.SMTFamily(), strip=True)
+        for path, constraints in path_constraints.copy().items():
+            if path not in path_to_adt:
+                raise ValueError(f"{path} is either invalid or not an adt leaf")
+            assert path in self.input_varmap
+            adt = path_to_adt[path]
+            aadt = family.SMTFamily().get_adt_t(adt)
+            try:
+                constraints = tuple((aadt(c) for c in constraints))
+            except Exception as e:
+                print("Invalid constraints for {path}")
+                raise e
+            path_constraints[path] =constraints
+
+        self.path_constraints = path_constraints
 
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
-
-
-#Return a map from clean path to modified types
-def _create_flat_map(adt_t, path=(), mods=[]):
-    #remove modifiers from this level
-    adt_t, new_mods = unwrap_modifier(adt_t)
-    mods = new_mods + mods
-    flatmap = {}
-    if isinstance(adt_t, (AttrSyntax, GetitemSyntax)) and not isinstance(adt_t, EnumMeta):
-        for n, sub_adt_t in adt_t.field_dict.items():
-            sub_flatmap = _create_flat_map(sub_adt_t, path+(n,), mods)
-            flatmap.update(sub_flatmap)
-    else:
-        flatmap[path] = wrap_modifier(adt_t, mods)
-    return flatmap
 
 
 class RewriteRule:
@@ -195,7 +214,7 @@ class RewriteRule:
     # Returns a counterexample if found, otherwise None
     def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
         # create free variable for each ir_val
-        ir_path_types = _create_flat_map(strip_modifiers(self.ir_fc(family.SMTFamily()).input_t))
+        ir_path_types = _create_path_to_adt(strip_modifiers(self.ir_fc(family.SMTFamily()).input_t))
         ir_vars = {path:_free_var_from_t(ir_path_types[path]) for path in self.ir_bounded}
         ir_inputs = self.build_ir_input(ir_vars, family.SMTFamily())
         arch_inputs = self.build_arch_input(ir_vars, family.SMTFamily())
@@ -245,27 +264,36 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        arch_input_flat_map = _create_flat_map(archmapper.peak_fc(family.SMTFamily()).input_t)
+        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=family.SMTFamily())
 
-        ir_flat_map = _create_flat_map(self.peak_fc(family.SMTFamily()).input_t)
+        #Removes any invalid bindings
+        def constraint_filter(binding):
+            for ir_path, arch_path in binding:
+                if arch_path in archmapper.path_constraints and ir_path is not Unbound:
+                    return False
+            return True
+
+        ir_path_to_adt = self.path_to_adt(input=True, family=family.SMTFamily())
         #Verify all paths are the same
-        assert set(ir_flat_map.keys()) == set(self.input_varmap.keys())
+        assert set(ir_path_to_adt.keys()) == set(self.input_varmap.keys())
         for af in archmapper.input_forms:
             #Verify all paths of form is subset of all paths
-            assert set(arch_input_flat_map.keys()).issuperset(set(af.varmap.keys()))
-            form_arch_input_flat_map = {p:T for p, T in arch_input_flat_map.items() if p in af.varmap}
-            input_bindings.append(create_bindings(form_arch_input_flat_map, ir_flat_map))
+            assert set(arch_input_path_to_adt.keys()).issuperset(set(af.varmap.keys()))
+            form_arch_input_path_to_adt = {p:T for p, T in arch_input_path_to_adt.items() if p in af.varmap}
+            bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
+            bindings = list(filter(constraint_filter, bindings))
+            input_bindings.append(bindings)
         # Check Early out
         self.has_bindings = max(len(bs) for bs in input_bindings) > 0
         if not self.has_bindings:
             return
 
         # Create output bindings
-        arch_output_flat_map = _create_flat_map(archmapper.peak_fc(family.SMTFamily()).output_t)
-        ir_flat_map = _create_flat_map(self.peak_fc(family.SMTFamily()).output_t)
+        arch_output_path_to_adt = archmapper.path_to_adt(input=False, family=family.SMTFamily())
+        ir_path_to_adt = self.path_to_adt(input=False, family=family.SMTFamily())
 
         #binding = [bidx]
-        output_bindings = create_bindings(arch_output_flat_map, ir_flat_map)
+        output_bindings = create_bindings(arch_output_path_to_adt, ir_path_to_adt)
 
         # Check Early out
         self.has_bindings = len(output_bindings) > 0
@@ -292,39 +320,36 @@ class IRMapper(SMTMapper):
         ob_var = SBV[max_output_bindings]()
 
 
-        def check_constrain_constant_bv(ir_path, arch_path):
-            arch_t = arch_input_flat_map[arch_path]
-            return (archmapper.constrain_constant_bv is not None) and \
-                    (ir_path is Unbound) and \
-                    issubclass(arch_t, Const) and \
-                    issubclass(arch_t, SBV)
-
         constraints = []
         #Build the constraint
+        forall_vars = set()
         for fi, ibindings in enumerate(input_bindings):
             conditions = list(form_conditions[fi])
             for bi, ibinding in enumerate(ibindings):
                 bi_match = (ib_var == 2**bi)
                 #Build substitution map
                 submap = []
-                const_constraints = []
                 for ir_path, arch_path in ibinding:
                     arch_var = archmapper.input_varmap[arch_path]
-                    if check_constrain_constant_bv(ir_path, arch_path):
-                        width = arch_var.size
-                        const_constraint = or_reduce((arch_var == val for val in archmapper.constrain_constant_bv if val < 2**width))
-                        const_constraints.append(const_constraint)
+                    is_unbound = ir_path is Unbound
+                    is_constrained = arch_path in self.archmapper.path_constraints
+                    is_const = issubclass(arch_input_path_to_adt[arch_path], Const)
+                    if is_constrained:
+                        assert is_unbound
                         continue
 
-                    elif ir_path is Unbound:
-                        continue
-                    else:
+                    if is_unbound and not is_const:
+                        #add arch_var to list of forall vars
+                        forall_vars.add(arch_var.value)
+                    elif not is_unbound and not is_constrained:
+                        #substitue arch_var with ir_var add ir_var to forall list
                         ir_var = self.input_varmap[ir_path]
+                        submap.append((arch_var, ir_var))
+                        forall_vars.add(ir_var.value)
 
-                    submap.append((arch_var, ir_var))
                 for bo, obinding in enumerate(output_bindings):
                     bo_match = (ob_var == 2**bo)
-                    conditions = list(form_conditions[fi]) + [bi_match, bo_match] + const_constraints
+                    conditions = list(form_conditions[fi]) + [bi_match, bo_match]
                     for ir_path, arch_path in obinding:
                         if ir_path is Unbound:
                             continue
@@ -335,17 +360,42 @@ class IRMapper(SMTMapper):
                     constraints.append(conditions)
 
         formula = or_reduce([and_reduce(conds) for conds in constraints])
-        forall_vars = [var.value for var in self.input_varmap.values()]
+
+        # Adding in the constraints:
+
+        # Start with the non-const constraints.
+        # This is basically doing universal qualifier over a limited set of values
+        #   To do this, evaluate the formula with each possible value,
+        #   then 'and' together the resulting partially-evaluted formulas
+        for path, constraints in archmapper.path_constraints.items():
+            is_const = issubclass(arch_input_path_to_adt[path], Const)
+            if is_const:
+                continue
+            arch_var = archmapper.input_varmap[path]
+            formula = and_reduce((formula.substitute((arch_var, c)) for c in constraints))
+
+        # Then deal with the const constraints.
+        # This is saying only allow a set of values for the existential quantifier
+        # Thus just create an additional constraint that arch_var is either c1 or c2 or c3
+        for path, constraints in archmapper.path_constraints.items():
+            is_const = issubclass(arch_input_path_to_adt[path], Const)
+            if not is_const:
+                continue
+            arch_var = archmapper.input_varmap[path]
+            constraint = or_reduce((arch_var == c for c in constraints))
+            formula &= constraint
+
 
         self.ib_var = ib_var
         self.ob_var = ob_var
         self.input_bindings = input_bindings
         self.output_bindings = output_bindings
-        self.formula = formula.value
+        self.formula = smt.ForAll(list(forall_vars), formula.value)
         self.forall_vars = forall_vars
+        self.formula_wo_forall = formula.value
 
     def run_efsmt(self, solver_name : str = 'cvc4', itr_limit = 10):
-        return efsmt(self.forall_vars, self.formula, BV, itr_limit, solver_name, self)
+        return efsmt(self.forall_vars, self.formula_wo_forall, BV, itr_limit, solver_name, self)
 
     def solve(self,
         solver_name : str = 'z3',
@@ -354,10 +404,8 @@ class IRMapper(SMTMapper):
         if not self.has_bindings:
             return None
 
-        formula = smt.ForAll(self.forall_vars, self.formula)
-
         with smt.Solver(solver_name, logic=BV) as solver:
-            solver.add_assertion(formula)
+            solver.add_assertion(self.formula)
             is_solved = solver.solve()
             if not is_solved:
                 return None
@@ -380,7 +428,7 @@ def rr_from_solver(solver, irmapper):
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
 
-    #extract, simplify, and convert constants to BV in the input binding 
+    #extract, simplify, and convert constants to BV in the input binding
     bv_ibinding = []
     for ir_path, arch_path in ibinding:
         if ir_path is Unbound:
@@ -390,7 +438,6 @@ def rr_from_solver(solver, irmapper):
         bv_ibinding.append((ir_path, arch_path))
 
     bv_ibinding = rebind_binding(bv_ibinding, family.PyFamily())
-
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
 
     bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)

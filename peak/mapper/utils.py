@@ -294,10 +294,7 @@ def _sort_by_t(path2t : tp.Mapping[tuple, "adt"]) ->tp.Mapping["adt", tp.List[tu
 
     return t2path
 
-def create_bindings(
-    arch_flat : Product,
-    ir_flat : Product,
-):
+def create_bindings(arch_flat: dict, ir_flat: dict):
     arch_by_t = _sort_by_t(arch_flat)
     ir_by_t = _sort_by_t(ir_flat)
     #check early out
@@ -326,11 +323,13 @@ def create_bindings(
                     return False
             return ret
         type_bindings = []
+
         for ir_match in filter(filt, it.product(*[ir_poss for _ in range(len(arch_paths))])):
 
             type_bindings.append(list(zip(ir_match, arch_paths)))
         possible_matching[arch_type] = type_bindings
     bindings = []
+
     for l in it.product(*possible_matching.values()):
         bindings.append(list(it.chain(*l)))
     return bindings

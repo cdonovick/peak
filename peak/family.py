@@ -5,6 +5,7 @@ from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
 from ast_tools import SymbolTable
 import hwtypes
+from hwtypes.modifiers import strip_modifiers
 import magma as m
 
 from .assembler import Assembler
@@ -64,6 +65,8 @@ class _AsmFamily(AbstractFamily):
         self._asm_extras = asm_extras
 
     def get_adt_t(self, adt_t):
+        if issubclass(adt_t, (self.Bit, self.BitVector)):
+            return adt_t
         if not hwtypes.is_adt_type(adt_t):
             raise TypeError(f'expected adt_t not {adt_t}')
 
@@ -221,7 +224,7 @@ class MagmaFamily(_AsmFamily):
     def assemble(self, locals, globals):
         def adtify(t_):
             if hwtypes.is_adt_type(t_):
-                return self.get_adt_t(t_)
+                return self.get_adt_t(strip_modifiers(t_))
             elif isinstance(t_, tuple):
                 return tuple(adtify(t__) for t__ in t_)
             else:
