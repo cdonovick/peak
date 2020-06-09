@@ -6,30 +6,32 @@ from peak import Peak, name_outputs, family_closure, Const
 
 @family_closure
 def PE_fc(family):
-    Inst, Operand0T, Operand1T, Word, T = ISA_fc(family)
-
+    isa = ISA_fc(family)
     @family.assemble(locals(), globals())
     class PE(Peak):
 
-        @name_outputs(out=Word)
-        def __call__(self, inst: Const(Inst), op0: Operand0T, op1: Operand1T) -> Word:
-            o0 = op0
-            if op1[Word].match:
-                # arith op
-                o1 = op1[Word].value
-                if inst.Opcode == Inst.Opcode.A:
-                    return o0 + o1 + inst.offset
+        @name_outputs(out=isa.Word)
+        def __call__(self, inst: Const(isa.Inst), in0: isa.Word, in1: isa.Word) -> isa.Word:
+            is_bitop = ~inst[isa.ArithOp].match
+            if not is_bitop:
+                arithOp = inst[isa.ArithOp].value
+                op = arithOp[0]
+                offset = arithOp[1]
+                if op == isa.Op.A:
+                    return in0 + in1 + offset
                 else:
-                    return o0 - o1 + inst.offset
+                    return in0 - in1 + offset
             else:
                 # bit op
-                ox = op1[T].value
-                o1 = ox[0]
-                b  = ox[1]
-                if inst.Opcode == Inst.Opcode.A:
-                    res = o0 & o1
+                bitOp = inst[isa.BitOp].value
+                #op = bitOp.op
+                #neg = bitOp.neg
+                op = bitOp[0]
+                neg = bitOp[1]
+                if op == isa.Op.A:
+                    res = in0 & in1
                 else:
-                    res = o0 | o1
-                return b.ite(~res, res)
+                    res = in0 | in1
+                return neg.ite(~res, res)
     return PE
 
