@@ -394,7 +394,7 @@ class IRMapper(SMTMapper):
         self.forall_vars = forall_vars
         self.formula_wo_forall = formula.value
 
-    def run_efsmt(self, solver_name : str = 'cvc4', itr_limit = 10):
+    def solve_efsmt(self, solver_name : str = 'cvc4', itr_limit = 10):
         return efsmt(self.forall_vars, self.formula_wo_forall, BV, itr_limit, solver_name, self)
 
     def solve(self,
@@ -459,7 +459,7 @@ def efsmt(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = No
             eres = solver.solve()
 
             if not eres:
-                return False
+                return None
             else :
                 tau = {v: solver.get_value(v) for v in x}
                 sub_phi = phi.substitute(tau).simplify()
