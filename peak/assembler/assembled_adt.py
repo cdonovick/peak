@@ -109,7 +109,7 @@ class AssembledADTMeta(BoundMeta):
     def __init__(cls, name, bases, namespace, **kwargs):
         if not cls.is_bound:
             return
-        assembler = cls.assembler_t(cls.adt_t)
+        cls._assembler_ = assembler = cls.assembler_t(cls.adt_t)
         default_bv_arg = (
             f'default_bv',
             f'tp.Optional[int] = 0',
@@ -222,11 +222,15 @@ def from_fields(cls, {sig}) -> {cls.__name__!r}:
     def bv_type(cls):
         return cls.fields[2]
 
+    # For the bitvector protocol
+    def _bitvector_t_(cls):
+        return cls.bv_type[cls._assembler_.width]
+
 
 class AssembledADT(metaclass=AssembledADTMeta):
     def __init__(self, adt):
         cls = type(self)
-        self._assembler_ = assembler = cls.assembler_t(cls.adt_t)
+        assembler = cls._assembler_
         if isinstance(adt, cls):
             self._value_ =  adt._value_
         elif isinstance(adt, cls.adt_t):
@@ -238,7 +242,7 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
     def __getitem__(self, key):
         cls = type(self)
-        sub = self._assembler_.sub.get(key, _MISSING)
+        sub = cls._assembler_.sub.get(key, _MISSING)
         if sub is not _MISSING:
             if issubclass(cls[key], AbstractBit):
                 field = self._value_[sub.idx][0]
@@ -251,19 +255,19 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
         if not _issubclass(cls.adt_t, Sum):
             return field
-        tag = self._value_[self._assembler_.sub.tag_idx]
+        tag = self._value_[cls._assembler_.sub.tag_idx]
         # if key is an assembled adt class just grab the type from it
         if key is _TAG:
             return tag
 
-        if _issubclass(key, AssembledADT):
+        if _issubclass(key, cls.unbound_t):
             T = key.adt_t
         else:
             T = key
 
         if T in cls.adt_t:
-            T = self._assembler_.assemble_tag(T, cls.bv_type)
-        if not isinstance(T, cls.bv_type[self._assembler_.tag_width]):
+            T = cls._assembler_.assemble_tag(T, cls.bv_type)
+        if not isinstance(T, cls.bv_type[cls._assembler_.tag_width]):
             raise TypeError(type(T), T, cls.adt_t)
         match = tag == T
         return cls.adt_t.Match(match, field, safe=False)
@@ -283,19 +287,27 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
     def __eq__(self, other):
         cls = type(self)
-        #The bug is here. cls.adt_t (opcode) is different than opcode
         if isinstance(other, cls):
             return self._value_ == other._value_
-        elif isinstance(other, cls.bv_type[self._assembler_.width]):
+        elif isinstance(other, cls.bv_type[cls._assembler_.width]):
             return self._value_ == other
         elif isinstance(other, cls.adt_t):
-            opcode = self._assembler_.assemble(other, cls.bv_type)
+            opcode = cls._assembler_.assemble(other, cls.bv_type)
             return self._value_ == opcode
         else:
             return NotImplemented
 
     def __ne__(cls, other):
         return ~(cls == other)
+
+    # For the bitvector protocol
+    @classmethod
+    def _from_bitvector_(cls, value):
+        return cls(value)
+
+    def _to_bitvector_(self):
+        return self._value_
+
 
 class AssembledADTRecursor:
     def __call__(self, aadt_t, *args, **kwargs):
@@ -329,13 +341,13 @@ class AssembledADTRecursor:
     def product(self):
         return
 
+
 class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
     def _bases_from_idx(cls, idx):
         return super()._bases_from_idx(idx[:-1])
 
     def _to_magma_(cls):
-        assembler = cls.assembler_t(cls.adt_t)
-        return cls.bv_type[assembler.width].qualify(cls.fields[3])
+        return cls._bitvector_t_().qualify(cls.fields[3])
 
     def _qualify_magma_(cls, d):
         return cls.unbound_t[(*cls.fields[:-1], d)]
@@ -352,9 +364,8 @@ class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
     def _from_magma_value_(cls, value):
         if not value.is_oriented(cls.fields[3]):
             raise TypeError('value is not properly oriented')
-        return cls(value)
+        return cls._from_bitvector_(value)
 
 
 class MagmaADT(AssembledADT, m.MagmaProtocol, metaclass=MAADTMeta):
-    def _get_magma_value_(self):
-        return self._value_
+    _get_magma_value_ = AssembledADT._to_bitvector_
