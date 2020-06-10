@@ -309,6 +309,35 @@ class AssembledADT(metaclass=AssembledADTMeta):
         return self._value_
 
 
+class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
+    def _bases_from_idx(cls, idx):
+        return super()._bases_from_idx(idx[:-1])
+
+    def _to_magma_(cls):
+        return cls._bitvector_t_().qualify(cls.fields[3])
+
+    def _qualify_magma_(cls, d):
+        return cls.unbound_t[(*cls.fields[:-1], d)]
+
+    def _flip_magma_(cls):
+        d = cls.fields[3]
+        if d == m.Direction.In:
+            return cls.unbound_t[(*cls.fields[:-1], m.Direction.Out)]
+        elif d == m.Direction.Out:
+            return cls.unbound_t[(*cls.fields[:-1], m.Direction.In)]
+        else:
+            return cls
+
+    def _from_magma_value_(cls, value):
+        if not value.is_oriented(cls.fields[3]):
+            raise TypeError('value is not properly oriented')
+        return cls._from_bitvector_(value)
+
+
+class MagmaADT(AssembledADT, m.MagmaProtocol, metaclass=MAADTMeta):
+    _get_magma_value_ = AssembledADT._to_bitvector_
+
+
 class AssembledADTRecursor:
     def __call__(self, aadt_t, *args, **kwargs):
         if (issubclass(aadt_t, AbstractBit) or issubclass(aadt_t, AbstractBitVector)):
@@ -342,30 +371,3 @@ class AssembledADTRecursor:
         return
 
 
-class MAADTMeta(AssembledADTMeta, m.MagmaProtocolMeta):
-    def _bases_from_idx(cls, idx):
-        return super()._bases_from_idx(idx[:-1])
-
-    def _to_magma_(cls):
-        return cls._bitvector_t_().qualify(cls.fields[3])
-
-    def _qualify_magma_(cls, d):
-        return cls.unbound_t[(*cls.fields[:-1], d)]
-
-    def _flip_magma_(cls):
-        d = cls.fields[3]
-        if d == m.Direction.In:
-            return cls.unbound_t[(*cls.fields[:-1], m.Direction.Out)]
-        elif d == m.Direction.Out:
-            return cls.unbound_t[(*cls.fields[:-1], m.Direction.In)]
-        else:
-            return cls
-
-    def _from_magma_value_(cls, value):
-        if not value.is_oriented(cls.fields[3]):
-            raise TypeError('value is not properly oriented')
-        return cls._from_bitvector_(value)
-
-
-class MagmaADT(AssembledADT, m.MagmaProtocol, metaclass=MAADTMeta):
-    _get_magma_value_ = AssembledADT._to_bitvector_
