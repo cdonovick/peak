@@ -36,7 +36,7 @@ class SMTForms(AssembledADTRecursor):
     def bv(self, aadt_t, path, value):
         #Leaf node
         if value is None:
-            bv_value = aadt_t()
+            bv_value = aadt_t(prefix=str(path))
         else:
             bv_value = value
         varmap = {path: bv_value}
@@ -47,7 +47,7 @@ class SMTForms(AssembledADTRecursor):
         if value is None:
             adt_t, assembler_t, bv_t = aadt_t.fields
             assembler = assembler_t(adt_t)
-            bv_value = bv_t[assembler.width]()
+            bv_value = bv_t[assembler.width](prefix=str(path))
             aadt_value = aadt_t(bv_value)
         else:
             assert isinstance(value, aadt_t)
@@ -214,7 +214,7 @@ class SimplifyBinding(AssembledADTRecursor):
         for field_name, sub_binding in sub_binding_dict.items():
             simplified_binding = self(aadt_t[field_name], sub_binding)
             simplified_binding_dict[field_name] = simplified_binding
-            simplify &= len(simplified_binding)==1 and not isinstance(simplified_binding[0][0], tuple)
+            simplify &= len(simplified_binding)==1 and not (isinstance(simplified_binding[0][0], tuple) or simplified_binding[0][0] is Unbound)
 
         if simplify:
             value_dict = {field_name:b[0][0] for field_name, b in simplified_binding_dict.items()}
@@ -273,7 +273,7 @@ def rebind_binding(binding, _family):
     ret_binding = []
     for ir_path, arch_path in binding:
         arch_path = tuple(rebind_type(t, _family) for t in arch_path)
-        if not isinstance(ir_path, tuple):
+        if not (isinstance(ir_path, tuple) or ir_path is Unbound):
             ir_path = rebind_value(ir_path, _family)
         ret_binding.append((ir_path, arch_path))
     return ret_binding
@@ -342,8 +342,8 @@ def _pretty_path(path):
     else:
         return str(path)
 
-def pretty_print_binding(binding):
-    print("(")
+def pretty_print_binding(binding, printer=print):
+    printer("(")
     for ir_path, arch_path in binding:
-        print(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
-    print(")")
+        printer(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
+    printer(")")

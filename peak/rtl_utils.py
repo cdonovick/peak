@@ -2,7 +2,7 @@ import magma as m
 from collections import OrderedDict
 
 @m.cache_definition
-def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
+def wrap_with_disassembler(PE, disassembler, width, layout, inst_type, wrapped_name="WrappedPE"):
     WrappedIO = OrderedDict()
     for key, value in PE.interface.ports.items():
         if isinstance(value, m.Out(inst_type)):
@@ -30,6 +30,7 @@ def wrap_with_disassembler(PE, disassembler, width, layout, inst_type):
                 m.wire(region, field)
 
     class WrappedPE(m.Circuit):
+        name = wrapped_name
         io = m.IO(**WrappedIO)
         pe = PE()
         for key, value in PE.interface.ports.items():
