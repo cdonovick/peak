@@ -1,3 +1,10 @@
+from hwtypes import BitVector, Bit
+from hwtypes import make_modifier
+from hwtypes.adt import Product, Tuple, Sum, Enum
+from hwtypes.bit_vector_util import BitVectorProtocol
+
+import pytest
+
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import  AssembledADT
 from peak.assembler.assembler_util import _issubclass
@@ -7,10 +14,6 @@ from examples.pico.isa import Inst as pico_isa
 from examples.min_pe.isa import ISA_fc as gen_min_isa
 import examples.pico.asm as pico_asm
 
-from hwtypes import BitVector, Bit
-from hwtypes import make_modifier
-from hwtypes.adt import Product, Tuple, Sum, Enum
-import pytest
 
 FooBV = make_modifier('Foo')(BitVector)
 BarBV = make_modifier('Bar')(BitVector)
@@ -24,6 +27,8 @@ def test_assembled_adt(isa, bv_type):
         asm_adt = AssembledADT[isa, Assembler, bv_type]
         asm = Assembler(isa)
 
+        assert issubclass(asm_adt, BitVectorProtocol)
+
         for inst in isa.enumerate():
             opcode = asm.assemble(inst, bv_type=bv_type)
             assert asm_adt(inst) == asm_adt(opcode)
@@ -34,11 +39,13 @@ def test_assembled_adt(isa, bv_type):
             assert type(asm_adt(inst) == inst) is Bit
             assert asm_adt(inst) == opcode
             assert type(asm_adt(inst) == opcode) is Bit
+            assert isinstance(asm_adt(inst), BitVectorProtocol)
 
             assert asm_adt(opcode) == inst
             assert type(asm_adt(opcode) == inst) is Bit
             assert asm_adt(opcode) == opcode
             assert type(asm_adt(opcode) == opcode) is Bit
+            assert isinstance(asm_adt(opcode), BitVectorProtocol)
 
         if _issubclass(isa, Sum):
             for field in isa.fields:

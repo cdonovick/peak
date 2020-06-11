@@ -12,11 +12,6 @@ def ISA_fc(family):
     Word = family.BitVector[8]
     Bit  = family.BitVector[1]
 
-    # TODO there is a bug when trying to use Product here
-    #class BitOp(Product):
-    #    op = Op
-    #    neg = Bit
-
     BitOp = Tuple[Op, Bit]
 
     ArithOp = Tuple[Op, Word]

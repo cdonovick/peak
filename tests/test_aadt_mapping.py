@@ -17,11 +17,8 @@ def test_automapper():
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
-    expect_not_found = ('Mul', 'Shftr', 'Shftl')
+    expect_not_found = ('Mul', 'Shftr', 'Shftl', 'Not', 'Neg')
     for ir_name, ir_fc in IR.instructions.items():
-        if ir_name in ('Not', 'Neg'):
-            #Not implemented yet
-            continue
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
         rewrite_rule = ir_mapper.solve('z3')
         if rewrite_rule is None:

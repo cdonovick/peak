@@ -7,7 +7,7 @@ from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
 from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
-from .utils import create_bindings
+from .utils import create_bindings, pretty_print_binding
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import rebind_binding
@@ -15,6 +15,8 @@ from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
 from peak import family
+import logging
+logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -24,6 +26,8 @@ from functools import partial, reduce, lru_cache
 
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
+
+SMTFamily = family.SMTFamily()
 
 #Helper function to search for the one peak class
 def _get_peak_cls(fc_out):
@@ -68,7 +72,8 @@ class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
-        Peak_cls = _get_peak_cls(peak_fc(family.SMTFamily()))
+        Peak_cls = _get_peak_cls(peak_fc(SMTFamily))
+        name = Peak_cls.__name__
         try:
             input_t = Peak_cls.input_t
             output_t = Peak_cls.output_t
@@ -76,8 +81,8 @@ class SMTMapper:
             raise ValueError("Need to use gen_input_t and gen_output_t")
         stripped_input_t = strip_modifiers(input_t)
         stripped_output_t = strip_modifiers(output_t)
-        input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
-        output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
+        input_aadt_t = SMTFamily.get_adt_t(stripped_input_t)
+        output_aadt_t = SMTFamily.get_adt_t(stripped_output_t)
 
         input_forms, input_varmap = SMTForms()(input_aadt_t)
 
@@ -101,15 +106,15 @@ class SMTMapper:
         #verify same number of output forms
         assert all(num_output_forms == len(forms) for forms in output_forms)
         self.peak_fc = peak_fc
-
-        self.input_form_var = SBV[num_input_forms]()
-        self.output_form_var = SBV[num_output_forms]()
+        self.input_form_var = SBV[num_input_forms](prefix=f"{name}_if")
+        self.output_form_var = SBV[num_output_forms](prefix=f"{name}_of")
 
         self.input_forms = input_forms
         self.output_forms = output_forms
         self.num_output_forms = num_output_forms
         self.num_input_forms = num_input_forms
         self.input_varmap = input_varmap
+        self.const_paths = set(path for path, T in self.path_to_adt(True, SMTFamily, strip=False).items() if issubclass(T, Const))
 
     @lru_cache(None)
     def path_to_adt(self, input, family, strip=False):
@@ -127,13 +132,13 @@ class ArchMapper(SMTMapper):
 
         #Verify that all the path_constraints are valid
         path_constraints = {path: (c if isinstance(c, tuple) else (c,)) for path, c in path_constraints.items()}
-        path_to_adt = self.path_to_adt(input=True, family=family.SMTFamily(), strip=True)
+        path_to_adt = self.path_to_adt(input=True, family=SMTFamily, strip=True)
         for path, constraints in path_constraints.copy().items():
             if path not in path_to_adt:
                 raise ValueError(f"{path} is either invalid or not an adt leaf")
             assert path in self.input_varmap
             adt = path_to_adt[path]
-            aadt = family.SMTFamily().get_adt_t(adt)
+            aadt = SMTFamily.get_adt_t(adt)
             try:
                 constraints = tuple((aadt(c) for c in constraints))
             except Exception as e:
@@ -154,6 +159,8 @@ class RewriteRule:
         for ir_path, arch_path in ibinding:
             if isinstance(ir_path, tuple):
                 ir_bounded.add(ir_path)
+            elif ir_path is Unbound:
+                continue
             elif not isinstance(ir_path, (BitVector, Bit)):
                 raise ValueError(f"{ir_path} is not valid for binding")
 
@@ -198,15 +205,15 @@ class RewriteRule:
         return aadt_product_to_dict(input_val)
 
     def parse_ir_output(self, outputs):
-        output_t = self.ir_fc(family.SMTFamily()).output_t
-        output_aadt = family.SMTFamily().get_adt_t(output_t)
+        output_t = self.ir_fc(SMTFamily).output_t
+        output_aadt = SMTFamily.get_adt_t(output_t)
         output_value = wrap_outputs(outputs, output_aadt)
         _, values = SMTForms()(output_aadt, value=output_value)
         return values
 
     def parse_arch_output(self, outputs):
-        output_t = self.arch_fc(family.SMTFamily()).output_t
-        output_aadt = family.SMTFamily().get_adt_t(output_t)
+        output_t = self.arch_fc(SMTFamily).output_t
+        output_aadt = SMTFamily.get_adt_t(output_t)
         output_value = wrap_outputs(outputs, output_aadt)
         _, values = SMTForms()(output_aadt, value=output_value)
         return values
@@ -214,12 +221,12 @@ class RewriteRule:
     # Returns a counterexample if found, otherwise None
     def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
         # create free variable for each ir_val
-        ir_path_types = _create_path_to_adt(strip_modifiers(self.ir_fc(family.SMTFamily()).input_t))
+        ir_path_types = _create_path_to_adt(strip_modifiers(self.ir_fc(SMTFamily).input_t))
         ir_vars = {path:_free_var_from_t(ir_path_types[path]) for path in self.ir_bounded}
-        ir_inputs = self.build_ir_input(ir_vars, family.SMTFamily())
-        arch_inputs = self.build_arch_input(ir_vars, family.SMTFamily())
-        ir = self.ir_fc(family.SMTFamily())()
-        arch = self.arch_fc(family.SMTFamily())()
+        ir_inputs = self.build_ir_input(ir_vars, SMTFamily)
+        arch_inputs = self.build_arch_input(ir_vars, SMTFamily)
+        ir = self.ir_fc(SMTFamily)()
+        arch = self.arch_fc(SMTFamily)()
         ir_out_values = self.parse_ir_output(ir(**ir_inputs))
         arch_out_values = self.parse_arch_output(arch(**arch_inputs))
 
@@ -242,10 +249,11 @@ class RewriteRule:
 def _free_var_from_t(T):
     if issubclass(T, SBV):
         return T()
-    aadt_t = family.SMTFamily().get_adt_t(T)
+    aadt_t = SMTFamily.get_adt_t(T)
     adt_t, assembler_t, bv_t = aadt_t.fields
     assembler = assembler_t(adt_t)
     return bv_t[assembler.width]()
+
 
 class IRMapper(SMTMapper):
     def __init__(self, archmapper, ir_fc):
@@ -264,7 +272,7 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=family.SMTFamily())
+        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=SMTFamily)
 
         #Removes any invalid bindings
         def constraint_filter(binding):
@@ -273,7 +281,7 @@ class IRMapper(SMTMapper):
                     return False
             return True
 
-        ir_path_to_adt = self.path_to_adt(input=True, family=family.SMTFamily())
+        ir_path_to_adt = self.path_to_adt(input=True, family=SMTFamily)
         #Verify all paths are the same
         assert set(ir_path_to_adt.keys()) == set(self.input_varmap.keys())
         for af in archmapper.input_forms:
@@ -282,15 +290,19 @@ class IRMapper(SMTMapper):
             form_arch_input_path_to_adt = {p:T for p, T in arch_input_path_to_adt.items() if p in af.varmap}
             bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
             bindings = list(filter(constraint_filter, bindings))
+            for i, b in enumerate(bindings):
+                logger.debug(f"Binidng {i}")
+                pretty_print_binding(b, logger.debug)
             input_bindings.append(bindings)
         # Check Early out
         self.has_bindings = max(len(bs) for bs in input_bindings) > 0
         if not self.has_bindings:
+            logger.debug("Early out, no input binidngs")
             return
 
         # Create output bindings
-        arch_output_path_to_adt = archmapper.path_to_adt(input=False, family=family.SMTFamily())
-        ir_path_to_adt = self.path_to_adt(input=False, family=family.SMTFamily())
+        arch_output_path_to_adt = archmapper.path_to_adt(input=False, family=SMTFamily)
+        ir_path_to_adt = self.path_to_adt(input=False, family=SMTFamily)
 
         #binding = [bidx]
         output_bindings = create_bindings(arch_output_path_to_adt, ir_path_to_adt)
@@ -298,6 +310,7 @@ class IRMapper(SMTMapper):
         # Check Early out
         self.has_bindings = len(output_bindings) > 0
         if not self.has_bindings:
+            logger.debug("Early out, no output binidngs")
             return
 
         form_var = archmapper.input_form_var
@@ -315,9 +328,9 @@ class IRMapper(SMTMapper):
 
 
         max_input_bindings = max(len(bindings) for bindings in input_bindings)
-        ib_var = SBV[max_input_bindings]()
+        ib_var = SBV[max_input_bindings](prefix="ib")
         max_output_bindings = len(output_bindings)
-        ob_var = SBV[max_output_bindings]()
+        ob_var = SBV[max_output_bindings](prefix="ob")
 
 
         constraints = []
@@ -359,6 +372,12 @@ class IRMapper(SMTMapper):
                         conditions.append(ir_out == arch_out)
                     constraints.append(conditions)
 
+        logger.debug("Unconstrained Formula")
+        for c in constraints:
+            logger.debug("  [")
+            for cond in c:
+                logger.debug(f"    {cond.value},")
+            logger.debug("  ],")
         formula = or_reduce([and_reduce(conds) for conds in constraints])
 
         # Adding in the constraints:
@@ -393,6 +412,10 @@ class IRMapper(SMTMapper):
         self.formula = smt.ForAll(list(forall_vars), formula.value)
         self.forall_vars = forall_vars
         self.formula_wo_forall = formula.value
+
+        logger.debug("Universally Quantified Vars")
+        for var in forall_vars:
+            logger.debug(f"  {var}")
 
     def solve(self,
         solver_name : str = 'z3',
@@ -433,7 +456,7 @@ def rr_from_solver(solver, irmapper):
     #extract, simplify, and convert constants to BV in the input binding
     bv_ibinding = []
     for ir_path, arch_path in ibinding:
-        if ir_path is Unbound:
+        if (ir_path is Unbound) and (arch_path in am.const_paths or arch_path in am.path_constraints):
             var = am.input_varmap[arch_path]
             bv_val = solved_to_bv(var, solver)
             ir_path = bv_val
@@ -442,8 +465,8 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = rebind_binding(bv_ibinding, family.PyFamily())
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
 
-    bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
-    bv_ibinding = _strip_aadt(bv_ibinding)
+    #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
+    bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
@@ -475,7 +498,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
         ValueError("Unknown result in efsmt")
 
 
-def _strip_aadt(binding):
+def strip_aadt(binding):
     ret_binding = []
     for ir_path, arch_path in binding:
         if isinstance(ir_path, AssembledADT):
