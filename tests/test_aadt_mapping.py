@@ -50,7 +50,7 @@ def test_efsmt():
             #Not implemented yet
             continue
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
-        rewrite_rule = ir_mapper.solve_efsmt('cvc4')
+        rewrite_rule = ir_mapper.solve('cvc4', external_loop=True)
         if rewrite_rule is None:
             assert ir_name in expect_not_found
             continue
