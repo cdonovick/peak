@@ -342,8 +342,8 @@ def _pretty_path(path):
     else:
         return str(path)
 
-def pretty_print_binding(binding):
-    print("(")
+def pretty_print_binding(binding, printer=print):
+    printer("(")
     for ir_path, arch_path in binding:
-        print(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
-    print(")")
+        printer(f"  {_pretty_path(ir_path)} <=> {_pretty_path(arch_path)}")
+    printer(")")

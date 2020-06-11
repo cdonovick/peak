@@ -15,6 +15,8 @@ from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
 from peak import family
+import logging
+logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
@@ -252,8 +254,9 @@ def _free_var_from_t(T):
     assembler = assembler_t(adt_t)
     return bv_t[assembler.width]()
 
+
 class IRMapper(SMTMapper):
-    def __init__(self, archmapper, ir_fc, verbose=False):
+    def __init__(self, archmapper, ir_fc):
         super().__init__(ir_fc)
         #For now assume that ir input forms and ir output forms is just 1
         if self.num_input_forms > 1:
@@ -265,14 +268,6 @@ class IRMapper(SMTMapper):
 
         self.archmapper = archmapper
         arch_output_form = archmapper.output_forms[0]
-
-        if verbose:
-            print("IR Vars")
-            for path, var in self.input_varmap.items():
-                print(f"  {path} -> {var.value}")
-            print("Arch Vars")
-            for path, var in archmapper.input_varmap.items():
-                print(f"  {path} -> {var.value}")
 
         # Create input bindings
         # binding = [input_form_idx][bidx]
@@ -295,16 +290,14 @@ class IRMapper(SMTMapper):
             form_arch_input_path_to_adt = {p:T for p, T in arch_input_path_to_adt.items() if p in af.varmap}
             bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
             bindings = list(filter(constraint_filter, bindings))
-            if verbose:
-                for i, b in enumerate(bindings):
-                    print(f"Binidng {i}")
-                    pretty_print_binding(b)
+            for i, b in enumerate(bindings):
+                logger.debug(f"Binidng {i}")
+                pretty_print_binding(b, logger.debug)
             input_bindings.append(bindings)
         # Check Early out
         self.has_bindings = max(len(bs) for bs in input_bindings) > 0
         if not self.has_bindings:
-            if verbose:
-                print("Early out, no input binidngs")
+            logger.debug("Early out, no input binidngs")
             return
 
         # Create output bindings
@@ -317,8 +310,7 @@ class IRMapper(SMTMapper):
         # Check Early out
         self.has_bindings = len(output_bindings) > 0
         if not self.has_bindings:
-            if verbose:
-                print("Early out, no output binidngs")
+            logger.debug("Early out, no output binidngs")
             return
 
         form_var = archmapper.input_form_var
@@ -380,13 +372,12 @@ class IRMapper(SMTMapper):
                         conditions.append(ir_out == arch_out)
                     constraints.append(conditions)
 
-        if verbose:
-            print("Unconstrained Formula")
-            for c in constraints:
-                print("  [")
-                for cond in c:
-                    print(f"    {cond.value},")
-                print("  ],")
+        logger.debug("Unconstrained Formula")
+        for c in constraints:
+            logger.debug("  [")
+            for cond in c:
+                logger.debug(f"    {cond.value},")
+            logger.debug("  ],")
         formula = or_reduce([and_reduce(conds) for conds in constraints])
 
         # Adding in the constraints:
@@ -420,10 +411,9 @@ class IRMapper(SMTMapper):
         self.output_bindings = output_bindings
         self.formula = smt.ForAll(list(forall_vars), formula.value)
         self.forall_vars = forall_vars
-        if verbose:
-            print("Universally Quantified Vars")
-            for var in forall_vars:
-                print(f"  {var}")
+        logger.debug("Universally Quantified Vars")
+        for var in forall_vars:
+            logger.debug(f"  {var}")
 
 
     def solve(self,
