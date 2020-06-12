@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import functools
+import types
 
 from ast_tools.passes import begin_rewrite, end_rewrite
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
@@ -10,6 +11,7 @@ from hwtypes import is_adt_type
 from hwtypes.adt import Product, Tuple
 
 from peak.assembler import Assembler, MagmaADT
+from peak import family
 
 import magma
 
@@ -99,14 +101,42 @@ def typecheck(call_fn):
 #1) Caches the function call
 #2) Stores the family closure in Peak._fc_ if it can
 class family_closure:
-    def __init__(self, fc):
+    def __init__(self, arg):
+        self.is_bound = False
+        if isinstance(arg, types.FunctionType):
+            self._family_ = family
+            self._bind(arg)
+        else:
+            self._family_ = arg
+
+    def _bind(self, fc):
+        self.is_bound = True
         self.fc = fc
         self.cache = {}
 
-    def __call__(self, family, *args, **kwargs):
-        key = (family, tuple(args), tuple(kwargs.items()))
+    @property
+    def family(self):
+        return self._family_
+
+    @property
+    def Magma(self):
+        return self(self.family.MagmaFamily())
+
+    @property
+    def SMT(self):
+        return self(self.family.SMTFamily())
+
+    @property
+    def Py(self):
+        return self(self.family.PyFamily())
+
+    def __call__(self, *args, **kwargs):
+        if not self.is_bound:
+            self._bind(*args, **kwargs)
+            return self
+        key = (tuple(args), tuple(kwargs.items()))
         if key in self.cache:
             return self.cache[key]
-        res = self.fc(family, *args, **kwargs)
+        res = self.fc(*args, **kwargs)
         self.cache[key] = res
         return res
