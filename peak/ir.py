@@ -19,7 +19,9 @@ class IR:
         self.instructions[name] = peak_fc
 
     #fun should have the form def fun(family, *args)
-    def add_peak_instruction(self, name : str, input_interface : Product, output_interface : Product, fun : tp.Callable):
+    def add_peak_instruction(self, name : str, input_interface : Product, output_interface : Product, fun : tp.Callable, cls_name=None):
+        if cls_name is None:
+            cls_name = name
         #Assuming for now that abstract bitvectors are used in the interfaces
         inputs = input_interface.field_dict
         outputs = output_interface.field_dict
@@ -34,14 +36,14 @@ class IR:
         class_src.append(f"def peak_fc(family):")
         for t, tname in t_to_tname.items():
             class_src.append(f"{tab*1}_{tname} = _rebind_type({tname}, family)")
-        class_src.append(f"{tab*1}class {name}(Peak):")
+        class_src.append(f"{tab*1}class {cls_name}(Peak):")
         output_types = ", ".join([f"{field} = _{t_to_tname[t]}" for field, t in outputs.items()])
         input_types = ", ".join([f"{field} : _{t_to_tname[t]}" for field, t in inputs.items()])
         fun_call = "family, " + ", ".join(inputs.keys())
         class_src.append(f"{tab*2}@name_outputs({output_types})")
         class_src.append(f"{tab*2}def __call__(self, {input_types}):")
         class_src.append(f"{tab*3}return _fun_({fun_call})")
-        class_src.append(f"{tab*1}return {name}")
+        class_src.append(f"{tab*1}return {cls_name}")
         class_src = '\n'.join(class_src)
         exec_ls = {}
         #add all the types to globals
