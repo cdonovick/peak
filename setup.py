@@ -1,15 +1,15 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 import sys
 
 setup(
     name='peak',
     version='0.0.1',
-    url='https://github.com/phanrahan/peak',
+    url='https://github.com/cdonovick/peak',
     license='MIT',
-    maintainer='Pat Hanrahan',
-    maintainer_email='hanrahan@cs.stanford.edu',
+    maintainer='Caleb Donovick',
+    maintainer_email='donovick@cs.stanford.edu',
     description='A DSL for Specifying Processors',
-    packages=find_packages(),
+    packages=find_namespace_packages(include=['peak', 'peak.*']),
     install_requires=[
         "hwtypes >= 1.4.0",
         "astor",
