@@ -420,8 +420,7 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 10,
-        custom_enumeration : tp.Mapping[type, tp.Callable] = {}
+        itr_limit = 10
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
