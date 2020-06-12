@@ -9,6 +9,7 @@ from examples.sum_pe.sim import PE_fc, ISA_fc
 from examples.smallir import gen_SmallIR
 import pytest
 from peak.mapper.utils import pretty_print_binding
+from hwtypes import SMTFPVector, FPVector, RoundingMode
 
 num_test_vectors = 16
 def test_automapper():
@@ -61,6 +62,54 @@ def test_efsmt():
             ir_inputs = rewrite_rule.build_ir_input(ir_vals, family.PyFamily())
             arch_inputs = rewrite_rule.build_arch_input(ir_vals, family.PyFamily())
             assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)
+
+def test_external_loop_UF():
+
+    def BFloat16_fc(family_):
+        if isinstance(family_, family.SMTFamily):
+            FPV = SMTFPVector
+        else:
+            FPV = FPVector
+        BFloat16 = FPV[8, 7, RoundingMode.RNE, False]
+        return BFloat16
+
+    @family_closure
+    def ir_fc(family):
+        Data = family.BitVector[16]
+
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            def __call__(self, in0: Data) -> Data:
+                return in0
+        return IR
+
+    #Simple PE that can only add or subtract
+    @family_closure
+    def PE_fc(family):
+        Data = family.BitVector[16]
+        BFloat16 = BFloat16_fc(family)
+        class Inst(Product):
+            class Op(Enum):
+                add = 1
+                nop = 2
+            sel=family.Bit
+
+        @family.assemble(locals(), globals())
+        class Arch(Peak):
+            def __call__(self, inst : Const(Inst), a: Data) -> Data:
+                if inst.Op == Inst.Op.add:
+                    a_fp = BFloat16.reinterpret_from_bv(a)
+                    ret = a_fp + a_fp
+                    return BFloat16.reinterpret_as_bv(ret)
+                else: #inst == Inst.nop
+                    return a
+        return Arch
+
+    arch_mapper = ArchMapper(PE_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    rewrite_rule = ir_mapper.solve('z3')
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    assert rewrite_rule is not None
 
 def test_custom_rr():
 
