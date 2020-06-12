@@ -35,6 +35,33 @@ def test_automapper():
             arch_inputs = rewrite_rule.build_arch_input(ir_vals, family.PyFamily())
             assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)
 
+def test_efsmt():
+    IR = gen_SmallIR(8)
+    arch_fc = PE_fc
+    arch_bv = arch_fc(family.PyFamily())
+    arch_mapper = ArchMapper(arch_fc)
+    expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
+    expect_not_found = ('Mul', 'Shftr', 'Shftl')
+    for ir_name, ir_fc in IR.instructions.items():
+        if ir_name in ('Not', 'Neg'):
+            #Not implemented yet
+            continue
+        ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+        rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+        if rewrite_rule is None:
+            assert ir_name in expect_not_found
+            continue
+        assert ir_name in expect_found
+        #verify the mapping works
+        counter_example = rewrite_rule.verify()
+        assert counter_example is None
+        ir_bv = ir_fc(family.PyFamily())
+        for _ in range(num_test_vectors):
+            ir_vals = {path:BitVector.random(8) for path in rewrite_rule.ir_bounded}
+            ir_inputs = rewrite_rule.build_ir_input(ir_vals, family.PyFamily())
+            arch_inputs = rewrite_rule.build_arch_input(ir_vals, family.PyFamily())
+            assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)
+
 def test_custom_rr():
 
     #This is like a CoreIR Add

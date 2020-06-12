@@ -411,17 +411,23 @@ class IRMapper(SMTMapper):
         self.output_bindings = output_bindings
         self.formula = smt.ForAll(list(forall_vars), formula.value)
         self.forall_vars = forall_vars
+        self.formula_wo_forall = formula.value
+
         logger.debug("Universally Quantified Vars")
         for var in forall_vars:
             logger.debug(f"  {var}")
 
-
     def solve(self,
         solver_name : str = 'z3',
+        external_loop : bool = False,
+        itr_limit = 10,
         custom_enumeration : tp.Mapping[type, tp.Callable] = {}
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
+
+        if external_loop:
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, BV, itr_limit, solver_name, self)
 
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)
@@ -462,6 +468,34 @@ def rr_from_solver(solver, irmapper):
     #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
+
+def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
+
+    y = set(y)
+    x = phi.get_free_variables() - y
+
+    with smt.Solver (logic = logic, name = solver_name) as solver:
+        solver.add_assertion(smt.Bool(True))
+        loops = 0
+
+        while maxloops is None or loops <= maxloops:
+            loops += 1
+            eres = solver.solve()
+
+            if not eres:
+                return None
+            else:
+                tau = {v: solver.get_value(v) for v in x}
+                sub_phi = phi.substitute(tau).simplify()
+                model = smt.get_model(smt.Not(sub_phi), solver_name = solver_name, logic = logic)
+
+                if model is None:
+                    return rr_from_solver(solver, irmapper)
+                else :
+                    sigma = {v: model.get_value(v) for v in y}
+                    sub_phi = phi.substitute(sigma).simplify()
+                    solver.add_assertion(sub_phi)
+        ValueError("Unknown result in efsmt")
 
 
 def strip_aadt(binding):
