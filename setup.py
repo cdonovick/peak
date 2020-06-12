@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import sys
 
 setup(
@@ -9,9 +9,7 @@ setup(
     maintainer='Pat Hanrahan',
     maintainer_email='hanrahan@cs.stanford.edu',
     description='A DSL for Specifying Processors',
-    packages=[
-        "peak",
-    ],
+    packages=find_packages(),
     install_requires=[
         "hwtypes >= 1.4.0",
         "astor",
