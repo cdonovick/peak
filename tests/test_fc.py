@@ -25,5 +25,5 @@ def test_autocall(fc):
     # note that family closure just return their
     # arguments this shows fc.T calls fc(fc.family.TFamily())
     assert isinstance(fc.Magma, fc.family.MagmaFamily)
-    assert isinstance(fc.Python, fc.family.PyFamily)
+    assert isinstance(fc.Py, fc.family.PyFamily)
     assert isinstance(fc.SMT, fc.family.SMTFamily)

@@ -127,7 +127,7 @@ class family_closure:
         return self(self.family.SMTFamily())
 
     @property
-    def Python(self):
+    def Py(self):
         return self(self.family.PyFamily())
 
     def __call__(self, *args, **kwargs):
