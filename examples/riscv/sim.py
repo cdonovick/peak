@@ -1,30 +1,37 @@
-
-from .isa import ISA_fc
 from peak import Peak, name_outputs, family_closure, Const
 
-@family_closure
+from .isa import ISA_fc
+from . import family
+
+@family_closure(family)
 def R32I_fc(family):
-    Bit = isa.Bit
-    BitVector = isa.BitVector
-    Unsigned = isa.Unsigned
-    Signed = isa.Signed
-    Word = BitVector[32]
+    Bit = family.Bit
+    BitVector = family.BitVector
+    Unsigned = family.Unsigned
+    Signed = family.Signed
+    Word = family.Word
+    idx = family.Idx
+
 
     isa = ISA_fc(family)
+    RegisterFile = family.get_register_file()
 
     ExecInst = family.get_constructor(isa.AluInst)
 
     @family.assemble(locals(), globals())
     class R32I(Peak):
         @name_outputs(out=Word, pc_next=Word)
-        def __call__(self, inst: isa.ExpandInst, pc: Word) -> (Word, Word):
+        def __call__(self,
+                     inst: isa.Inst,
+                     pc: Word,
+                     register_file: RegisterFile) -> Word:
             # Decode
             # Inputs:
             #   inst, pc
             # Outputs:
-            #   a, b, exec_inst,
+            #   a, b, exec_inst, rd
             #   lsb_mask, is_branch, is_jump
-            #   branch_offset, cmp_zero, invert
+            #   branch_offset, cmp_zero, invert,
             lsb_mask = Word(-1)
             is_branch = Bit(0)
             is_jump = Bit(0)
@@ -32,23 +39,29 @@ def R32I_fc(family):
             cmp_zero = Bit(0)
             invert = Bit(0)
 
+            # Note rd != 0 is implicit enable
+            rd = Idx(0)
+
             if inst.alu.match:
                 alu_inst = inst.alu.value
                 if alu_inst.i.match:
                     i_inst = alu_inst.i.value
-                    a = i_inst.data.rs1
+                    a = register_file.load1(i_inst.data.rs1)
                     b = i_inst.data.imm.sext(20)
                     exec_inst = ExecInst(isa.ArithInst, i_inst.tag)
+                    rd = i_inst.data.rd
                 elif alu_inst.s.match:
                     s_inst = alu_inst.s.value
-                    a = s_inst.data.rs1
+                    a = register_file.load1(i_inst.data.rs1)
                     b = s_inst.data.imm.sext(27)
                     exec_inst = ExecInst(isa.ShftInst, s_inst.tag)
+                    rd = s_inst.data.rd
                 elif alu_inst.r.match:
                     r_inst = alu_inst.r.value
-                    a = r_inst.data.rs1
-                    b = r_inst.data.rs2
+                    a = register_file.load1(i_inst.data.rs1)
+                    b = register_file.load2(i_inst.data.rs2)
                     exec_inst = r_inst.tag
+                    rd = r_inst.data.rd
                 else:
                     assert alu_inst.u.match
                     u_inst = alu_inst.u.value
@@ -59,6 +72,7 @@ def R32I_fc(family):
                         a = pc
                     b = u_inst.data.imm.sext(12) << 12
                     exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.ADD)
+                    rd = u_inst.data.rd
             elif inst.ctrl.match:
                 ctrl_inst = inst.ctrl.value
                 if ctrl_inst.j.match:
@@ -68,25 +82,27 @@ def R32I_fc(family):
                         jal_inst = j_inst[isa.JAL].value
                         a = pc
                         b = jal_inst.imm.sext(12) << 1
+                        rd = jal_inst.rd
                     else:
                         assert j_inst[isa.JALR].match
                         jalr_inst = j_inst[isa.JALR].value
-                        a = jalr_inst.rs1
+                        a = register_file.load1(jalr_inst.rs1)
                         b = jalr_inst.imm.sext(20)
                         lsb_mask = ~Word(1)
+                        rd = jalr_inst.rd
                     exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.ADD)
                 else:
                     assert ctrl_inst.b.match
                     b_inst = ctrl_inst.b.value
                     is_branch = Bit(1)
-                    a = b_inst.data.rs1
-                    b = b_inst.data.rs2
+                    a = register_file.load1(b_inst.data.rs1)
+                    b = register_file.load2(b_inst.data.rs2)
                     branch_offset = b_inst.data.imm.sext(20) << 1
 
                     # hand coded common sub-expr elimin
                     is_eq = b_inst.tag == isa.BranchInst.BEQ
                     is_ne = b_inst.tag == isa.BranchInst.BNE
-                    is_bge = (b_inst.tag == isa.BranchInst.BGE
+                    is_bge = b_inst.tag == isa.BranchInst.BGE
                     is_signed = (is_bge | b_inst.tag == isa.BranchInst.BLT)
                     cmp_ge = (is_bge | b_inst.tag == isa.BranchInst.BGEU)
 
@@ -144,10 +160,10 @@ def R32I_fc(family):
 
             # Commit
             # Inputs:
-            #   pc, c, is_branch, is_jump
+            #   pc, rd, c, is_branch, is_jump
             #   branch_target, cmp_zero, invert
             # Outputs:
-            #   out, pc_next
+            #   pc_next
             assert not (is_jump & is_branch)
             pc_next = pc+4
             if is_branch:
@@ -167,6 +183,8 @@ def R32I_fc(family):
             else:
                 out = c
 
-            return (out, pc_next)
+
+            register_file.store(rd, out)
+            return pc_next
 
     return R32I

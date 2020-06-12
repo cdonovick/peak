@@ -1,23 +1,21 @@
-from functools import lru_cache
 from types import SimpleNamespace
 
 from hwtypes.adt import Enum, Product, TaggedUnion, Sum
 from hwtypes.adt_util import rebind_type
 
-from peak.peak import Const
+from peak import family_closure
+
+from . import family
 
 
-@lru_cache(None)
+@family_closure(family)
 def ISA_fc(family):
 
     Bit = family.Bit
     BitVector = family.BitVector
-    SIntVector = family.SIntVector
-    UIntVector = family.UIntVector
 
-    IRegIdx = new(BitVector, 5, name="IRegIdx")
-    ORegIdx = new(BitVector, 5, name="ORegIdx")
-    RegVal = new(BitVector, 32, name="RegVal")
+    IRegIdx = family.Idx
+    ORegIdx = family.Idx
 
     class R(Product):
         rd = ORegIdx
@@ -27,31 +25,31 @@ def ISA_fc(family):
     class I(Product):
         rd = ORegIdx
         rs1 = IRegIdx
-        imm = Const(BitVector[12])
+        imm = BitVector[12]
 
     # for shifts
     class Is(Product):
         rd = ORegIdx
         rs1 = IRegIdx
-        imm = Const(BitVector[5])
+        imm = BitVector[5]
 
     class S(Product):
         rs1 = IRegIdx
         rs2 = IRegIdx
-        imm = Const(BitVector[12])
+        imm = BitVector[12]
 
     class U(Product):
         rd = IRegIdx
-        imm = Const(BitVector[20])
+        imm = BitVector[20]
 
     class B(Product):
         rs1 = IRegIdx
         rs2 = IRegIdx
-        imm = Const(BitVector[12])
+        imm = BitVector[12]
 
     class J(Product):
         rd = ORegIdx
-        imm = Const(BitVector[20])
+        imm = BitVector[20]
 
     class ArithInst(Enum):
         ADD = Enum.Auto()
@@ -67,7 +65,7 @@ def ISA_fc(family):
         SRL = Enum.Auto()
         SRA = Enum.Auto()
 
-    class PCInst(Enum)
+    class PCInst(Enum):
         LUI = Enum.Auto()
         AUIPC = Enum.Auto()
 
@@ -145,8 +143,5 @@ def ISA_fc(family):
         ctrl = Control
         mem = Memory
 
-    #Should probably happen automatically in the mapper code
-    #also should remove the ORegIdx types
-    ExpandInst = Inst.rebind_type(IRegIdx, RegVal)
 
     return SimpleNamespace(**locals())
