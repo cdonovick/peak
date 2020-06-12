@@ -14,41 +14,41 @@ def ISA_fc(family):
     Bit = family.Bit
     BitVector = family.BitVector
 
-    IRegIdx = family.Idx
-    ORegIdx = family.Idx
+    Idx = family.Idx
+    Word = family.Word
 
     class R(Product):
-        rd = ORegIdx
-        rs1 = IRegIdx
-        rs2 = IRegIdx
+        rd = Idx
+        rs1 = Idx
+        rs2 = Idx
 
     class I(Product):
-        rd = ORegIdx
-        rs1 = IRegIdx
+        rd = Idx
+        rs1 = Idx
         imm = BitVector[12]
 
     # for shifts
     class Is(Product):
-        rd = ORegIdx
-        rs1 = IRegIdx
+        rd = Idx
+        rs1 = Idx
         imm = BitVector[5]
 
     class S(Product):
-        rs1 = IRegIdx
-        rs2 = IRegIdx
+        rs1 = Idx
+        rs2 = Idx
         imm = BitVector[12]
 
     class U(Product):
-        rd = IRegIdx
+        rd = Idx
         imm = BitVector[20]
 
     class B(Product):
-        rs1 = IRegIdx
-        rs2 = IRegIdx
+        rs1 = Idx
+        rs2 = Idx
         imm = BitVector[12]
 
     class J(Product):
-        rd = ORegIdx
+        rd = Idx
         imm = BitVector[20]
 
     class ArithInst(Enum):
@@ -80,7 +80,7 @@ def ISA_fc(family):
         tag = ShftInst
 
     class ALUR(Product):
-        data = U
+        data = R
         tag = AluInst
 
     class ALUU(Product):

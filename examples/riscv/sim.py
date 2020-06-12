@@ -10,7 +10,7 @@ def R32I_fc(family):
     Unsigned = family.Unsigned
     Signed = family.Signed
     Word = family.Word
-    idx = family.Idx
+    Idx = family.Idx
 
 
     isa = ISA_fc(family)
@@ -20,7 +20,7 @@ def R32I_fc(family):
 
     @family.assemble(locals(), globals())
     class R32I(Peak):
-        @name_outputs(out=Word, pc_next=Word)
+        @name_outputs(pc_next=Word)
         def __call__(self,
                      inst: isa.Inst,
                      pc: Word,
@@ -52,14 +52,14 @@ def R32I_fc(family):
                     rd = i_inst.data.rd
                 elif alu_inst.s.match:
                     s_inst = alu_inst.s.value
-                    a = register_file.load1(i_inst.data.rs1)
+                    a = register_file.load1(s_inst.data.rs1)
                     b = s_inst.data.imm.sext(27)
                     exec_inst = ExecInst(isa.ShftInst, s_inst.tag)
                     rd = s_inst.data.rd
                 elif alu_inst.r.match:
                     r_inst = alu_inst.r.value
-                    a = register_file.load1(i_inst.data.rs1)
-                    b = register_file.load2(i_inst.data.rs2)
+                    a = register_file.load1(r_inst.data.rs1)
+                    b = register_file.load2(r_inst.data.rs2)
                     exec_inst = r_inst.tag
                     rd = r_inst.data.rd
                 else:
@@ -187,4 +187,4 @@ def R32I_fc(family):
             register_file.store(rd, out)
             return pc_next
 
-    return R32I
+    return R32I, RegisterFile, isa
