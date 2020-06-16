@@ -1,4 +1,4 @@
-from hwtypes import Product, Bit
+from hwtypes import Product, Bit, Tuple
 from hwtypes import TypeFamily
 
 from .isa import Op
@@ -19,19 +19,19 @@ def PE_fc(family: AbstractFamily):
 
     ALU = ALU_fc(family)
 
+    Output_T = Tuple[Data, Data]
+    Output_Tc = family.get_constructor(Output_T)
+
     @family.assemble(locals(), globals())
     class PE(Peak):
         def __init__(self):
             self.alu0 : ALU = ALU()
             self.alu1 : ALU = ALU()
 
-        def __call__(self, inst : Inst, data0 : Data, data1 : Data) -> Data:
+        def __call__(self, inst : Inst, data0 : Data, data1 : Data) -> (Output_T, Bit):
             data1 = self.alu1(inst.op1, data0, data1)
             data0 = self.alu0(inst.op0, data0, data1)
 
-            if inst.choice:
-                return data1
-            else:
-                return data0
+            return Output_Tc(*[data0, data1]), Bit(0)
 
     return PE
