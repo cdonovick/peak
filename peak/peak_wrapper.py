@@ -4,7 +4,7 @@ import inspect
 import os
 import logging
 
-from peak import Peak, family_closure
+from peak import Peak, family_closure, name_outputs
 from peak import family
 from peak.family import AbstractFamily
 from hwtypes import Tuple
@@ -32,7 +32,7 @@ def exec_source(source, name, globals):
     #Need to write out a file, then exec using 'compile'
     return _locals[name]
 
-def wrap_peak_class(PE_fc):
+def wrap_peak_class(PE_fc, Inst_fc):
     inputs = PE_fc.Py.input_t
     outputs = PE_fc.Py.output_t
 
@@ -92,29 +92,36 @@ def wrap_peak_class(PE_fc):
     outputs_type_str = ""
     new_outputs_str = ""
     outputs_expanded = ""
+    named_outputs = "@name_outputs("
 
     for idx, (name, type_) in enumerate(outputs.field_dict.items()): 
         
         if issubclass(type_, hwtypes.Tuple):
-            outputs_type_str += "out" + str(name) + ", "
+            outputs_type_str += str(name) + ", "
             
             for ind, i in enumerate(outputs[name]):
                 if issubclass(i, hwtypes.BitVector):
                     outputs_str += "Data, "
                     out_width = len(i)
+                    named_outputs += f"{name}_{ind} = Data, "
                 else:
                     outputs_str += "Bit, "
-                outputs_expanded += f"out{idx}[{ind}], "
+                    named_outputs += f"{name}_{ind} = Bit, "
+                outputs_expanded += f"{name}[{ind}], "
         elif issubclass(type_, hwtypes.BitVector):
             outputs_str += "Data, "
-            outputs_type_str += "out" + str(idx) + ", "
-            outputs_expanded += f"out{idx}, "
+            outputs_type_str += str(name) + ", "
+            outputs_expanded += f"{name}, "
+            named_outputs += str(name) + " = Data, "
         else:
             outputs_str += "Bit, "
-            outputs_type_str += "out" + str(idx) + ", "
-            outputs_expanded += f"out{idx}, "
+            outputs_type_str += str(name) + ", "
+            outputs_expanded += f"{name}, "
+            named_outputs += str(name) + " = Bit, "
             
 
+    named_outputs = named_outputs[:-2]
+    named_outputs += ")"
     outputs_str = outputs_str[:-2]
     outputs_type_str = outputs_type_str[:-2]
     outputs_expanded = outputs_expanded[:-2]
@@ -124,13 +131,14 @@ def wrap_peak_class(PE_fc):
 def PE_wrapped_fc(family: AbstractFamily):
     Data = family.BitVector['''+ str(width) +''']
     Bit = family.Bit
-    # Inst = Inst_fc(family)
+    Inst = Inst_fc(family)
 ''' + tuple_inputs_str + '''
     @family.assemble(locals(), globals())
     class PE_wrapped(Peak):
         def __init__(self):
             self.PE : PE_fc(family) = PE_fc(family)()
 
+        '''+named_outputs+'''
         def __call__(self, ''' + new_inputs_str + ''') -> (''' + outputs_str + '''):
             ''' + constructed_tuples + '''
             ''' + outputs_type_str + ''' = self.PE(''' + pe_call_inputs + ''')
@@ -144,9 +152,10 @@ def PE_wrapped_fc(family: AbstractFamily):
         Peak=Peak,
         AbstractFamily=AbstractFamily,
         family_closure=family_closure,
+        name_outputs=name_outputs,
         family=family,
-        # Inst_fc=Inst_fc,
-        Inst=Inst,
+        Inst_fc=Inst_fc,
+        # Inst=Inst,
         PE_fc=PE_fc,
         Tuple=Tuple
     )
