@@ -1,7 +1,7 @@
 import typing as tp
 from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
-from hwtypes import SMTBitVector as SBV
+from hwtypes import SMTBit, SMTBitVector as SBV
 from hwtypes import Bit, BitVector
 from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
@@ -265,7 +265,7 @@ class RewriteRule:
                 return ir_ce, arch_ce
 
 def _free_var_from_t(T):
-    if issubclass(T, SBV):
+    if issubclass(T, (SBV, SMTBit)):
         return T()
     aadt_t = SMTFamily.get_adt_t(T)
     adt_t, assembler_t, bv_t = aadt_t.fields

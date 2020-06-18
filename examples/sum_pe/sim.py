@@ -11,7 +11,7 @@ def PE_fc(family):
     class PE(Peak):
 
         @name_outputs(out=isa.Word)
-        def __call__(self, inst: Const(isa.Inst), in0: isa.Word, in1: isa.Word, in2: isa.Word) -> isa.Word:
+        def __call__(self, inst: Const(isa.Inst), in0: isa.Word, in1: isa.Word, in2: isa.Word, in3: family.Bit) -> isa.Word:
             is_bitop = ~inst[isa.ArithOp].match
             if not is_bitop:
                 arithOp = inst[isa.ArithOp].value

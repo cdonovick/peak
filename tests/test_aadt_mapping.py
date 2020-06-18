@@ -1,5 +1,5 @@
 from peak.assembler.assembler import Assembler
-from peak.assembler.assembled_adt import  AssembledADT
+from peak.assembler.assembled_adt import AssembledADT
 from hwtypes import Bit, BitVector
 from hwtypes.adt import Enum, Product
 from peak.mapper import ArchMapper, RewriteRule
