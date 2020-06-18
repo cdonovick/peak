@@ -185,6 +185,7 @@ def _sum(isa: tp.Type[Sum]):
     field_to_tags = defaultdict(list)
     layout = {}
     tag_width = (len(isa.field_dict)-1).bit_length()
+    tag_layout = (0, tag_width)
 
     sorted_fields = list(sorted(
         isa.field_dict.items(),
@@ -246,10 +247,9 @@ def _sum(isa: tp.Type[Sum]):
         return valid
 
 
-    tag_assemble = name_to_field.__getitem__
+    tag_assemble = name_to_tag.__getitem__
     tag_diasssamble = tag_to_name.__getitem__
     tag_is_valid = _gen_is_valid(tag_to_name.keys(), tag_width)
-    tag_layout = (0, tag_width)
     return (assemble, disassemble, is_valid, width, layout,
             tag_assemble, tag_diasssamble, tag_is_valid, tag_width, tag_layout)
 
