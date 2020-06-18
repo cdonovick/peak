@@ -255,20 +255,24 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
         if not _issubclass(cls.adt_t, Sum):
             return field
+
         tag = self._value_[cls._assembler_.sub.tag_idx]
-        # if key is an assembled adt class just grab the type from it
+
         if key is _TAG:
             return tag
 
+        # if key is an assembled adt class just grab the type from it
         if _issubclass(key, cls.unbound_t):
             T = key.adt_t
         else:
             T = key
 
-        if T in cls.adt_t:
+        if T in cls.adt_t.field_dict:
             T = cls._assembler_.assemble_tag(T, cls.bv_type)
+
         if not isinstance(T, cls.bv_type[cls._assembler_.tag_width]):
             raise TypeError(type(T), T, cls.adt_t)
+
         match = tag == T
         return cls.adt_t.Match(match, field, safe=False)
 
