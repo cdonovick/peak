@@ -154,55 +154,68 @@ class ArchMapper(SMTMapper):
 
 class RewriteRule:
     def __init__(self, ibinding, obinding, ir_fc, arch_fc):
-        #Contains all the ir paths that are bound to arch paths
-        ir_bounded = set()
+        #Verify that there are no Unbound Consts in the ibinding
+        arch_path_types = _create_path_to_adt(arch_fc(SMTFamily).input_t)
         for ir_path, arch_path in ibinding:
-            if isinstance(ir_path, tuple):
-                ir_bounded.add(ir_path)
-            elif ir_path is Unbound:
-                continue
-            elif not isinstance(ir_path, (BitVector, Bit)):
-                raise ValueError(f"{ir_path} is not valid for binding")
+            if ir_path is Unbound and isinstance(arch_path_types[arch_path], Const):
+                raise ValueError(f"Arch path {arch_path} needs to have a value")
 
         #These are PyFamily bindings
         self.ibinding = ibinding
         self.obinding = obinding
-        self.ir_bounded = ir_bounded
         self.ir_fc = ir_fc
         self.arch_fc = arch_fc
 
-    def build_ir_input(self, ir_inputs : tp.Mapping["path", BitVector], family):
-        ir_binding = [(val, path) for path, val in ir_inputs.items()]
-        ir_input_aadt_t = _input_aadt_t(self.ir_fc, family)
-        complete_binding = SimplifyBinding()(ir_input_aadt_t, ir_binding)
-        #internally verify entire binding was simplified to a constant
-        assert len(complete_binding)==1
-        assert complete_binding[0][1] is ()
-        input_val = complete_binding[0][0]
+    def get_input_paths(self):
+        #Input paths are ir_paths, and arch_paths which are not const and do not have a value
+        arch_path_types = _create_path_to_adt(self.arch_fc(SMTFamily).input_t)
+        ir_paths = set()
+        arch_paths = set()
+        for ir_path, arch_path in self.ibinding:
+            if isinstance(ir_path, tuple):
+                ir_paths.add(ir_path)
+            elif ir_path is Unbound and not isinstance(arch_path_types[arch_path], Const):
+                arch_paths.add(arch_path)
+        return ir_paths, arch_paths
 
-        #create dict of input values
-        return aadt_product_to_dict(input_val)
+    def build_inputs(self, ir_inputs : tp.Mapping["path", BitVector], arch_inputs: tp.Mapping["path", BitVector], family):
+        ir_paths, arch_paths = self.get_input_paths()
+        if set(ir_inputs.keys()) != set(ir_paths):
+            raise ValueError("ir_inputs are wrong")
+        if set(arch_inputs.keys()) != set(arch_paths):
+            raise ValueError("arch_inputs are wrong")
 
-    def build_arch_input(self, ir_inputs : tp.Mapping["path", BitVector], family):
-        arch_bindings = {}
-        complete_binding = []
         ibinding = rebind_binding(self.ibinding, family)
+        ir_binding = []
+        arch_binding = []
         for ir_path, arch_path in ibinding:
             if isinstance(ir_path, tuple):
-                if ir_path not in ir_inputs:
-                    raise ValueError(f"{ir_path} must be in ir_inputs")
-                complete_binding.append((ir_inputs[ir_path], arch_path))
+                assert ir_path in ir_inputs
+                val = ir_inputs[ir_path]
+                ir_binding.append((val, ir_path))
+                arch_binding.append((val, arch_path))
+            elif ir_path is Unbound:
+                assert arch_path in arch_inputs
+                arch_binding.append((arch_inputs[arch_path], arch_path))
             else:
-                complete_binding.append((ir_path, arch_path))
-        arch_input_aadt_t = _input_aadt_t(self.arch_fc, family)
-        complete_binding = SimplifyBinding()(arch_input_aadt_t, complete_binding)
+                arch_binding.append((ir_path, arch_path))
+
+        arch_aadt = _input_aadt_t(self.arch_fc, family)
+        arch_binding = SimplifyBinding()(arch_aadt, arch_binding)
+        # internally verify entire binding was simplified to a constant
+        assert len(arch_binding) == 1
+        assert arch_binding[0][1] is ()
+        arch_input = arch_binding[0][0]
+
+        ir_aadt = _input_aadt_t(self.ir_fc, family)
+        ir_binding = SimplifyBinding()(ir_aadt, ir_binding)
         #internally verify entire binding was simplified to a constant
-        assert len(complete_binding)==1
-        assert complete_binding[0][1] is ()
-        input_val = complete_binding[0][0]
+        assert len(ir_binding)==1
+        assert ir_binding[0][1] is ()
+        ir_input = ir_binding[0][0]
 
         #create dict of input values
-        return aadt_product_to_dict(input_val)
+        return aadt_product_to_dict(ir_input), aadt_product_to_dict(arch_input)
 
     def parse_ir_output(self, outputs):
         output_t = self.ir_fc(SMTFamily).output_t
@@ -222,9 +235,12 @@ class RewriteRule:
     def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
         # create free variable for each ir_val
         ir_path_types = _create_path_to_adt(strip_modifiers(self.ir_fc(SMTFamily).input_t))
-        ir_vars = {path:_free_var_from_t(ir_path_types[path]) for path in self.ir_bounded}
-        ir_inputs = self.build_ir_input(ir_vars, SMTFamily)
-        arch_inputs = self.build_arch_input(ir_vars, SMTFamily)
+        arch_path_types = _create_path_to_adt(strip_modifiers(self.arch_fc(SMTFamily).input_t))
+        ir_paths, arch_paths = self.get_input_paths()
+
+        ir_values = {path:_free_var_from_t(ir_path_types[path]) for path in ir_paths}
+        arch_values = {path: _free_var_from_t(arch_path_types[path]) for path in arch_paths}
+        ir_inputs, arch_inputs = self.build_inputs(ir_values, arch_values, SMTFamily)
         ir = self.ir_fc(SMTFamily)()
         arch = self.arch_fc(SMTFamily)()
         ir_out_values = self.parse_ir_output(ir(**ir_inputs))
@@ -244,7 +260,9 @@ class RewriteRule:
             if verified:
                 return None
             else:
-                return {path: solved_to_bv(var, solver) for path, var in ir_vars.items()}
+                ir_ce = {path: solved_to_bv(var, solver) for path, var in ir_values.items()}
+                arch_ce = {path: solved_to_bv(var, solver) for path, var in arch_values.items()}
+                return ir_ce, arch_ce
 
 def _free_var_from_t(T):
     if issubclass(T, SBV):
