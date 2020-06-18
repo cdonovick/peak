@@ -10,7 +10,8 @@ class Op(Enum):
 @family_closure
 def ISA_fc(family):
     Word = family.BitVector[8]
-    Bit  = family.BitVector[1]
+    BV1 = family.BitVector[1]
+    Bit  = family.Bit
 
     BitOp = Tuple[Op, Bit]
 
