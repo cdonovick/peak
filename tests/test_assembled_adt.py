@@ -31,6 +31,7 @@ def test_assembled_adt(isa, bv_type):
 
         for inst in isa.enumerate():
             opcode = asm.assemble(inst, bv_type=bv_type)
+            assert asm_adt._is_valid_(opcode)
             assert asm_adt(inst) == asm_adt(opcode)
             assert issubclass(type(asm_adt(inst)._value_), bv_type)
             assert issubclass(type(asm_adt(opcode)._value_), bv_type)
