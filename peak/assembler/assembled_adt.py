@@ -202,6 +202,10 @@ class AssembledADTMeta(BoundMeta):
     def bv_type(cls):
         return cls.fields[2]
 
+    # is_valid is a name I don't want to reserve
+    def _is_valid_(cls, opcode: AbstractBitVector) -> AbstractBit:
+        return cls._assembler_.is_valid(opcode)
+
     # For the bitvector protocol
     def _bitvector_t_(cls):
         return cls.bv_type[cls._assembler_.width]
