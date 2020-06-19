@@ -76,11 +76,19 @@ class AbstractAssembler(metaclass=AssemblerMeta):
         pass
 
     @abstractmethod
+    def is_valid(self, opcode: AbstractBitVector) -> AbstractBit:
+        pass
+
+    @abstractmethod
     def assemble_tag(self, T: type, bv_type: tp.Type[AbstractBitVector]) -> AbstractBitVector:
         pass
 
     @abstractmethod
     def disassemble_tag(self, opcode: BitVector) -> 'T':
+        pass
+
+    @abstractmethod
+    def is_valid_tag(self, tag: AbstractBitVector) -> AbstractBit:
         pass
 
     @property

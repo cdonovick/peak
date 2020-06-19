@@ -1,12 +1,15 @@
 import abc
 from collections import Counter
 from functools import reduce
+import inspect
 import itertools as it
 import typing as tp
 
-from hwtypes import AbstractBitVectorMeta, TypeFamily, Enum, Sum, Product, Tuple
+from hwtypes import AbstractBitVectorMeta, TypeFamily
 from hwtypes import AbstractBitVector, AbstractBit
+
 from hwtypes.adt_meta import BoundMeta
+from hwtypes.adt import Enum, Product, Sum, Tuple, TaggedUnion
 from hwtypes.modifiers import is_modified
 
 import magma as m
@@ -41,7 +44,7 @@ def _create_from_layout(width, layout, field_bvs, bv_type: AbstractBitVector, de
     for field_name, (low, hi) in layout.items():
         # need to add None to keep the indexing consistent
         slots[low:hi] = field_bvs[field_name], *(None for _ in range(low+1, hi))
-    bv = reduce(bv_type.concat, (s for s in slots if s is not None))
+    bv = reduce(bv_type.concat, (_as_bv(s) for s in slots if s is not None))
     assert bv.size == width
     #Need to cast to bv_type since magma's concats do not return bv_type
     return bv_type[width](bv)
@@ -60,43 +63,34 @@ def _as_bv(v):
     return bv_value
 
 
-def _tuple_builder(cls, *args, default_bv):
-    adt_t = cls.adt_t
-    assert len(args) == len(adt_t.fields)
+def _taggedunion_from_fields(cls, tag_bv=None, default_bv=0, **kwargs):
+    if len(kwargs) != 1:
+        raise  TypeError('Expected exactly one keyword argument')
 
-    assembler = cls.assembler_t(adt_t)
-    fields = {i: _as_bv(cls[i](v)) for i, v in enumerate(args)}
-    bv_value = _create_from_layout(
-            assembler.width, assembler.layout, fields, cls.bv_type, default_bv)
-    return cls(bv_value)
-
-
-def _product_builder(cls, *, default_bv, **kwargs):
-    adt_t = cls.adt_t
-    assert kwargs.keys() == adt_t.field_dict.keys()
-    assembler = cls.assembler_t(adt_t)
-
-    fields = {k: _as_bv(getattr(cls, k)(v)) for k, v in kwargs.items()}
-    bv_value = _create_from_layout(
-            assembler.width, assembler.layout, fields, cls.bv_type, default_bv)
-    return cls(bv_value)
+    tag, val = kwargs.popitem()
+    tag = cls.adt_t.field_dict[tag]
+    value_bv = getattr(cls, tag)(value)
+    return _sum_from_fields(
+            cls, tag, val,
+            tag_bv=tag_bv, value_bv=value_bv, default_bv=default_bv)
 
 
-def _sum_builder(cls, T, value, *, tag_bv, default_bv):
-    adt_t = cls.adt_t
-    assembler = cls.assembler_t(adt_t)
-    if tag_bv is not None:
-        assert isinstance(tag_bv, cls.bv_type)
-        assert tag_bv.size == assembler.tag_width
-    else:
-        tag_bv = assembler.assemble_tag(T, cls.bv_type)
+def _sum_from_fields(cls, tag, value,  *,
+        tag_bv=None, value_bv=None, default_bv=0):
+
+    assembler = cls._assembler_
+    if tag_bv is None:
+        tag_bv = assembler.assemble_tag(tag, cls.bv_type)
+
+    if value_bv is None:
+        value_bv = cls[tag](value)
 
     fields = {
-        'value': _as_bv(cls[T](value)),
+        'value': value_bv,
         'tag': tag_bv,
     }
     layout = {
-        'value': assembler.layout[T],
+        'value': assembler.layout[tag],
         'tag': assembler.tag_layout,
     }
 
@@ -105,64 +99,50 @@ def _sum_builder(cls, T, value, *, tag_bv, default_bv):
     return cls(bv_value)
 
 
+def _product_from_fields(cls, *args, default_bv=0, **kwargs):
+    sig = inspect.signature(cls.adt_t.__init__)
+    # ... for self
+    bound = sig.bind(..., *args, **kwargs)
+    fields = bound.arguments
+    fields = {k: getattr(cls, k)(v) for k, v in fields.items() if k != 'self'}
+    assembler = cls._assembler_
+    bv_value = _create_from_layout(
+            assembler.width, assembler.layout, fields, cls.bv_type, default_bv)
+    return cls(bv_value)
+
+
+def _tuple_from_fields(cls, *args, default_bv=0):
+    if len(args) != len(cls.adt_t.fields):
+        raise  TypeError('Incorrect number of positional arguments')
+
+    assembler = cls._assembler_
+    fields = {i: cls[i](v) for i, v in enumerate(args)}
+    bv_value = _create_from_layout(
+            assembler.width, assembler.layout, fields, cls.bv_type, default_bv)
+    return cls(bv_value)
+
+def _enum_from_fields(cls, value, *, default_bv=0):
+    return cls(value)
+
 class AssembledADTMeta(BoundMeta):
     def __init__(cls, name, bases, namespace, **kwargs):
         if not cls.is_bound:
             return
-        cls._assembler_ = assembler = cls.assembler_t(cls.adt_t)
-        default_bv_arg = (
-            f'default_bv',
-            f'tp.Optional[int] = 0',
-        )
+        cls._assembler_ = cls.assembler_t(cls.adt_t)
         if is_modified(cls.adt_t):
             raise TypeError(f"Cannot create Assembled ADT from a modified adt type {cls.adt_t}")
         if issubclass(cls.adt_t, Product):
-            arg_strs = [(f'{k}', f'{v.__name__!r}')
-                    for k, v in cls.adt_t.field_dict.items()]
-            sig_args = it.chain(arg_strs, [('*',), default_bv_arg])
-            sig = ', '.join(map(': '.join, sig_args))
-            builder_args = ', '.join(it.starmap('{0}={0}'.format, arg_strs))
-            builder = _product_builder
+            cls.from_fields = classmethod(_product_from_fields)
         elif issubclass(cls.adt_t, Tuple):
-            arg_strs = [(f'_{k}', f'{v.__name__!r}')
-                    for k, v in cls.adt_t.field_dict.items()]
-            sig_args = it.chain(arg_strs, [('*',), default_bv_arg])
-            sig = ', '.join(map(': '.join, sig_args))
-            builder_args = ', '.join(k[0] for k in arg_strs)
-            builder = _tuple_builder
+            cls.from_fields = classmethod(_tuple_from_fields)
         elif issubclass(cls.adt_t, Enum):
-            sig = f"value, {default_bv_arg[0]}: {default_bv_arg[1]}"
-            builder_args = "value"
-            def builder(cls, v, default_bv):
-                return cls(v)
+            cls.from_fields = classmethod(_enum_from_fields)
+        elif issubclass(cls.adt_t, TaggedUnion):
+            cls.from_fields = classmethod(_taggedunion_from_fields)
         elif issubclass(cls.adt_t, Sum):
-            value_types = ', '.join(
-                map(
-                    lambda t: repr(t.__name__),
-                    (cls.bv_type, *cls.adt_t.fields)
-                )
-            )
-            tag_type = f'{cls.bv_type.__name__!r}[{assembler.tag_width}]'
-            sig = (
-                f'T: type, '
-                f'value: tp.Union[{value_types}], '
-                f'*, '
-                f'tag_bv: tp.Optional[{tag_type}] = None, '
-                f'{default_bv_arg[0]}: {default_bv_arg[1]}'
-            )
-            builder_args = ('T=T, value=value, tag_bv=tag_bv')
-            builder = _sum_builder
+            cls.from_fields = classmethod(_sum_from_fields)
         else:
             return
-
-        from_fields = f'''
-@classmethod
-def from_fields(cls, {sig}) -> {cls.__name__!r}:
-    return builder(cls, {builder_args}, default_bv=default_bv)
-'''
-        env = dict(builder=builder, tp=tp)
-        exec(from_fields, env, env)
-        cls.from_fields = env['from_fields']
 
     def _name_from_idx(cls, idx):
         return f'{cls.__name__}[{", ".join(map(repr, idx))}]'
@@ -222,6 +202,10 @@ def from_fields(cls, {sig}) -> {cls.__name__!r}:
     def bv_type(cls):
         return cls.fields[2]
 
+    # is_valid is a name I don't want to reserve
+    def _is_valid_(cls, opcode: AbstractBitVector) -> AbstractBit:
+        return cls._assembler_.is_valid(opcode)
+
     # For the bitvector protocol
     def _bitvector_t_(cls):
         return cls.bv_type[cls._assembler_.width]
@@ -255,20 +239,24 @@ class AssembledADT(metaclass=AssembledADTMeta):
 
         if not _issubclass(cls.adt_t, Sum):
             return field
+
         tag = self._value_[cls._assembler_.sub.tag_idx]
-        # if key is an assembled adt class just grab the type from it
+
         if key is _TAG:
             return tag
 
+        # if key is an assembled adt class just grab the type from it
         if _issubclass(key, cls.unbound_t):
             T = key.adt_t
         else:
             T = key
 
-        if T in cls.adt_t:
+        if T in cls.adt_t.field_dict:
             T = cls._assembler_.assemble_tag(T, cls.bv_type)
+
         if not isinstance(T, cls.bv_type[cls._assembler_.tag_width]):
             raise TypeError(type(T), T, cls.adt_t)
+
         match = tag == T
         return cls.adt_t.Match(match, field, safe=False)
 
@@ -369,5 +357,3 @@ class AssembledADTRecursor:
     @abc.abstractmethod
     def product(self):
         return
-
-

@@ -23,6 +23,7 @@ def test_assembler_disassembler(isa, bv_type):
     for inst in isa.enumerate():
         opcode = assembler.assemble(inst, bv_type=bv_type)
         assert isinstance(opcode, bv_type[assembler.width])
+        assert assembler.is_valid(opcode)
         assert assembler.disassemble(opcode) == inst
 
         for name, field in isa.field_dict.items():
@@ -34,15 +35,17 @@ def test_assembler_disassembler(isa, bv_type):
             if issubclass(isa, Product):
                 assert getattr(assembler.sub, name).asm is sub_assembler
 
-            if issubclass(isa, (Product, Tuple)):
+            if issubclass(isa, Tuple):
                 sub_opcode = opcode[assembler.sub[name].idx]
                 assert isinstance(sub_opcode, bv_type[sub_assembler.width])
+                assert sub_assembler.is_valid(sub_opcode)
                 sub_inst = sub_assembler.disassemble(sub_opcode)
                 assert isinstance(sub_inst, field)
                 assert sub_inst == inst.value_dict[name]
-            if issubclass(isa, Sum) and inst[field].match:
+            elif issubclass(isa, Sum) and inst[field].match:
                 sub_opcode = opcode[assembler.sub[field].idx]
                 assert isinstance(sub_opcode, bv_type[sub_assembler.width])
+                assert sub_assembler.is_valid(sub_opcode)
                 sub_inst = sub_assembler.disassemble(sub_opcode)
                 assert isinstance(sub_inst, field)
                 assert sub_inst == inst.value_dict[name]
