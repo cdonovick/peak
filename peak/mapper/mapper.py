@@ -3,6 +3,7 @@ from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
 from hwtypes import SMTBit, SMTBitVector as SBV
 from hwtypes import Bit, BitVector
+from hwtypes.adt import is_adt_type
 from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
 from .utils import SMTForms, SimplifyBinding
@@ -155,11 +156,16 @@ class ArchMapper(SMTMapper):
 class RewriteRule:
     def __init__(self, ibinding, obinding, ir_fc, arch_fc):
         #Verify that there are no Unbound Consts in the ibinding
-        arch_path_types = _create_path_to_adt(arch_fc(SMTFamily).input_t)
+        arch_path_types = _create_path_to_adt(arch_fc.Py.input_t)
+        #verify that each type is valid
         for ir_path, arch_path in ibinding:
             if ir_path is Unbound and isinstance(arch_path_types[arch_path], Const):
                 raise ValueError(f"Arch path {arch_path} needs to have a value")
-
+            elif not isinstance(ir_path, tuple):
+                T = strip_modifiers(arch_path_types[arch_path])
+                if is_adt_type(T):
+                    if AssembledADT[T, Assembler, family.PyFamily().BitVector].is_valid():
+                        raise ValueError(f"{ir_path} is not valid for {arch_path}")
         #These are PyFamily bindings
         self.ibinding = ibinding
         self.obinding = obinding
