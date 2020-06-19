@@ -108,6 +108,55 @@ def test_custom_rr():
     arch_bv = PE_fc.Py[0]
     assert ir_bv()(**ir_inputs) != arch_bv()(**arch_inputs)[0]
 
+def test_verify_vs_solve():
+
+    #This is like a CoreIR Add
+    @family_closure
+    def coreir_add_fc(family):
+        Data = family.BitVector[16]
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in0: Data, in1: Data):
+                return in0 + in1
+        return IR
+
+ 
+    @family_closure
+    def PE_fc(family):
+        Data = family.BitVector[16]
+
+        @family.assemble(locals(), globals())
+        class Arch(Peak):
+            def __call__(self, a: Data, b: Data, c: Data) -> Data:
+                    sum = a + b
+                    product = sum * c
+                    return product
+        return Arch
+
+
+    ir_fc = coreir_add_fc
+
+    arch_mapper = ArchMapper(PE_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+
+    found_rr = rewrite_rule is not None
+
+    # Test "correct" rewrite rule
+    input_binding = [
+        (("in0",), ("a",)),
+        (("in1",), ("b",)),
+        (BitVector[16](1), ("c",)), # Cant assign Const value to c, should give error
+    ]
+    output_binding = [(("out",), (0,))]
+
+    rr = RewriteRule(input_binding, output_binding, ir_fc, PE_fc)
+    verified_rr = rr.verify() is None
+
+    assert found_rr == verified_rr
+
 
 #This will test the const modifier
 def test_const():
