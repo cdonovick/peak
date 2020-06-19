@@ -26,6 +26,7 @@ def test_automapper(external_loop):
             assert ir_name in expect_not_found
             continue
         assert ir_name in expect_found
+
         #verify the mapping works
         counter_example = rewrite_rule.verify()
         assert counter_example is None
