@@ -35,7 +35,7 @@ def test_automapper(external_loop):
             ir_vals = {path: BitVector.random(8) for path in ir_paths}
             arch_vals = {path: BitVector.random(8) for path in arch_paths}
             ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
-            assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)
+            assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
 
 def test_custom_rr():
 
