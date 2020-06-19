@@ -248,6 +248,10 @@ class RewriteRule:
 
         outputs = []
         for ir_path, arch_path in self.obinding:
+            # The value of an unused output does not matter
+            if ir_path is Unbound:
+                continue
+
             if ir_path not in ir_out_values:
                 raise ValueError(f"{ir_path} is not valid")
             if arch_path not in arch_out_values:
