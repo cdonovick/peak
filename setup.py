@@ -11,7 +11,7 @@ setup(
     description='A DSL for Specifying Processors',
     packages=find_namespace_packages(include=['peak', 'peak.*']),
     install_requires=[
-        "hwtypes >= 1.4.0",
+        "hwtypes >= 1.4.1",
         "astor",
         "pysmt",
         "magma-lang",
