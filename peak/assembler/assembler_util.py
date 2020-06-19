@@ -71,7 +71,7 @@ def _gen_is_valid(
             invalid.append(0)
 
         x = 1
-        while x <= (1 << width):
+        while x < (1 << width):
             if x not in opcodes:
                 invalid.append(x)
             x <<= 1
