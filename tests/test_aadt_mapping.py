@@ -26,6 +26,7 @@ def test_automapper(external_loop):
             assert ir_name in expect_not_found
             continue
         assert ir_name in expect_found
+
         #verify the mapping works
         counter_example = rewrite_rule.verify()
         assert counter_example is None
@@ -77,7 +78,7 @@ def test_custom_rr():
     Inst_adt = AssembledADT[Inst_bv, Assembler, BitVector]
 
     ir_fc = coreir_add_fc
-    arch_fc = lambda f: PE_fc(f)[0] #Only return peak class
+    arch_fc = family_closure(lambda f: PE_fc(f)[0]) #Only return peak class
     output_binding = [(("out",), (0,))]
 
     #Test correct rewrite rule
