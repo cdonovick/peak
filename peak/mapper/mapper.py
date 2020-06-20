@@ -156,10 +156,11 @@ class ArchMapper(SMTMapper):
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
 
-def is_valid(aadt_value: AssembledADT):
-    if not isinstance(aadt_value, AssembledADT):
-        raise NotImplementedError()
-    return type(aadt_value)._is_valid_(aadt_value._value_)
+def is_valid(aadt_value: tp.Union[AssembledADT, AbstractBit, AbstractBitVector]):
+    if isinstance(aadt_value, (AbstractBitVector, AbstractBit)):
+        return aadt_value.get_family().Bit(1)
+    else:
+        return type(aadt_value)._is_valid_(aadt_value._value_)
 
 class RewriteRule:
     def __init__(self, ibinding, obinding, ir_fc, arch_fc):
