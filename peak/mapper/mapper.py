@@ -3,6 +3,7 @@ from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
 from hwtypes import SMTBit, SMTBitVector as SBV
 from hwtypes import Bit, BitVector
+from hwtypes import AbstractBit, AbstractBitVector
 from hwtypes.adt import is_adt_type
 from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
@@ -89,9 +90,12 @@ class SMTMapper:
 
         #output_form = output_forms[input_form_idx][output_form_idx]
         output_forms = []
+        self.const_valid_conditions = []
+        const_fields = [field for field, T in input_t.field_dict.items() if issubclass(T, Const)]
+
         for input_form in input_forms:
             inputs = aadt_product_to_dict(input_form.value)
-
+            self.const_valid_conditions.append([is_valid(inputs[field]) for field in const_fields])
             #Construct output_aadt value
             outputs = Peak_cls()(**inputs)
             output_value = wrap_outputs(outputs, output_aadt_t)
@@ -152,22 +156,33 @@ class ArchMapper(SMTMapper):
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
 
+def is_valid(aadt_value: AssembledADT):
+    if not isinstance(aadt_value, AssembledADT):
+        raise NotImplementedError()
+    return type(aadt_value)._is_valid_(aadt_value._value_)
 
 class RewriteRule:
     def __init__(self, ibinding, obinding, ir_fc, arch_fc):
         #Verify that there are no Unbound Consts in the ibinding
-        arch_path_types = _create_path_to_adt(arch_fc.Py.input_t)
+        #Force each value to be the appropriate size python bitvector
         #verify that each type is valid
+        arch_path_types = _create_path_to_adt(arch_fc.Py.input_t)
+        self.ibinding = []
         for ir_path, arch_path in ibinding:
             if ir_path is Unbound and isinstance(arch_path_types[arch_path], Const):
                 raise ValueError(f"Arch path {arch_path} needs to have a value")
-            elif not isinstance(ir_path, tuple):
+            elif ir_path is not Unbound and not isinstance(ir_path, tuple):
+                #Build the python bitvector and verify it is valid
                 T = strip_modifiers(arch_path_types[arch_path])
+                aadt = AssembledADT[T, Assembler, family.PyFamily().BitVector]
+                ir_path = aadt(ir_path)
                 if is_adt_type(T):
-                    if AssembledADT[T, Assembler, family.PyFamily().BitVector].is_valid():
+                    if not is_valid(ir_path):
                         raise ValueError(f"{ir_path} is not valid for {arch_path}")
-        #These are PyFamily bindings
-        self.ibinding = ibinding
+                    ir_path = ir_path._value_
+                assert isinstance(ir_path, (AbstractBit, AbstractBitVector))
+            self.ibinding.append((ir_path, arch_path))
+
         self.obinding = obinding
         self.ir_fc = ir_fc
         self.arch_fc = arch_fc
@@ -342,12 +357,16 @@ class IRMapper(SMTMapper):
             return
 
         form_var = archmapper.input_form_var
+
+
         #Create the form_conditions (preconditions) based off of the arch_forms
         #[input_form_idx]
         form_conditions = []
         for fi, form in enumerate(archmapper.input_forms):
-            #form_condition represents the & of all the appropriate matche
-            conditions = [form_var == 2**fi]
+            # form_condition represents the & of all the appropriate matches
+            #   and that the const adt types are valid
+            assert len(archmapper.const_valid_conditions[fi]) > 0
+            conditions = [form_var == 2**fi] + archmapper.const_valid_conditions[fi]
             for path, choice in form.path_dict.items():
                 match_path = path + (Match,)
                 assert match_path in archmapper.input_varmap
