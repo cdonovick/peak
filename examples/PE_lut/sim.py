@@ -15,6 +15,7 @@ def gen_sub_modules(width):
         @family.assemble(locals(), globals())
         class ALU(Peak):
             def __call__(self, alu_inst: Const(isa.AluInst), a: isa.Data, b: isa.Data, d: isa.Bit) -> isa.Data:
+
                 a = isa.SData(a)
                 b = isa.SData(b)
                 op = alu_inst.op
@@ -25,7 +26,6 @@ def gen_sub_modules(width):
                 else: # op == OP.Mux:
                     res = d.ite(a, b)
                 return res
-
         @family.assemble(locals(), globals())
         class LUT(Peak):
             def __call__(self, lut: Const(isa.LUT_t), bit0: isa.Bit, bit1: isa.Bit, bit2: isa.Bit) -> isa.Bit:
@@ -47,8 +47,8 @@ def gen_PE(width):
         @family.assemble(locals(), globals())
         class PE(Peak):
             def __init__(self):
-                self.lut = modules.LUT()
-                self.alu = modules.ALU()
+                self.lut: modules.LUT = modules.LUT()
+                self.alu: modules.ALU = modules.ALU()
 
             def __call__(self, inst: Const(isa.Inst), d0: isa.Data, d1: isa.Data, b0: isa.Bit, b1: isa.Bit, b2: isa.Bit) -> (isa.Data, isa.Bit):
                 alu_out = self.alu(inst.alu_inst, d0, d1, b0)

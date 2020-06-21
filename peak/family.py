@@ -223,10 +223,11 @@ class MagmaFamily(_AsmFamily):
 
     def assemble(self, locals, globals):
         def adtify(t_):
-            if hwtypes.is_adt_type(t_):
-                return self.get_adt_t(strip_modifiers(t_))
-            elif isinstance(t_, tuple):
+            if isinstance(t_, tuple):
                 return tuple(adtify(t__) for t__ in t_)
+            t_ = strip_modifiers(t_)
+            if hwtypes.is_adt_type(t_):
+                return self.get_adt_t(t_)
             else:
                 return t_
         env = SymbolTable(locals, globals)
@@ -235,6 +236,7 @@ class MagmaFamily(_AsmFamily):
             annotations = {}
             for arg, t_ in call.__annotations__.items():
                 annotations[arg] = adtify(t_)
+                print(arg, annotations[arg])
             call.__annotations__ = annotations
             cls = m.circuit.sequential(cls, env=env)
             return cls
