@@ -106,8 +106,10 @@ def _gen_is_valid(
         assert i == opcodes[-2]
         if j == i+1:
             range_validators.append(_gen_is_valid(range(lb, j+1), width))
+        elif j == lb:
+            range_validators.append(_gen_is_valid(range(lb, lb+1), width))
         else:
-            range_validators.append(_gen_is_valid(range(lb, max(i+1, lb+1)), width))
+            range_validators.append(_gen_is_valid(range(lb, i+1), width))
             range_validators.append(_gen_is_valid([j], width))
 
         # Only use a the range validators if its cheaper than enumerating
