@@ -2,8 +2,6 @@ from peak import Peak, family_closure, Const
 from .isa import gen_isa
 from types import SimpleNamespace
 
-#Const = lambda x: x
-
 def gen_sub_modules(width):
     isa_fc = gen_isa(width)
 
@@ -11,10 +9,17 @@ def gen_sub_modules(width):
     def modules_fc(family):
         isa = isa_fc(family)
 
+        @family.assemble(locals(), globals())
+        class LUT(Peak):
+            def __call__(self, lut: isa.LUT_t, bit0: isa.Bit, bit1: isa.Bit, bit2: isa.Bit) -> isa.Bit:
+                i = isa.IDX_t([bit0, bit1, bit2])
+                i = i.zext(5)
+                return ((lut >> i) & 1)[0]
+
         OP = isa.OP
         @family.assemble(locals(), globals())
         class ALU(Peak):
-            def __call__(self, alu_inst: Const(isa.AluInst), a: isa.Data, b: isa.Data, d: isa.Bit) -> isa.Data:
+            def __call__(self, alu_inst: isa.AluInst, a: isa.Data, b: isa.Data, d: isa.Bit) -> isa.Data:
 
                 a = isa.SData(a)
                 b = isa.SData(b)
@@ -26,12 +31,8 @@ def gen_sub_modules(width):
                 else: # op == OP.Mux:
                     res = d.ite(a, b)
                 return res
-        @family.assemble(locals(), globals())
-        class LUT(Peak):
-            def __call__(self, lut: Const(isa.LUT_t), bit0: isa.Bit, bit1: isa.Bit, bit2: isa.Bit) -> isa.Bit:
-                i = isa.IDX_t([bit0, bit1, bit2])
-                i = i.zext(5)
-                return ((lut >> i) & 1)[0]
+
+
 
         return SimpleNamespace(**locals())
 
