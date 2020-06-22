@@ -3,7 +3,9 @@ from collections import Counter
 from functools import reduce
 import inspect
 import itertools as it
+import operator
 import typing as tp
+import traceback
 
 from hwtypes import AbstractBitVectorMeta, TypeFamily
 from hwtypes import AbstractBitVector, AbstractBit
@@ -63,32 +65,34 @@ def _as_bv(v):
     return bv_value
 
 
-def _taggedunion_from_fields(cls, tag_bv=None, default_bv=0, **kwargs):
+def _taggedunion_from_fields(cls, *, tag_bv=None, default_bv=0, **kwargs):
     if len(kwargs) != 1:
         raise  TypeError('Expected exactly one keyword argument')
 
-    tag, val = kwargs.popitem()
-    tag = cls.adt_t.field_dict[tag]
+    tag, value = kwargs.popitem()
     value_bv = getattr(cls, tag)(value)
-    return _sum_from_fields(
-            cls, tag, val,
-            tag_bv=tag_bv, value_bv=value_bv, default_bv=default_bv)
+    return _sum_or_tagged_from_fields(cls, tag, tag_bv, value_bv, default_bv)
+
 
 
 def _sum_from_fields(cls, tag, value,  *,
-        tag_bv=None, value_bv=None, default_bv=0):
+        tag_bv=None, default_bv=0):
 
+    value_bv = cls[tag](value)
+    return _sum_or_tagged_from_fields(cls, tag, tag_bv, value_bv, default_bv)
+
+
+def _sum_or_tagged_from_fields(cls, tag, tag_bv, value_bv, default_bv):
     assembler = cls._assembler_
+
     if tag_bv is None:
         tag_bv = assembler.assemble_tag(tag, cls.bv_type)
-
-    if value_bv is None:
-        value_bv = cls[tag](value)
 
     fields = {
         'value': value_bv,
         'tag': tag_bv,
     }
+
     layout = {
         'value': assembler.layout[tag],
         'tag': assembler.tag_layout,
@@ -97,6 +101,7 @@ def _sum_from_fields(cls, tag, value,  *,
     bv_value = _create_from_layout(
             assembler.width, layout, fields, cls.bv_type, default_bv)
     return cls(bv_value)
+
 
 
 def _product_from_fields(cls, *args, default_bv=0, **kwargs):
@@ -123,6 +128,7 @@ def _tuple_from_fields(cls, *args, default_bv=0):
 
 def _enum_from_fields(cls, value, *, default_bv=0):
     return cls(value)
+
 
 class AssembledADTMeta(BoundMeta):
     def __init__(cls, name, bases, namespace, **kwargs):
@@ -225,17 +231,23 @@ class AssembledADT(metaclass=AssembledADTMeta):
             self._value_ = adt
 
     def __getitem__(self, key):
+        return self._get(key, operator.getitem, KeyError)
+
+    def __getattr__(self, attr):
+        return self._get(attr, getattr, AttributeError)
+
+    def _get(self, key, getter, Error):
         cls = type(self)
         sub = cls._assembler_.sub.get(key, _MISSING)
         if sub is not _MISSING:
-            if issubclass(cls[key], AbstractBit):
+            if issubclass(getter(cls, key), AbstractBit):
                 field = self._value_[sub.idx][0]
             else:
-                field = cls[key](self._value_[sub.idx])
+                field = getter(cls, key)(self._value_[sub.idx])
         elif key is _TAG and not _issubclass(cls.adt_t, Sum):
-            raise KeyError(f"can only get tag from Sum types")
+            raise Error(f"can only get tag from Sum types")
         elif not key is _TAG:
-            raise KeyError(key)
+            raise Error(key)
 
         if not _issubclass(cls.adt_t, Sum):
             return field
@@ -260,12 +272,6 @@ class AssembledADT(metaclass=AssembledADTMeta):
         match = tag == T
         return cls.adt_t.Match(match, field, safe=False)
 
-    def __getattr__(self, attr):
-        try:
-            return self[attr]
-        except KeyError:
-            pass
-        raise AttributeError(attr)
 
     def __hash__(self):
         return hash(self._value_)
@@ -326,13 +332,15 @@ class MagmaADT(AssembledADT, m.MagmaProtocol, metaclass=MAADTMeta):
     _get_magma_value_ = AssembledADT._to_bitvector_
 
 
-class AssembledADTRecursor:
+class AssembledADTRecursor(metaclass=abc.ABCMeta):
     def __call__(self, aadt_t, *args, **kwargs):
         if (issubclass(aadt_t, AbstractBit) or issubclass(aadt_t, AbstractBitVector)):
             return self.bv(aadt_t,*args,**kwargs)
         adt_t = aadt_t.adt_t
         if issubclass(adt_t, Enum):
             return self.enum(aadt_t, *args, **kwargs)
+        elif issubclass(adt_t, TaggedUnion):
+            return self.tagged_union(aadt_t, *args, **kwargs)
         elif issubclass(adt_t, Sum):
             return self.sum(aadt_t, *args, **kwargs)
         elif issubclass(adt_t, Product):
@@ -343,17 +351,16 @@ class AssembledADTRecursor:
             raise ValueError("Unreachable")
 
     @abc.abstractmethod
-    def bv(self):
-        return
+    def bv(self, aadt_t, *args, **kwargs): pass
 
     @abc.abstractmethod
-    def enum(self):
-        return
+    def enum(self, aadt_t, *args, **kwargs): pass
 
     @abc.abstractmethod
-    def sum(self):
-        return
+    def sum(self, aadt_t, *args, **kwargs): pass
 
     @abc.abstractmethod
-    def product(self):
-        return
+    def tagged_union(self, aadt_t, *args, **kwargs): pass
+
+    @abc.abstractmethod
+    def product(self, aadt_t, *args, **kwargs): pass
