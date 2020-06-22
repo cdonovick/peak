@@ -275,9 +275,11 @@ def run_constraint_test(arch_fc, ir_fc, constraints, solved):
         assert solved
 
 
-@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
-@pytest.mark.parametrize('ISA_fc', [ISA_fc_s, ISA_fc_t])
-def test_const_constraint(arch_fc, ISA_fc):
+@pytest.mark.parametrize('arch_fc, ISA_fc, is_sum', [
+    (PE_fc_s, ISA_fc_s, True),
+    (PE_fc_t, ISA_fc_t, False),
+    ])
+def test_const_constraint(arch_fc, ISA_fc, is_sum):
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[8]
@@ -298,7 +300,11 @@ def test_const_constraint(arch_fc, ISA_fc):
         (5, False),
         ((3, 5), False),
     ):
-        constraints = {("inst", isa.ArithOp, 1): constraint}
+        if is_sum:
+            constraints = {("inst", isa.ArithOp, 1): constraint}
+        else:
+            constraints = {("inst", 'alu', 1): constraint}
+
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
 
     OpT = isa.Op
@@ -307,13 +313,18 @@ def test_const_constraint(arch_fc, ISA_fc):
         ((OpT.A, OpT.B), True),
         (OpT.B, False),
     ):
-        constraints = {("inst", isa.ArithOp, 0): constraint}
+        if is_sum:
+            constraints = {("inst", isa.ArithOp, 0): constraint}
+        else:
+            constraints = {("inst", 'alu', 0): constraint}
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
 
 
-@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
-@pytest.mark.parametrize('ISA_fc', [ISA_fc_s, ISA_fc_t])
-def test_non_const_constraint(arch_fc, ISA_fc):
+@pytest.mark.parametrize('arch_fc, ISA_fc, is_sum', [
+    (PE_fc_s, ISA_fc_s, True),
+    (PE_fc_t, ISA_fc_t, False),
+    ])
+def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[8]
@@ -333,9 +344,16 @@ def test_non_const_constraint(arch_fc, ISA_fc):
         (-4, False),
         ((-5, -4), False),
     ):
-        constraints = {
-            ("inst", isa.ArithOp, 0): OpT.A,  # Const
-            ("inst", isa.ArithOp, 1): 5,  # Const
-            ("in0",): in0_constraint,  # Not Const
-        }
+        if is_sum:
+            constraints = {
+                ("inst", isa.ArithOp, 0): OpT.A,  # Const
+                ("inst", isa.ArithOp, 1): 5,  # Const
+                ("in0",): in0_constraint,  # Not Const
+            }
+        else:
+            constraints = {
+                ("inst", 'alu', 0): OpT.A,  # Const
+                ("inst", 'alu', 1): 5,  # Const
+                ("in0",): in0_constraint,  # Not Const
+            }
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)

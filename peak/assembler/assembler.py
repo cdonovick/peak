@@ -203,6 +203,7 @@ def _sum(isa: tp.Type[Sum]):
             assert len(field_to_tags[field]) == 1
             field_width = Assembler(field).width
             layout[field] = (tag_width, tag_width + field_width)
+            layout[name] = (tag_width, tag_width + field_width)
             payload_width = max(payload_width, field_width)
 
     max_tag = tag
