@@ -63,7 +63,7 @@ def _as_bv(v):
     return bv_value
 
 
-def _taggedunion_from_fields(cls, tag_bv=None, default_bv=0, **kwargs):
+def _taggedunion_from_fields(cls, *, tag_bv=None, default_bv=0, **kwargs):
     if len(kwargs) != 1:
         raise  TypeError('Expected exactly one keyword argument')
 
