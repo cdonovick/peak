@@ -5,16 +5,17 @@ from hwtypes.adt import Enum, Product
 from peak.mapper import ArchMapper, RewriteRule
 from peak import Const, family_closure, Peak, name_outputs
 from peak import family
-from examples.sum_pe.sim import PE_fc, ISA_fc
+from examples.sum_pe.sim import PE_fc as PE_fc_s, ISA_fc as ISA_fc_s
+from examples.tagged_pe.sim import PE_fc as PE_fc_t, ISA_fc as ISA_fc_t
 from examples.smallir import gen_SmallIR
 import pytest
 from peak.mapper.utils import pretty_print_binding
 
 num_test_vectors = 16
-@pytest.mark.parametrize("external_loop", [True, False])
-def test_automapper(external_loop):
+@pytest.mark.parametrize('external_loop', [True, False])
+@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
+def test_automapper(external_loop, arch_fc):
     IR = gen_SmallIR(8)
-    arch_fc = PE_fc
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
@@ -37,6 +38,7 @@ def test_automapper(external_loop):
             arch_vals = {path: BitVector.random(8) for path in arch_paths}
             ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
             assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
+
 
 def test_custom_rr():
 
@@ -154,6 +156,7 @@ def test_const():
     assert rr is not None
     assert (('const_value',), ('inst', 'imm')) in rr.ibinding
 
+
 #This will test the const modifier without the name_outputs
 def test_const_tuple():
 
@@ -195,6 +198,7 @@ def test_const_tuple():
     assert rr is not None
     assert (('const_value',), ('inst', 'imm')) in rr.ibinding
 
+
 def test_early_out_inputs():
     @family_closure
     def IR_fc(family):
@@ -225,6 +229,7 @@ def test_early_out_inputs():
     rr = ir_mapper.solve('z3')
     assert rr is None
     assert not ir_mapper.has_bindings
+
 
 def test_early_out_outputs():
     @family_closure
@@ -258,8 +263,7 @@ def test_early_out_outputs():
     assert not ir_mapper.has_bindings
 
 
-def run_constraint_test(ir_fc, constraints, solved):
-    arch_fc = PE_fc
+def run_constraint_test(arch_fc, ir_fc, constraints, solved):
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc, path_constraints=constraints)
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
@@ -270,7 +274,10 @@ def run_constraint_test(ir_fc, constraints, solved):
     else:
         assert solved
 
-def test_const_constraint():
+
+@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
+@pytest.mark.parametrize('ISA_fc', [ISA_fc_s, ISA_fc_t])
+def test_const_constraint(arch_fc, ISA_fc):
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[8]
@@ -292,7 +299,7 @@ def test_const_constraint():
         ((3, 5), False),
     ):
         constraints = {("inst", isa.ArithOp, 1): constraint}
-        run_constraint_test(ir_fc, constraints=constraints, solved=solved)
+        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
 
     OpT = isa.Op
     for constraint, solved in (
@@ -301,9 +308,12 @@ def test_const_constraint():
         (OpT.B, False),
     ):
         constraints = {("inst", isa.ArithOp, 0): constraint}
-        run_constraint_test(ir_fc, constraints=constraints, solved=solved)
+        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
 
-def test_non_const_constraint():
+
+@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
+@pytest.mark.parametrize('ISA_fc', [ISA_fc_s, ISA_fc_t])
+def test_non_const_constraint(arch_fc, ISA_fc):
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[8]
@@ -328,4 +338,4 @@ def test_non_const_constraint():
             ("inst", isa.ArithOp, 1): 5,  # Const
             ("in0",): in0_constraint,  # Not Const
         }
-        run_constraint_test(ir_fc, constraints=constraints, solved=solved)
+        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
