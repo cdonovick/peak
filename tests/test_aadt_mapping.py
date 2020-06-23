@@ -9,6 +9,8 @@ from examples.sum_pe.sim import PE_fc, ISA_fc
 from examples.smallir import gen_SmallIR
 import pytest
 from peak.mapper.utils import pretty_print_binding
+from examples.fp_pe.sim import PE_fc as FP_PE_Fc
+from examples.fp_pe.sim import Inst as FP_Inst
 
 num_test_vectors = 16
 @pytest.mark.parametrize("external_loop", [True, False])
@@ -329,3 +331,28 @@ def test_non_const_constraint():
             ("in0",): in0_constraint,  # Not Const
         }
         run_constraint_test(ir_fc, constraints=constraints, solved=solved)
+
+
+def test_fp():
+
+    @family_closure
+    def IR_fc(family):
+        Data = family.BitVector[16]
+
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, a : Data, b : Data):
+                return a + b
+        return IR
+
+    arch_fc = family_closure(lambda f: FP_PE_Fc(f)[0])
+
+    arch_mapper = ArchMapper(arch_fc)
+    ir_fc = IR_fc
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    rr = ir_mapper.solve('z3', external_loop=True)
+    assert rr is not None
+
+    for r in rr.ibinding:
+        print(r)
