@@ -13,18 +13,20 @@ def R32I_fc(family):
     Idx = family.Idx
 
 
-    isa = ISA_fc(family)
+    isa = ISA_fc.Py
     RegisterFile = family.get_register_file()
 
     ExecInst = family.get_constructor(isa.AluInst)
 
     @family.assemble(locals(), globals())
     class R32I(Peak):
+        def __init__(self):
+            self.register_file = RegisterFile()
+
         @name_outputs(pc_next=Word)
         def __call__(self,
                      inst: isa.Inst,
-                     pc: Word,
-                     register_file: RegisterFile) -> Word:
+                     pc: Word) -> Word:
             # Decode
             # Inputs:
             #   inst, pc
@@ -46,20 +48,20 @@ def R32I_fc(family):
                 alu_inst = inst.alu.value
                 if alu_inst.i.match:
                     i_inst = alu_inst.i.value
-                    a = register_file.load1(i_inst.data.rs1)
+                    a = self.register_file.load1(i_inst.data.rs1)
                     b = i_inst.data.imm.sext(20)
                     exec_inst = ExecInst(isa.ArithInst, i_inst.tag)
                     rd = i_inst.data.rd
                 elif alu_inst.s.match:
                     s_inst = alu_inst.s.value
-                    a = register_file.load1(s_inst.data.rs1)
+                    a = self.register_file.load1(s_inst.data.rs1)
                     b = s_inst.data.imm.sext(27)
                     exec_inst = ExecInst(isa.ShftInst, s_inst.tag)
                     rd = s_inst.data.rd
                 elif alu_inst.r.match:
                     r_inst = alu_inst.r.value
-                    a = register_file.load1(r_inst.data.rs1)
-                    b = register_file.load2(r_inst.data.rs2)
+                    a = self.register_file.load1(r_inst.data.rs1)
+                    b = self.register_file.load2(r_inst.data.rs2)
                     exec_inst = r_inst.tag
                     rd = r_inst.data.rd
                 else:
@@ -86,7 +88,7 @@ def R32I_fc(family):
                     else:
                         assert j_inst[isa.JALR].match
                         jalr_inst = j_inst[isa.JALR].value
-                        a = register_file.load1(jalr_inst.rs1)
+                        a = self.register_file.load1(jalr_inst.rs1)
                         b = jalr_inst.imm.sext(20)
                         lsb_mask = ~Word(1)
                         rd = jalr_inst.rd
@@ -95,16 +97,16 @@ def R32I_fc(family):
                     assert ctrl_inst.b.match
                     b_inst = ctrl_inst.b.value
                     is_branch = Bit(1)
-                    a = register_file.load1(b_inst.data.rs1)
-                    b = register_file.load2(b_inst.data.rs2)
+                    a = self.register_file.load1(b_inst.data.rs1)
+                    b = self.register_file.load2(b_inst.data.rs2)
                     branch_offset = b_inst.data.imm.sext(20) << 1
 
                     # hand coded common sub-expr elimin
                     is_eq = b_inst.tag == isa.BranchInst.BEQ
                     is_ne = b_inst.tag == isa.BranchInst.BNE
                     is_bge = b_inst.tag == isa.BranchInst.BGE
-                    is_signed = (is_bge | b_inst.tag == isa.BranchInst.BLT)
-                    cmp_ge = (is_bge | b_inst.tag == isa.BranchInst.BGEU)
+                    is_signed = is_bge | (b_inst.tag == isa.BranchInst.BLT)
+                    cmp_ge = is_bge | (b_inst.tag == isa.BranchInst.BGEU)
 
                     if (is_eq | is_ne):
                         exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.XOR)
@@ -184,7 +186,42 @@ def R32I_fc(family):
                 out = c
 
 
-            register_file.store(rd, out)
+            self.register_file.store(rd, out)
             return pc_next
+    return R32I, isa
 
-    return R32I, RegisterFile, isa
+
+@family_closure(family)
+def R32I_mappable_fc(family):
+    R32I, isa = R32I_fc(family)
+    Word = family.Word
+
+
+    @family.assemble(locals(), globals())
+    class R32I_mappable(Peak):
+        def __init__(self):
+            self.riscv = R32I()
+
+        @name_outputs(pc_next=Word, rd=Word)
+        def __call__(self,
+                     inst: isa.Inst,
+                     pc: Word,
+                     rs1: Word,
+                     rs2: Word
+                     ) -> (Word, Word):
+            self._set_rs1_(rs1)
+            self._set_rs2_(rs2)
+            pc_next = self.riscv(inst, pc)
+            return pc_next, self.riscv.register_file.rd
+
+        def _set_rs1_(self, rs1):
+            self.riscv.register_file._set_rs1_(rs1)
+
+        def _set_rs2_(self, rs2):
+            self.riscv.register_file._set_rs2_(rs2)
+
+        def _set_rd_(self, rd):
+            self.riscv.register_file._set_rd_(rd)
+
+    return R32I_mappable, isa
+

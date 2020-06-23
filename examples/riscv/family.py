@@ -1,6 +1,8 @@
 
 from peak import family
 
+from ast_tools.passes import remove_asserts
+
 
 # A bit of hack putting the def of word and idx here
 # and not isa but it makes life easier
@@ -37,30 +39,43 @@ class PyFamily(_RiscFamily_mixin, family.PyFamily):
                     self.rf[idx] = value
         return RegisterFile
 
+
 class SMTFamily(_RiscFamily_mixin, family.SMTFamily):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._passes = remove_asserts(), *self._passes
     def get_register_file(fam_self):
         class RegisterFile:
-            def __init__(self, rs1_val, rs2_val, rd_val):
-                self.rs1 = rs1_val
-                self.rs2 = rs2_val
-                self.rd = rd_val
+            def __init__(self):
+                self.rs1 = fam_self.Word()
+                self.rs2 = fam_self.Word()
+                self.rd = fam_self.Word()
 
             def load1(self, idx):
                 if not isinstance(idx, fam_self.Idx):
                     raise TypeError(idx)
-                return (idx != self.Idx(0)).ite(self.rs1, self.Word(0))
+                return (idx != fam_self.Idx(0)).ite(self.rs1, fam_self.Word(0))
 
             def load2(self, idx):
                 if not isinstance(idx, fam_self.Idx):
                     raise TypeError(idx)
-                return (idx != self.Idx(0)).ite(self.rs2, self.Word(0))
+                return (idx != fam_self.Idx(0)).ite(self.rs2, fam_self.Word(0))
 
             def store(self, idx, value):
                 if not isinstance(idx, fam_self.Idx):
                     raise TypeError(idx)
                 elif not isinstance(value, fam_self.Word):
                     raise TypeError(value)
-                self.rd = (idx != self.IDx(0)).ite(value, self.rd)
+                self.rd = (idx != fam_self.Idx(0)).ite(value, self.rd)
+
+            def _set_rs1_(self, val):
+                self.rs1 = val
+
+            def _set_rs2_(self, val):
+                self.rs2 = val
+
+            def _set_rd_(self, val):
+                self.rd = val
 
         return RegisterFile
 
