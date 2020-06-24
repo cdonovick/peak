@@ -159,11 +159,21 @@ class AssembledADTMeta(BoundMeta):
             return cls.unbound_t[(val, *cls.fields[1:])]
         else:
             adt_t = key[0]
-            if (_issubclass(adt_t, AbstractBitVector)
-                or _issubclass(adt_t, AbstractBit)):
-                # Bit of a hack but don't bother wrapping Bits/Bitvectors
-                # Removes the issue of adding __operators__
-                return adt_t
+            fam = key[2].get_family()
+            # Bit of a hack but don't bother wrapping Bits/Bitvectors
+            # Removes the issue of adding __operators__
+            if _issubclass(adt_t, AbstractBit):
+                return fam.Bit
+            elif _issubclass(adt_t, AbstractBitVector):
+                # There should really be a better way to check this
+                adt_fam  = adt_t.get_family()
+                if issubclass(adt_t, adt_fam.Signed):
+                    return fam.Signed[adt_t.size]
+                elif issubclass(adt_t, adt_fam.Unsigned):
+                    return fam.Unsigned[adt_t.size]
+                else:
+                    return fam.BitVector[adt_t.size]
+
             T = super().__getitem__(key)
             return T
 
@@ -226,7 +236,7 @@ class AssembledADT(metaclass=AssembledADTMeta):
         elif isinstance(adt, cls.adt_t):
             self._value_ = assembler.assemble(adt, cls.bv_type)
         elif not isinstance(adt, cls.bv_type[assembler.width]):
-            raise TypeError(f'expected {cls.bv_type[assembler.width]} or {cls.adt_t} not {adt}:{type(adt)}')
+            raise TypeError(f'expected one of:\n\t{cls.bv_type[assembler.width]}\n\t{cls}\n\t{cls.adt_t}\nnot:\n\t{type(adt)}')
         else:
             self._value_ = adt
 
