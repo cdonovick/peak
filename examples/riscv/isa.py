@@ -17,6 +17,7 @@ def ISA_fc(family):
     Idx = family.Idx
     Word = family.Word
 
+    # Define the layout of instruction minus tag fields (opcode/func3/func7)
     class R(Product):
         rd = Idx
         rs1 = Idx
@@ -27,7 +28,10 @@ def ISA_fc(family):
         rs1 = Idx
         imm = BitVector[12]
 
-    # for shifts
+    # For shifts
+    # I would argue that is actually closer to an R type (where rs2 is treated
+    # as an immiedate) than an I type. But in any event it is its own form,
+    # destinct from both I and R so I don't kno why riscv calls them I type.
     class Is(Product):
         rd = Idx
         rs1 = Idx
@@ -51,6 +55,8 @@ def ISA_fc(family):
         rd = Idx
         imm = BitVector[20]
 
+
+    # define tags for func7/func3
     class ArithInst(Enum):
         ADD = Enum.Auto()
         SUB = Enum.Auto()
@@ -60,45 +66,31 @@ def ISA_fc(family):
         OR = Enum.Auto()
         XOR = Enum.Auto()
 
-    class ShftInst(Enum):
+    class ShiftInst(Enum):
         SLL = Enum.Auto()
         SRL = Enum.Auto()
         SRA = Enum.Auto()
 
-    class PCInst(Enum):
-        LUI = Enum.Auto()
-        AUIPC = Enum.Auto()
+    # Does not effect the encoding, but there is not
+    # currently a way to union enums
+    class AluInst(TaggedUnion):
+        arith = ArithInst
+        shift = ShiftInst
 
-    AluInst = Sum[ArithInst, ShftInst]
+    class StoreInst(Enum):
+        SB = Enum.Auto()
+        SH = Enum.Auto()
+        SW = Enum.Auto()
+        SD = Enum.Auto()
 
-    class ALUI(Product):
-        data = I
-        tag = ArithInst
-
-    class ALUS(Product):
-        data = Is
-        tag = ShftInst
-
-    class ALUR(Product):
-        data = R
-        tag = AluInst
-
-    class ALUU(Product):
-        data = U
-        tag = PCInst
-
-
-    class ALU(TaggedUnion):
-        i = ALUI
-        s = ALUS
-        r = ALUR
-        u = ALUU
-
-    class JAL(J): pass
-    class JALR(I): pass
-
-    JMP = Sum[JAL, JALR]
-
+    class LoadInst(Enum):
+        LB = Enum.Auto()
+        LBU = Enum.Auto()
+        LH = Enum.Auto()
+        LHU = Enum.Auto()
+        LW = Enum.Auto()
+        LWU = Enum.Auto()
+        LD = Enum.Auto()
 
     class BranchInst(Enum):
         BEQ = Enum.Auto()
@@ -108,40 +100,56 @@ def ISA_fc(family):
         BGE = Enum.Auto()
         BGEU = Enum.Auto()
 
+    # Define tagged Layouts
+    # The types here should define the opcode field
+    # and when combined with there tag define opcode/func3/func7
+    class OP(Product):
+        data = R
+        tag = AluInst
+
+    class OP_IMM_A(Product):
+        data = I
+        tag = ArithInst
+
+    class OP_IMM_S(Product):
+        data = Is
+        tag = ShiftInst
+
+    #an OP_IMM is either:
+    #   OP_IMM_A (I data, ArithInst tag)
+    #   OP_IMM_S (Is data, ShftInst tag)
+    class OP_IMM(TaggedUnion):
+        arith = OP_IMM_A
+        shift = OP_IMM_S
+
+
+    # LUI / AUIPC each define there own opcode so I don't merging them
+    # with the tag / data style
+    class LUI(U): pass
+
+    class AUIPC(U): pass
+
+    # Similar to above as JAL/JALR are distinguished by opcode I don't
+    # create a tagged union with JAL=J; JALR=I
+    class JAL(J): pass
+
+    class JALR(I): pass
+
     class Branch(Product):
         data = B
         tag = BranchInst
 
-    class Control(TaggedUnion):
-        j = JMP
-        b = Branch
-
     class Load(Product):
         data = I
-        class tag(Enum):
-            LB = Enum.Auto()
-            LBU = Enum.Auto()
-            LH = Enum.Auto()
-            LHU = Enum.Auto()
-            LW = Enum.Auto()
-            LWU = Enum.Auto()
-            LD = Enum.Auto()
-
+        tag = LoadInst
 
     class Store(Product):
         data = S
-        class tag(Enum):
-            SB = Enum.Auto()
-            SH = Enum.Auto()
-            SW = Enum.Auto()
-            SD = Enum.Auto()
+        tag = LoadInst
 
-    Memory = Sum[Load, Store]
 
-    class Inst(TaggedUnion):
-        alu = ALU
-        ctrl = Control
-        mem = Memory
+    # This sum type defines the opcode field
+    Inst = Sum[OP, OP_IMM, LUI, AUIPC, JAL, JALR, Branch, Load, Store]
 
 
     return SimpleNamespace(**locals())

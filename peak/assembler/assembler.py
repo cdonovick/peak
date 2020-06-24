@@ -205,6 +205,8 @@ def _sum(isa: tp.Type[Sum]):
             layout[field] = (tag_width, tag_width + field_width)
             layout[name] = (tag_width, tag_width + field_width)
             payload_width = max(payload_width, field_width)
+        elif name not in layout:
+            layout[name] = layout[field]
 
     max_tag = tag
     width = tag_width + payload_width
