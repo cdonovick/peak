@@ -237,6 +237,6 @@ class MagmaFamily(_AsmFamily):
             for arg, t_ in call.__annotations__.items():
                 annotations[arg] = adtify(t_)
             call.__annotations__ = annotations
-            cls = m.circuit.sequential(cls, env=env)
+            cls = m.sequential2(env=env)(cls)
             return cls
         return deco
