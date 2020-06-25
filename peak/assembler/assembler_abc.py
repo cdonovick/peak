@@ -1,11 +1,11 @@
 from abc import ABCMeta, abstractmethod
-from hwtypes import AbstractBit, AbstractBitVector, BitVector
-from hwtypes.adt import Enum, Product, Sum, Tuple
-from hwtypes.adt_meta import BoundMeta, GetitemSyntax, AttrSyntax
-
 import typing as tp
 import warnings
 import weakref
+
+from hwtypes import AbstractBit, AbstractBitVector, BitVector
+from hwtypes.adt import Enum, Product, Sum, Tuple
+from hwtypes.adt_meta import BoundMeta, GetitemSyntax, AttrSyntax
 
 from .assembler_util import _issubclass
 

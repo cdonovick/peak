@@ -44,85 +44,100 @@ def R32I_fc(family):
             # Note rd != 0 is implicit enable
             rd = Idx(0)
 
-            if inst.alu.match:
-                alu_inst = inst.alu.value
-                if alu_inst.i.match:
-                    i_inst = alu_inst.i.value
-                    a = self.register_file.load1(i_inst.data.rs1)
-                    b = i_inst.data.imm.sext(20)
-                    exec_inst = ExecInst(isa.ArithInst, i_inst.tag)
-                    rd = i_inst.data.rd
-                elif alu_inst.s.match:
-                    s_inst = alu_inst.s.value
-                    a = self.register_file.load1(s_inst.data.rs1)
-                    b = s_inst.data.imm.sext(27)
-                    exec_inst = ExecInst(isa.ShftInst, s_inst.tag)
-                    rd = s_inst.data.rd
-                elif alu_inst.r.match:
-                    r_inst = alu_inst.r.value
-                    a = self.register_file.load1(r_inst.data.rs1)
-                    b = self.register_file.load2(r_inst.data.rs2)
-                    exec_inst = r_inst.tag
-                    rd = r_inst.data.rd
-                else:
-                    assert alu_inst.u.match
-                    u_inst = alu_inst.u.value
-                    if u_inst.tag == isa.PCInst.LUI:
-                        a = Word(0)
-                    else:
-                        assert u_inst.tag == isa.PCInst.AUIPC
-                        a = pc
-                    b = u_inst.data.imm.sext(12) << 12
-                    exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.ADD)
-                    rd = u_inst.data.rd
-            elif inst.ctrl.match:
-                ctrl_inst = inst.ctrl.value
-                if ctrl_inst.j.match:
-                    j_inst = ctrl_inst.j.value
-                    is_jump = Bit(1)
-                    if j_inst[isa.JAL].match:
-                        jal_inst = j_inst[isa.JAL].value
-                        a = pc
-                        b = jal_inst.imm.sext(12) << 1
-                        rd = jal_inst.rd
-                    else:
-                        assert j_inst[isa.JALR].match
-                        jalr_inst = j_inst[isa.JALR].value
-                        a = self.register_file.load1(jalr_inst.rs1)
-                        b = jalr_inst.imm.sext(20)
-                        lsb_mask = ~Word(1)
-                        rd = jalr_inst.rd
-                    exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.ADD)
-                else:
-                    assert ctrl_inst.b.match
-                    b_inst = ctrl_inst.b.value
-                    is_branch = Bit(1)
-                    a = self.register_file.load1(b_inst.data.rs1)
-                    b = self.register_file.load2(b_inst.data.rs2)
-                    branch_offset = b_inst.data.imm.sext(20) << 1
+            if inst[isa.OP].match:
+                op_inst = inst[isa.OP].value
+                a = self.register_file.load1(op_inst.data.rs1)
+                b = self.register_file.load2(op_inst.data.rs2)
+                exec_inst = op_inst.tag
+                rd = op_inst.data.rd
 
-                    # hand coded common sub-expr elimin
-                    is_eq = b_inst.tag == isa.BranchInst.BEQ
-                    is_ne = b_inst.tag == isa.BranchInst.BNE
-                    is_bge = b_inst.tag == isa.BranchInst.BGE
-                    is_signed = is_bge | (b_inst.tag == isa.BranchInst.BLT)
-                    cmp_ge = is_bge | (b_inst.tag == isa.BranchInst.BGEU)
+            elif inst[isa.OP_IMM].match:
+                op_imm_inst = inst[isa.OP_IMM].value
+                if op_imm_inst.arith.match:
+                    op_imm_arith_inst = op_imm_inst.arith.value
+                    a = self.register_file.load1(op_imm_arith_inst.data.rs1)
+                    b = op_imm_arith_inst.data.imm.sext(20)
+                    exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
+                    rd = op_imm_arith_inst.data.rd
 
-                    if (is_eq | is_ne):
-                        exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.XOR)
-                        cmp_zero = Bit(1)
-                        invert = is_ne
+                else:
+                    assert op_imm_inst.shift.match
+                    op_imm_shift_inst = op_imm_inst.shift.value
+                    a = self.register_file.load1(op_imm_shift_inst.data.rs1)
+                    b = op_imm_shift_inst.data.imm.sext(27)
+                    exec_inst = ExecInst(shift=op_imm_shift_inst.tag)
+                    rd = op_imm_shift_inst.data.rd
+
+            elif inst[isa.LUI].match:
+                lui_inst = inst[isa.LUI].value
+                a = Word(0)
+                b = lui_inst.imm.sext(12) << 12
+                rd = lui_inst.rd
+                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+
+            elif inst[isa.AUIPC].match:
+                auipc_inst = inst[isa.AUIPC].value
+                a = pc
+                b = auipc_inst.imm.sext(12) << 12
+                rd = auipc_inst.rd
+                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+
+            elif inst[isa.JAL].match:
+                is_jump = Bit(1)
+                jal_inst = inst[isa.JAL].value
+                a = pc
+                b = jal_inst.imm.sext(12) << 1
+                rd = jal_inst.rd
+                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+
+            elif inst[isa.JALR].match:
+                is_jump = Bit(1)
+                lsb_mask = ~Word(1)
+                jalr_inst = inst[isa.JALR].value
+                a = self.register_file.load1(jalr_inst.rs1)
+                b = jalr_inst.imm.sext(20)
+                rd = jalr_inst.rd
+                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+
+            elif inst[isa.Branch].match:
+                is_branch = Bit(1)
+                branch_inst = inst[isa.Branch].value
+                a = self.register_file.load1(branch_inst.data.rs1)
+                b = self.register_file.load2(branch_inst.data.rs2)
+                branch_offset = branch_inst.data.imm.sext(20) << 1
+
+                # hand coded common sub-expr elimin
+                is_eq = branch_inst.tag == isa.BranchInst.BEQ
+                is_ne = branch_inst.tag == isa.BranchInst.BNE
+                is_bge = branch_inst.tag == isa.BranchInst.BGE
+                is_signed = is_bge | (branch_inst.tag == isa.BranchInst.BLT)
+                cmp_ge = is_bge | (branch_inst.tag == isa.BranchInst.BGEU)
+
+                if (is_eq | is_ne):
+                    # for equality comparisons we use an xor
+                    exec_inst = ExecInst(arith=isa.ArithInst.XOR)
+                    # compare the output to 0
+                    cmp_zero = Bit(1)
+                    # invert the result for ne
+                    invert = is_ne
+                else:
+                    # Reuse SLT and SLTU
+                    if is_signed:
+                        exec_inst = ExecInst(arith=isa.ArithInst.SLT)
                     else:
-                        if is_signed:
-                            exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.SLT)
-                        else:
-                            exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.SLTU)
-                        invert = cmp_ge
-            else:
-                assert inst.mem.match
+                        exec_inst = ExecInst(arith=isa.ArithInst.SLTU)
+                    # invert if we are doing a greater than
+                    invert = cmp_ge
+
+            elif inst[isa.Load].match:
                 a = Word(0)
                 b = Word(0)
-                exec_inst = ExecInst(isa.ArithInst, isa.ArithInst.ADD)
+                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+            else:
+                assert inst[isa.Store].match
+                a = Word(0)
+                b = Word(0)
+                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
             # Execute
             # Inputs:
@@ -130,8 +145,8 @@ def R32I_fc(family):
             # Outputs:
             #  c, branch_target
             branch_target = pc + branch_offset
-            if exec_inst[isa.ArithInst].match:
-                arith_inst = exec_inst[isa.ArithInst].value
+            if exec_inst.arith.match:
+                arith_inst = exec_inst.arith.value
                 if arith_inst == isa.ArithInst.ADD:
                     c = a + b
                 elif arith_inst == isa.ArithInst.SUB:
@@ -148,14 +163,14 @@ def R32I_fc(family):
                     assert arith_inst == isa.ArithInst.XOR
                     c = a ^ b
             else:
-                assert exec_inst[isa.ShftInst].match
-                shft_inst = exec_inst[isa.ShftInst].value
-                if shft_inst == isa.ShftInst.SLL:
+                assert exec_inst.shift.match
+                shift_inst = exec_inst.shift.value
+                if shift_inst == isa.ShiftInst.SLL:
                     c = a.bvshl(b)
-                elif shft_inst == isa.ShftInst.SRL:
+                elif shift_inst == isa.ShiftInst.SRL:
                     c = a.bvlshr(b)
                 else:
-                    assert shft_inst == isa.ShftInst.SRA
+                    assert shift_inst == isa.ShiftInst.SRA
                     c = a.bvashr(b)
 
             c = c & lsb_mask # clear bottom bit for jalr

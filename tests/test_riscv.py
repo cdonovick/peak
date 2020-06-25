@@ -23,10 +23,9 @@ def test_riscv():
     assert riscv.register_file.load2(rs2) == isa.Word(6)
 
     data  = isa.R(rd=rd, rs1=rs1, rs2=rs2)
-    tag = isa.AluInst(isa.ArithInst.ADD)
-    alur = isa.ALUR(data=data, tag=tag)
-    alu_inst = isa.ALU(r=alur)
-    inst = isa.Inst(alu=alu_inst)
+    tag = isa.AluInst(arith=isa.ArithInst.ADD)
+    op = isa.OP(data=data, tag=tag)
+    inst = isa.Inst(op)
 
     pc_next = riscv(inst, pc)
 
@@ -37,6 +36,8 @@ def test_riscv_smt():
     fam = family.SMTFamily()
     R32I, _ = sim_mod.R32I_mappable_fc(fam)
     isa = isa_mod.ISA_fc.Py
+
+    AsmInst = fam.get_adt_t(isa.Inst)
 
     riscv = R32I()
 
@@ -51,33 +52,35 @@ def test_riscv_smt():
     rs1 = isa.Idx(1)
     rs2 = isa.Idx(2)
     rd  = isa.Idx(3)
-    data  = isa.R(rd=rd, rs1=rs1, rs2=rs2)
-    tag = isa.AluInst(isa.ArithInst.SUB)
-    alur = isa.ALUR(data=data, tag=tag)
-    alu_inst = isa.ALU(r=alur)
-    inst = isa.Inst(alu=alu_inst)
 
-    asm_Inst = fam.get_adt_t(isa.Inst)
-    asm_inst = asm_Inst(inst)
-    pc_next, rd = riscv(asm_inst, pc, rs1_v, rs2_v)
+    data  = isa.R(rd=rd, rs1=rs1, rs2=rs2)
+    tag = isa.AluInst(arith=isa.ArithInst.SUB)
+    op = isa.OP(data=data, tag=tag)
+    inst = isa.Inst(op)
+
+    asm_inst = AsmInst(inst)
+
+    pc_next, rd_next = riscv(asm_inst, pc, rs1_v, rs2_v)
 
     # Recall pysmt == is structural equiv
     assert pc_next.value == (pc.value + 4)
-    assert rd.value == (rs1_v.value - rs2_v.value)
-    assert rd.value != rd_init.value
+    assert rd_next.value == (rs1_v.value - rs2_v.value)
+    assert rd_next.value == (rs1_v - rs2_v).value
+    assert rd_next.value != rd_init.value
 
     riscv._set_rd_(rd_init)
 
     # setting rd=r0 makes this a nop
     data  = isa.R(rd=r0, rs1=rs1, rs2=rs2)
-    tag = isa.AluInst(isa.ArithInst.SUB)
-    alur = isa.ALUR(data=data, tag=tag)
-    alu_inst = isa.ALU(r=alur)
-    inst = isa.Inst(alu=alu_inst)
-    asm_Inst = fam.get_adt_t(isa.Inst)
-    asm_inst = asm_Inst(inst)
+    tag = isa.AluInst(arith=isa.ArithInst.SUB)
+    op = isa.OP(data=data, tag=tag)
+    inst = isa.Inst(op)
 
-    pc_next, rd = riscv(asm_inst, pc, rs1_v, rs2_v)
+    asm_inst = AsmInst(inst)
+
+    pc_next, rd_next = riscv(asm_inst, pc, rs1_v, rs2_v)
+
     assert pc_next.value == (pc.value + 4)
-    assert rd.value != (rs1_v.value - rs2_v.value)
-    assert rd.value == rd_init.value
+    assert rd_next.value != (rs1_v.value - rs2_v.value)
+    assert rd_next.value != (rs1_v - rs2_v).value
+    assert rd_next.value == rd_init.value
