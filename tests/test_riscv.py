@@ -46,7 +46,6 @@ def test_riscv_smt():
     rd_init = fam.Word(name='rd_init')
     pc = fam.Word(name='pc')
 
-    riscv._set_rd_(rd_init)
 
     r0 = isa.Idx(0)
     rs1 = isa.Idx(1)
@@ -60,7 +59,7 @@ def test_riscv_smt():
 
     asm_inst = AsmInst(inst)
 
-    pc_next, rd_next = riscv(asm_inst, pc, rs1_v, rs2_v)
+    pc_next, rd_next = riscv(asm_inst, pc, rs1_v, rs2_v, rd_init)
 
     # Recall pysmt == is structural equiv
     assert pc_next.value == (pc.value + 4)
@@ -68,7 +67,6 @@ def test_riscv_smt():
     assert rd_next.value == (rs1_v - rs2_v).value
     assert rd_next.value != rd_init.value
 
-    riscv._set_rd_(rd_init)
 
     # setting rd=r0 makes this a nop
     data  = isa.R(rd=r0, rs1=rs1, rs2=rs2)
@@ -78,7 +76,7 @@ def test_riscv_smt():
 
     asm_inst = AsmInst(inst)
 
-    pc_next, rd_next = riscv(asm_inst, pc, rs1_v, rs2_v)
+    pc_next, rd_next = riscv(asm_inst, pc, rs1_v, rs2_v, rd_init)
 
     assert pc_next.value == (pc.value + 4)
     assert rd_next.value != (rs1_v.value - rs2_v.value)
