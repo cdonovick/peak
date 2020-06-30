@@ -1,6 +1,8 @@
 from peak import Peak, name_outputs, family_closure, Const
 
+
 from .isa import ISA_fc
+from .util import Initial
 from . import family
 
 @family_closure(family)
@@ -55,6 +57,12 @@ def R32I_fc(family):
                 op_imm_inst = inst[isa.OP_IMM].value
                 if op_imm_inst.arith.match:
                     op_imm_arith_inst = op_imm_inst.arith.value
+                    # Will need to manual add this to the constraints
+                    # for mapping there is no SUBI because but can always
+                    # do ADDI -imm.  However blocking in the ISA would
+                    # radically increase its complexity.
+                    assert op_imm_arith_inst.tag != isa.ArithInst.SUB
+
                     a = self.register_file.load1(op_imm_arith_inst.data.rs1)
                     b = op_imm_arith_inst.data.imm.sext(20)
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
@@ -219,13 +227,16 @@ def R32I_mappable_fc(family):
 
         @name_outputs(pc_next=Word, rd=Word)
         def __call__(self,
-                     inst: isa.Inst,
+                     inst: Const(isa.Inst),
                      pc: Word,
                      rs1: Word,
-                     rs2: Word
+                     rs2: Word,
+                     rd: Initial(Word),
                      ) -> (Word, Word):
+
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)
+            self._set_rd_(rd)
             pc_next = self.riscv(inst, pc)
             return pc_next, self.riscv.register_file.rd
 
