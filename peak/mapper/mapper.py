@@ -74,7 +74,7 @@ class SMTMapper:
     def __init__(self, peak_fc : tp.Callable):
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
-        Peak_cls = _get_peak_cls(peak_fc(SMTFamily))
+        Peak_cls = _get_peak_cls(peak_fc.SMT)
         name = Peak_cls.__name__
         try:
             input_t = Peak_cls.input_t

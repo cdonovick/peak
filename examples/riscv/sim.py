@@ -211,13 +211,14 @@ def R32I_fc(family):
 
             self.register_file.store(rd, out)
             return pc_next
-    return R32I, isa
+    return R32I
 
 
 @family_closure(family)
 def R32I_mappable_fc(family):
-    R32I, isa = R32I_fc(family)
+    R32I = R32I_fc(family)
     Word = family.Word
+    isa = ISA_fc.Py
 
 
     @family.assemble(locals(), globals())
@@ -249,5 +250,5 @@ def R32I_mappable_fc(family):
         def _set_rd_(self, rd):
             self.riscv.register_file._set_rd_(rd)
 
-    return R32I_mappable, isa
+    return R32I_mappable
 

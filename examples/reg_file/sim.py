@@ -37,12 +37,13 @@ def RegPE_fc(family):
 
             self.register_file.store(rd, c)
 
-    return RegPE, isa
+    return RegPE
 
 
 @family_closure(family)
 def RegPE_mappable_fc(family):
-    RegPE, isa = RegPE_fc(family)
+    RegPE = RegPE_fc(family)
+    isa = ISA_fc.Py
     Word = family.Word
 
 
@@ -57,22 +58,22 @@ def RegPE_mappable_fc(family):
                      rs1: Word,
                      rs2: Word,
                      rd: Initial(Word),
-                     ) -> (Word):
+                     ) -> Word:
 
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)
             self._set_rd_(rd)
             self.reg_pe(inst)
-            return self.riscv.register_file.rd
+            return self.reg_pe.register_file.rd
 
         def _set_rs1_(self, rs1):
-            self.riscv.register_file._set_rs1_(rs1)
+            self.reg_pe.register_file._set_rs1_(rs1)
 
         def _set_rs2_(self, rs2):
-            self.riscv.register_file._set_rs2_(rs2)
+            self.reg_pe.register_file._set_rs2_(rs2)
 
         def _set_rd_(self, rd):
-            self.riscv.register_file._set_rd_(rd)
+            self.reg_pe.register_file._set_rd_(rd)
 
-    return RegPE_mappable, isa
+    return RegPE_mappable
 

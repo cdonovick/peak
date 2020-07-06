@@ -1,15 +1,19 @@
-from peak.assembler.assembler import Assembler
-from peak.assembler.assembled_adt import AssembledADT
+import pytest
+
 from hwtypes import Bit, BitVector
 from hwtypes.adt import Enum, Product
-from peak.mapper import ArchMapper, RewriteRule
+
 from peak import Const, family_closure, Peak, name_outputs
 from peak import family
+from peak.assembler.assembler import Assembler
+from peak.assembler.assembled_adt import AssembledADT
+from peak.mapper import ArchMapper, RewriteRule
+from peak.mapper.utils import pretty_print_binding
+
+from examples.reg_file import sim as regsim, isa as regisa
+from examples.smallir import gen_SmallIR
 from examples.sum_pe.sim import PE_fc as PE_fc_s, ISA_fc as ISA_fc_s
 from examples.tagged_pe.sim import PE_fc as PE_fc_t, ISA_fc as ISA_fc_t
-from examples.smallir import gen_SmallIR
-import pytest
-from peak.mapper.utils import pretty_print_binding
 
 num_test_vectors = 16
 @pytest.mark.parametrize('external_loop', [True, False])
@@ -18,7 +22,7 @@ def test_automapper(external_loop, arch_fc):
     IR = gen_SmallIR(8)
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
-    expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor', 'Not', 'Neg')
+    expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor')
     expect_not_found = ('Mul', 'Shftr', 'Shftl', 'Not', 'Neg')
     for ir_name, ir_fc in IR.instructions.items():
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
@@ -38,6 +42,36 @@ def test_automapper(external_loop, arch_fc):
             arch_vals = {path: BitVector.random(8) for path in arch_paths}
             ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
             assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
+
+
+@pytest.mark.parametrize('external_loop', [True, False])
+def test_reg(external_loop):
+    IR = gen_SmallIR(32)
+    family = regsim.family
+    arch_bv = regsim.RegPE_mappable_fc(family.PyFamily())
+    arch_mapper = ArchMapper(regsim.RegPE_mappable_fc)
+    expect_found = frozenset(('Add', 'Nor', 'Not'))
+    expect_not_found = IR.instructions.keys() - expect_found
+
+    for ir_name, ir_fc in IR.instructions.items():
+        ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+        rewrite_rule = ir_mapper.solve('z3', external_loop=external_loop)
+        if rewrite_rule is None:
+            assert ir_name in expect_not_found
+            continue
+        assert ir_name in expect_found
+
+        #verify the mapping works
+        counter_example = rewrite_rule.verify()
+        assert counter_example is None
+        ir_bv = ir_fc(family.PyFamily())
+        ir_paths, arch_paths = rewrite_rule.get_input_paths()
+        # Need register allocations for this to work:
+        #for _ in range(num_test_vectors):
+        #    ir_vals = {path: BitVector.random(8) for path in ir_paths}
+        #    arch_vals = {path: BitVector.random(8) for path in arch_paths}
+        #    ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
+        #    assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
 
 
 def test_custom_rr():
@@ -357,3 +391,4 @@ def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
                 ("in0",): in0_constraint,  # Not Const
             }
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
+

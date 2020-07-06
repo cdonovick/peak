@@ -53,7 +53,7 @@ class SMTFamily(_RiscFamily_mixin, family.SMTFamily):
 
             def load1(self, idx):
                 if not isinstance(idx, fam_self.Idx):
-                    raise TypeError(idx)
+                    raise TypeError(f'{idx}::{type(idx)}, expected {fam_self.Idx}')
                 return (idx != fam_self.Idx(0)).ite(self.rs1, fam_self.Word(0))
 
             def load2(self, idx):
