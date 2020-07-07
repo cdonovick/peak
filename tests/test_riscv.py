@@ -1,7 +1,8 @@
 from examples.riscv import sim as sim_mod, isa as isa_mod, family
 
 def test_riscv():
-    R32I, isa = sim_mod.R32I_fc.Py
+    R32I = sim_mod.R32I_fc.Py
+    isa = isa_mod.ISA_fc.Py
     riscv = R32I()
 
     pc = isa.Word(0)
@@ -34,7 +35,7 @@ def test_riscv():
 
 def test_riscv_smt():
     fam = family.SMTFamily()
-    R32I, _ = sim_mod.R32I_mappable_fc(fam)
+    R32I = sim_mod.R32I_mappable_fc(fam)
     isa = isa_mod.ISA_fc.Py
 
     AsmInst = fam.get_adt_t(isa.Inst)
