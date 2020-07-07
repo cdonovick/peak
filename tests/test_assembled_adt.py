@@ -152,33 +152,47 @@ def test_from_subfields():
     assert hasattr(AS, "from_fields")
 
     #This is really what I want to do.
-    aa = AA.from_fields(
+    kwargs = dict(
         a=Bit(0),
         b=BV(3),
         e=E.b
     )
+
+    aa = AA.from_fields(**kwargs)
+
     assert aa == AA(a)
     assert aa.a == Bit(0)
     assert aa.b == BV(3)
     assert aa.e == E.b
+    assert aa == AA(**kwargs)
 
-    ab = AB.from_fields(
+    kwargs = dict(
         a=aa,
         b=Bit(1)
     )
+
+    ab = AB.from_fields(**kwargs)
     assert ab == AB(b)
     assert ab.a == aa
     assert ab.b == Bit(1)
+    assert ab == AB(**kwargs)
 
-    at = AT.from_fields(aa, e)
+    args = (aa, e)
+    at = AT.from_fields(*args)
     assert at == AT(t)
     assert at[0] == aa
     assert at[1] == e
+    assert at == AT(*args)
 
-    as_b = AS.from_fields(B, ab)
-    as_t = AS.from_fields(T, t)
+    args_b = (B, ab)
+    args_t = (T, t)
+    as_b = AS.from_fields(*args_b)
+    as_t = AS.from_fields(*args_t)
     assert as_b == AS(s_b)
+    assert as_b == AS(*args_b)
     assert as_t == AS(s_t)
+    assert as_t == AS(*args_t)
+
     assert as_b[B].match
     assert not as_b[T].match
     assert as_b[B].value == ab
