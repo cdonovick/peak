@@ -16,6 +16,8 @@ from examples.sum_pe.sim import PE_fc as PE_fc_s, ISA_fc as ISA_fc_s
 from examples.tagged_pe.sim import PE_fc as PE_fc_t, ISA_fc as ISA_fc_t
 
 num_test_vectors = 16
+
+
 @pytest.mark.parametrize('external_loop', [True, False])
 @pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
 def test_automapper(external_loop, arch_fc):
@@ -48,7 +50,7 @@ def test_automapper(external_loop, arch_fc):
 def test_reg(external_loop):
     IR = gen_SmallIR(32)
     family = regsim.family
-    arch_bv = regsim.RegPE_mappable_fc(family.PyFamily())
+    arch_bv = regsim.RegPE_fc.Py()
     arch_mapper = ArchMapper(regsim.RegPE_mappable_fc)
     expect_found = frozenset(('Add', 'Nor', 'Not'))
     expect_not_found = IR.instructions.keys() - expect_found
@@ -66,12 +68,35 @@ def test_reg(external_loop):
         assert counter_example is None
         ir_bv = ir_fc(family.PyFamily())
         ir_paths, arch_paths = rewrite_rule.get_input_paths()
-        # Need register allocations for this to work:
-        #for _ in range(num_test_vectors):
-        #    ir_vals = {path: BitVector.random(8) for path in ir_paths}
-        #    arch_vals = {path: BitVector.random(8) for path in arch_paths}
-        #    ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
-        #    assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
+        for _ in range(num_test_vectors):
+            ir_vals = {path: BitVector.random(8) for path in ir_paths}
+            arch_vals = {path: BitVector.random(8) for path in arch_paths}
+            ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
+            rs1 = arch_inputs['rs1']
+            rs2 = arch_inputs['rs2']
+            inst = arch_inputs['inst']
+            if inst.b.match:
+                binst = inst.b.value
+                # Hack to fix instruction where idx1 == idx2 but rs1 != rs2
+                idx1 = binst.rs1
+                idx2 = binst.rs2
+                if idx1 != 0 and idx2 != 0 and rs1 != rs2:
+                    while idx1 == idx2 or idx2 == 0:
+                        idx2 += 1
+                arch_bv.register_file.store(idx1, rs1)
+                arch_bv.register_file.store(idx2, rs2)
+                rd = binst.rd
+
+                Inst = type(inst)
+                # rebuild the instruction
+                inst = Inst.from_fields(b=Inst.b.from_fields(op=binst.op, rs1=idx1, rs2=idx2, rd=rd))
+            else:
+                uinst = inst.u.value
+                arch_bv.register_file.store(uinst.rs1, rs1)
+                rd = uinst.rd
+
+            arch_bv(inst)
+            assert ir_bv()(**ir_inputs) == arch_bv.register_file.load1(rd)
 
 
 def test_custom_rr():

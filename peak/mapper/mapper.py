@@ -509,8 +509,9 @@ def rr_from_solver(solver, irmapper):
             ir_path = bv_val
         bv_ibinding.append((ir_path, arch_path))
 
-    bv_ibinding = rebind_binding(bv_ibinding, family.PyFamily())
-    arch_input_aadt_t = _input_aadt_t(am.peak_fc, family.PyFamily())
+    fam = am.peak_fc._family_.PyFamily()
+    bv_ibinding = rebind_binding(bv_ibinding, fam)
+    arch_input_aadt_t = _input_aadt_t(am.peak_fc, fam)
 
     #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
