@@ -89,7 +89,7 @@ def test_reg(external_loop):
 
                 Inst = type(inst)
                 # rebuild the instruction
-                inst = Inst.from_fields(b=Inst.b.from_fields(op=binst.op, rs1=idx1, rs2=idx2, rd=rd))
+                inst = Inst(b=Inst.b(op=binst.op, rs1=idx1, rs2=idx2, rd=rd))
             else:
                 uinst = inst.u.value
                 arch_bv.register_file.store(uinst.rs1, rs1)

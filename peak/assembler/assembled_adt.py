@@ -150,6 +150,14 @@ class AssembledADTMeta(BoundMeta):
         else:
             return
 
+    def __call__(cls, *args, **kwargs):
+        # Dirty hack to make it seem like init can be called like from_fields
+        # In the face ambiguity it will use old constructor
+        try:
+            return super().__call__(*args, **kwargs)
+        except TypeError:
+            return cls.from_fields(*args, **kwargs)
+
     def _name_from_idx(cls, idx):
         return f'{cls.__name__}[{", ".join(map(repr, idx))}]'
 
