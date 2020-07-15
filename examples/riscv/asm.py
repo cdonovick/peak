@@ -1,9 +1,11 @@
+from collections import namedtuple
 import typing as tp
+
+from hwtypes.adt import TaggedUnion
 
 from .isa import ISA_fc
 
 isa = ISA_fc.Py
-
 
 ASM_TEMPLATE = '''\
 def asm_{INST_NAME}(rs1, rd, rs2=None, imm=None):
@@ -29,6 +31,8 @@ def asm_{INST_NAME}(rs1, rd, rs2=None, imm=None):
 
 
 for inst_name in isa.ArithInst._field_table_:
+    if inst_name == 'SUB':
+        continue
     f_str = ASM_TEMPLATE.format(
             INST_NAME=inst_name,
             LAYOUT='I',
@@ -39,7 +43,7 @@ for inst_name in isa.ArithInst._field_table_:
 
     exec(f_str)
 
-# redefine asm_SUB because there is no SUBI instruction
+# special case asm_SUB because there is no SUBI instruction
 def asm_SUB(rs1, rd, rs2=None, imm=None):
     if imm is not None and rs2 is not None:
         raise ValueError('May not specify both rs2 and imm')
@@ -72,6 +76,19 @@ for inst_name in isa.ShiftInst._field_table_:
 
     exec(f_str)
 
+
+
+IMM_BITS = {
+    isa.I : (0, 12),
+    isa.Is : (0, 5),
+    isa.S: (0, 12),
+    isa.U: (12, 32),
+    isa.B: (1, 13),
+    isa.J: (1, 21),
+}
+
+
+
 def set_fields(
         inst: isa.Inst,
         rs1: tp.Optional[int] = None,
@@ -80,129 +97,67 @@ def set_fields(
         imm: tp.Optional[int] = None,
         ) -> isa.Inst:
 
-    if inst[isa.OP].match:
-        T = isa.OP
-        data = inst[isa.OP].value.data
-        tag = inst[isa.OP].value.tag
-    elif inst[isa.OP_IMM].match:
-        inst_ = inst[isa.OP_IMM].value
-        if inst_[isa.OP_IMM_A].match:
-            T = lambda data, tag: isa.OP_IMM(arith=isa.OP_IMM_A(data, tag))
-            inst_ = inst_[isa.OP_IMM_A].value
-        else:
-            assert inst_[isa.OP_IMM_S].match
-            T = lambda data, tag: isa.OP_IMM(shift=isa.OP_IMM_S(data, tag))
-            inst_ = inst_[isa.OP_IMM_S].value
-        data = inst_.data
-        tag = inst_.tag
-    elif inst[isa.LUI].match:
-        T = lambda data, tag: isa.LUI(data)
-        data = inst[isa.LUI].value
-        tag = None
-    elif inst[isa.AUIPC].match:
-        T = lambda data, tag: isa.AUIPC(data)
-        data = inst[isa.AUIPC].value
-        tag = None
-    elif isnt[isa.JAL].match:
-        T = lambda data, tag: isa.JAL(data)
-        data = inst[isa.JAL].value
-        tag = None
-    elif inst[isa.JALR].match:
-        T = lambda data, tag: isa.JALR(data)
-        data = inst[isa.JALR].value
-        tag = None
-    elif inst[isa.Branch].match:
-        T = isa.Branch
-        data = inst[isa.Branch].value.data
-        tag = inst[isa.Branch].value.tag
-    elif inst[isa.Load].match:
-        T = isa.Load
-        data = inst[isa.Load].value.data
-        tag = inst[isa.Load].value.tag
-    elif inst[isa.Store].match:
-        T = isa.Store
-        data = inst[isa.Store].value.data
-        tag = inst[isa.Store].value.tag
-    else:
-        raise AssertionError(f'Unreachable code, inst: {inst} :: {type(inst)}')
+    # Unpack the data
+    for T in isa.Inst.field_dict:
+        if inst[T].match:
+            inst_ = inst[T].value
+            constructor = T
+            # case for OP_IMM
+            if issubclass(T, TaggedUnion):
+                assert T is isa.OP_IMM
+                for attr, S in T.field_dict.items():
+                    m = getattr(inst_, attr)
+                    if m.match:
+                        constructor = lambda data, tag: T(**{attr: S(data, tag)})
+                        inst_ = m.value
+                        break
 
-    # validate arguments
-    if isinstance(data, isa.R):
-        if imm is not None:
-            raise ValueError('R type instruction has no imm field')
-    elif isinstance(data, isa.I):
-        if rs2 is not None:
-            raise ValueError('I type instruction has no rs2 field')
-        if imm is not None and not (0 <= imm < (1 << isa.I.imm.size)):
-            raise ValueError('invalid imm')
+            if hasattr(inst_, 'data'):
+                assert hasattr(inst_, 'tag')
+                data = inst_.data
+                tag = inst_.tag
+            else:
+                assert not hasattr(inst_, 'tag')
+                constructor = lambda data, tag: T(data)
+                data = inst_
+                tag  = None
+            break
 
-    elif isinstance(data, isa.Is):
-        if rs2 is not None:
-            raise ValueError('Is type instruction has no rs2 field')
-        if imm is not None and not (0 <= imm < (1 << isa.Is.imm.size)):
-            raise ValueError('invalid imm')
-
-    elif isinstance(data, isa.S):
-        if rd is not None:
-            raise ValueError('S type instruction has no rd field')
-        if imm is not None and not (0 <= imm < (1 << isa.S.imm.size)):
-            raise ValueError('invalid imm')
-
-    elif isinstance(data, isa.U):
-        if (rs1 or rs2) is not None:
-            raise ValueError('U type instruction has no rs* field')
-        if imm is not None:
-            if imm < 0:
-                raise ValueError('invalid imm')
-            bottom_bits = imm % (1 << 12)
-            if bottom_bits != 0:
-                raise ValueError('invalid imm')
-            imm = imm >> 12
-            if imm >= (1 << isa.U.imm.size):
-                raise ValueError('invalid imm')
-
-    elif isinstance(data, isa.B):
-        if rd is not None:
-            raise ValueError('B type instruction has no rd field')
-        if imm is not None:
-            if imm < 0:
-                raise ValueError('invalid imm')
-            bottom_bits = imm % 2
-            if bottom_bits != 0:
-                raise ValueError('invalid imm')
-
-            imm = imm >> 1
-            if imm >= (1 << isa.B.imm.size):
-                raise ValueError('invalid imm')
-
-    elif isinstance(data, isa.J):
-        if (rs1 or rs2) is not None:
-            raise ValueError('J type instruction has no rs* field')
-        if imm is not None:
-            if imm < 0:
-                raise ValueError('invalid imm')
-            bottom_bits = imm % 2
-            if bottom_bits != 0:
-                raise ValueError('invalid imm')
-
-            imm = imm >> 1
-            if imm >= (1 << isa.J.imm.size):
-                raise ValueError('invalid imm')
-    else:
-        raise AssertionError(f'Unreachable code, data: {data} :: {type(data)}')
+    FIELDS = dict(rs1=rs1, rs2=rs2, rd=rd, imm=imm)
+    Data = type(data)
 
     kwargs = {}
-    for k, v in (('rs1', rs1), ('rs2', rs2), ('rd', rd), ('imm', imm)):
-        field = getattr(type(data), k, None)
-        if field:
-            if v is not None:
-                kwargs[k] = field(v)
+
+    # validate arguments
+    for field_name, field_value in FIELDS.items():
+        Field = getattr(Data, field_name, None)
+
+        if field_value is not None:
+            if Field is None:
+                raise ValueError(f'instruction {Data} has no {field_name} field')
+
+            if field_value < 0:
+                raise ValueError('Values for fields must be unsigned (positive)')
+
+            if field_name == 'imm':
+                field_bits = IMM_BITS[Data]
             else:
-                kwargs[k] = getattr(data, k)
+                field_bits = (0, Field.size)
 
-    data = type(data)(**kwargs)
-    new_inst = isa.Inst(T(data, tag))
+            #ensure bottom bits are 0
+            if field_value % (1 << field_bits[0]) != 0:
+                raise ValueError('Field can not store value, bottom bits would be truncated')
+
+            #ensure value fits in field
+            if field_value % (1 << field_bits[1]) != field_value:
+                raise ValueError('Field can not store value, top bits would be truncated')
+
+            kwargs[field_name] = Field(field_value >> field_bits[0])
+        elif Field is not None:
+            kwargs[field_name] = getattr(data, field_name)
+
+
+    data = Data(**kwargs)
+    sub_inst = constructor(data, tag)
+    new_inst = isa.Inst(sub_inst)
     return new_inst
-
-
-
