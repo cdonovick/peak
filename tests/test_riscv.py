@@ -7,6 +7,7 @@ from examples.riscv import sim as sim_mod, isa as isa_mod, family
 from examples.riscv import asm
 
 
+NTESTS = 16
 
 GOLD = {
         'ADD': lambda a, b: a + b,
@@ -34,28 +35,24 @@ def test_riscv(op_name, use_imm):
         riscv.register_file.store(isa.Idx(i), isa.Word(i))
 
     asm_f = getattr(asm, f'asm_{op_name}')
-    rs1 = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-    rd = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-    if use_imm:
-        imm = random.randrange(0, 1 << 5)
-        rs2 = None
-        a = riscv.register_file.load1(rs1)
-        b = isa.Word(imm)
-        if op_name == 'SUB':
-            imm = -imm
-            op_name = 'ADD'
-    else:
-        imm = None
-        rs2 = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-        a = riscv.register_file.load1(rs1)
-        b = riscv.register_file.load1(rs2)
+    for _ in range(NTESTS):
+        rs1 = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
+        rd = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
+        if use_imm:
+            imm = random.randrange(0, 1 << 5)
+            inst = asm_f(rs1=rs1, imm=imm, rd=rd)
+            a = riscv.register_file.load1(rs1)
+            b = isa.Word(imm)
+        else:
+            rs2 = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
+            inst = asm_f(rs1=rs1, rs2=rs2, rd=rd)
+            a = riscv.register_file.load1(rs1)
+            b = riscv.register_file.load1(rs2)
 
-    pc = isa.Word(random.randrange(0, 1 << isa.Word.size, 4))
-    inst = asm_f(rs1=rs1, rs2=rs2, imm=imm, rd=rd)
-    pc_next = riscv(inst, pc)
-    assert pc_next == pc + 4
-
-    assert GOLD[op_name](a, b) == riscv.register_file.load1(rd)
+        pc = isa.Word(random.randrange(0, 1 << isa.Word.size, 4))
+        pc_next = riscv(inst, pc)
+        assert pc_next == pc + 4
+        assert GOLD[op_name](a, b) == riscv.register_file.load1(rd)
 
 
 def test_riscv_smt():
@@ -115,6 +112,10 @@ def test_riscv_smt():
     )
 @pytest.mark.parametrize('use_imm', (False, True))
 def test_set_fields(op_name, use_imm):
+    # SUBI doesn't techinicaly exist
+    if op_name == 'SUB' and use_imm:
+        return
+
     isa = isa_mod.ISA_fc.Py
     asm_f = getattr(asm, f'asm_{op_name}')
 
@@ -145,7 +146,5 @@ def test_set_fields(op_name, use_imm):
 
     assert inst1 != inst2
 
-    # SUBI doesn't techinicaly exist
-    if op_name != 'SUB' or not use_imm:
-        assert asm.set_fields(inst1, rs1=rs1_, rs2=rs2_, imm=imm_, rd=rd_) == inst2
-        assert asm.set_fields(inst2, rs1=rs1,  rs2=rs2,  imm=imm,  rd=rd)  == inst1
+    assert asm.set_fields(inst1, rs1=rs1_, rs2=rs2_, imm=imm_, rd=rd_) == inst2
+    assert asm.set_fields(inst2, rs1=rs1,  rs2=rs2,  imm=imm,  rd=rd)  == inst1
