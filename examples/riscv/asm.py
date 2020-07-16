@@ -43,6 +43,19 @@ for inst_name in isa.ArithInst._field_table_:
 
     exec(f_str)
 
+
+for inst_name in isa.ShiftInst._field_table_:
+    f_str = ASM_TEMPLATE.format(
+            INST_NAME=inst_name,
+            LAYOUT='Is',
+            OP_T='OP_IMM_S',
+            TAG_T='ShiftInst',
+            TAG_KW='shift',
+        )
+
+    exec(f_str)
+
+
 # special case asm_SUB because there is no SUBI instruction
 def asm_SUB(rs1, rd, rs2=None, imm=None):
     if imm is not None and rs2 is not None:
@@ -63,19 +76,6 @@ def asm_SUB(rs1, rd, rs2=None, imm=None):
         T = isa.OP
         tag = isa.AluInst(arith=isa.ArithInst.SUB)
     return isa.Inst(T(data, tag))
-
-
-for inst_name in isa.ShiftInst._field_table_:
-    f_str = ASM_TEMPLATE.format(
-            INST_NAME=inst_name,
-            LAYOUT='Is',
-            OP_T='OP_IMM_S',
-            TAG_T='ShiftInst',
-            TAG_KW='shift',
-        )
-
-    exec(f_str)
-
 
 
 IMM_BITS = {
