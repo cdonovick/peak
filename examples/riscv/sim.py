@@ -72,7 +72,7 @@ def R32I_fc(family):
                     assert op_imm_inst.shift.match
                     op_imm_shift_inst = op_imm_inst.shift.value
                     a = self.register_file.load1(op_imm_shift_inst.data.rs1)
-                    b = op_imm_shift_inst.data.imm.sext(27)
+                    b = op_imm_shift_inst.data.imm.zext(27)
                     exec_inst = ExecInst(shift=op_imm_shift_inst.tag)
                     rd = op_imm_shift_inst.data.rd
 

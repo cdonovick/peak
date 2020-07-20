@@ -151,5 +151,4 @@ def ISA_fc(family):
     # This sum type defines the opcode field
     Inst = Sum[OP, OP_IMM, LUI, AUIPC, JAL, JALR, Branch, Load, Store]
 
-
     return SimpleNamespace(**locals())
