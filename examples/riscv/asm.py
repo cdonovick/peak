@@ -78,26 +78,13 @@ def asm_SUB(rs1, rd, rs2=None, imm=None):
     return isa.Inst(T(data, tag))
 
 
-IMM_BITS = {
-    isa.I : (0, 12),
-    isa.Is : (0, 5),
-    isa.S: (0, 12),
-    isa.U: (12, 32),
-    isa.B: (1, 13),
-    isa.J: (1, 21),
-}
-
-
-
 _LAYOUT_T = tp.Union[isa.R, isa.I, isa.Is, isa.S, isa.U, isa.B, isa.J]
 _TAG_T = tp.Union[isa.ArithInst, isa.ShiftInst,
         isa.StoreInst, isa.LoadInst, isa.BranchInst]
 _CONSTRUCTOR_T = tp.Callable[[_LAYOUT_T, tp.Optional[_TAG_T]], isa.Inst]
 
-
-def _gen_constructors() -> tp.Mapping[tp.Any, _CONSTRUCTOR_T]:
-    constructors = {}
-
+# Generates a constructor function
+def _gen(T) -> _CONSTRUCTOR_T:
     attrs = {
         isa.ArithInst: 'arith',
         isa.ShiftInst: 'shift',
@@ -108,38 +95,44 @@ def _gen_constructors() -> tp.Mapping[tp.Any, _CONSTRUCTOR_T]:
         isa.ShiftInst: isa.OP_IMM_S,
     }
 
-    #because of stupid closure behavior
-    def _gen(T):
-        if issubclass(T, TaggedUnion):
-            assert T is isa.OP_IMM
+    if issubclass(T, TaggedUnion):
+        assert T is isa.OP_IMM
+        def constructor(data: _LAYOUT_T, tag: _TAG_T):
+            tag_type = type(tag)
+            return T(**{attrs[tag_type]: containers[tag_type](data, tag)})
+    elif hasattr(T, 'data'):
+        assert hasattr(T, 'tag')
+        # case for AluInst
+        if issubclass(T.tag, TaggedUnion):
+            assert T.tag is isa.AluInst
             def constructor(data: _LAYOUT_T, tag: _TAG_T):
                 tag_type = type(tag)
-                return T(**{attrs[tag_type]: containers[tag_type](data, tag)})
-        elif hasattr(T, 'data'):
-            assert hasattr(T, 'tag')
-            # case for AluInst
-            if issubclass(T.tag, TaggedUnion):
-                assert T.tag is isa.AluInst
-                def constructor(data: _LAYOUT_T, tag: _TAG_T):
-                    tag_type = type(tag)
-                    return T(data, T.tag(**{attrs[tag_type]: tag}))
-            else:
-                def constructor(data: _LAYOUT_T, tag: _TAG_T):
-                    return T(data, tag)
+                return T(data, T.tag(**{attrs[tag_type]: tag}))
         else:
-            assert not hasattr(T, 'tag')
             def constructor(data: _LAYOUT_T, tag: _TAG_T):
-                return T(data)
-        return constructor
+                return T(data, tag)
+    else:
+        assert not hasattr(T, 'tag')
+        def constructor(data: _LAYOUT_T, tag: _TAG_T):
+            return T(data)
+    return constructor
 
-
-    for T in isa.Inst.field_dict:
-        constructors[T] = _gen(T)
-
-    return constructors
 
 # Given a top level type construct from data/tag
-CONSTRUCTORS : tp.Mapping[tp.Type, _CONSTRUCTOR_T] = _gen_constructors()
+CONSTRUCTORS : tp.Mapping[tp.Type, _CONSTRUCTOR_T] = {
+    T: _gen(T) for T in isa.Inst.field_dict
+}
+
+
+IMM_BITS = {
+    isa.I : (0, 12),
+    isa.Is : (0, 5),
+    isa.S: (0, 12),
+    isa.U: (12, 32),
+    isa.B: (1, 13),
+    isa.J: (1, 21),
+}
+
 
 def _unpack(inst: isa.Inst) -> tp.Tuple[
             _LAYOUT_T,
