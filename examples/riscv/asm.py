@@ -89,6 +89,104 @@ IMM_BITS = {
 
 
 
+_LAYOUT_T = tp.Union[isa.R, isa.I, isa.Is, isa.S, isa.U, isa.B, isa.J]
+_TAG_T = tp.Union[isa.ArithInst, isa.ShiftInst,
+        isa.StoreInst, isa.LoadInst, isa.BranchInst]
+_CONSTRUCTOR_T = tp.Callable[[_LAYOUT_T, tp.Optional[_TAG_T]], isa.Inst]
+
+
+def _gen_constructors() -> tp.Mapping[tp.Any, _CONSTRUCTOR_T]:
+    constructors = {}
+
+    attrs = {
+        isa.ArithInst: 'arith',
+        isa.ShiftInst: 'shift',
+    }
+
+    containers = {
+        isa.ArithInst: isa.OP_IMM_A,
+        isa.ShiftInst: isa.OP_IMM_S,
+    }
+
+    #because of stupid closure behavior
+    def _gen(T):
+        if issubclass(T, TaggedUnion):
+            assert T is isa.OP_IMM
+            def constructor(data: _LAYOUT_T, tag: _TAG_T):
+                tag_type = type(tag)
+                return T(**{attrs[tag_type]: containers[tag_type](data, tag)})
+        elif hasattr(T, 'data'):
+            assert hasattr(T, 'tag')
+            # case for AluInst
+            if issubclass(T.tag, TaggedUnion):
+                assert T.tag is isa.AluInst
+                def constructor(data: _LAYOUT_T, tag: _TAG_T):
+                    tag_type = type(tag)
+                    return T(data, T.tag(**{attrs[tag_type]: tag}))
+            else:
+                def constructor(data: _LAYOUT_T, tag: _TAG_T):
+                    return T(data, tag)
+        else:
+            assert not hasattr(T, 'tag')
+            def constructor(data: _LAYOUT_T, tag: _TAG_T):
+                return T(data)
+        return constructor
+
+
+    for T in isa.Inst.field_dict:
+        constructors[T] = _gen(T)
+
+    return constructors
+
+# Given a top level type construct from data/tag
+CONSTRUCTORS : tp.Mapping[tp.Type, _CONSTRUCTOR_T] = _gen_constructors()
+
+def _unpack(inst: isa.Inst) -> tp.Tuple[
+            _LAYOUT_T,
+            tp.Optional[_TAG_T],
+            tp.Type, # The matching type
+        ]:
+    for T in isa.Inst.field_dict:
+        if inst[T].match:
+            inst_ = inst[T].value
+            # case for OP_IMM
+            if issubclass(T, TaggedUnion):
+                assert T is isa.OP_IMM
+                for attr, S in T.field_dict.items():
+                    m = getattr(inst_, attr)
+                    if m.match:
+                        inst_ = m.value
+                        break
+                else:
+                    # Should always break
+                    raise AssertionError('Unreachable code')
+
+            if hasattr(inst_, 'data'):
+                assert hasattr(inst_, 'tag')
+                data = inst_.data
+                tag = inst_.tag
+                # case for AluInst
+                if isinstance(tag, TaggedUnion):
+                    tag_type = type(tag)
+                    assert tag_type is isa.AluInst
+                    for attr in tag_type.field_dict:
+                        m = getattr(tag, attr)
+                        if m.match:
+                            tag = m.value
+                            break
+                    else:
+                        # Should always break
+                        raise AssertionError('Unreachable code')
+            else:
+                assert not hasattr(inst_, 'tag')
+                data = inst_
+                tag  = None
+
+            return data, tag, T
+    # Should have returned
+    raise AssertionError('Unreachable code')
+
+
 def set_fields(
         inst: isa.Inst,
         rs1: tp.Optional[int] = None,
@@ -98,66 +196,59 @@ def set_fields(
         ) -> isa.Inst:
 
     # Unpack the data
-    for T in isa.Inst.field_dict:
-        if inst[T].match:
-            inst_ = inst[T].value
-            constructor = T
-            # case for OP_IMM
-            if issubclass(T, TaggedUnion):
-                assert T is isa.OP_IMM
-                for attr, S in T.field_dict.items():
-                    m = getattr(inst_, attr)
-                    if m.match:
-                        constructor = lambda data, tag: T(**{attr: S(data, tag)})
-                        inst_ = m.value
-                        break
+    data, tag, inst_type = _unpack(inst)
+    data_type = type(data)
 
-            if hasattr(inst_, 'data'):
-                assert hasattr(inst_, 'tag')
-                data = inst_.data
-                tag = inst_.tag
-            else:
-                assert not hasattr(inst_, 'tag')
-                constructor = lambda data, tag: T(data)
-                data = inst_
-                tag  = None
-            break
+    constructor = CONSTRUCTORS[inst_type]
 
     FIELDS = dict(rs1=rs1, rs2=rs2, rd=rd, imm=imm)
-    Data = type(data)
-
     kwargs = {}
 
     # validate arguments
     for field_name, field_value in FIELDS.items():
-        Field = getattr(Data, field_name, None)
+        field_type = getattr(data_type, field_name, None)
 
         if field_value is not None:
-            if Field is None:
-                raise ValueError(f'instruction {Data} has no {field_name} field')
+            if field_type is None:
+                raise ValueError(f'instruction {data_type} has no {field_name} field')
 
             if field_value < 0:
                 raise ValueError('Values for fields must be unsigned (positive)')
 
             if field_name == 'imm':
-                field_bits = IMM_BITS[Data]
+                field_bits = IMM_BITS[data_type]
             else:
-                field_bits = (0, Field.size)
+                field_bits = (0, field_type.size)
 
             #ensure bottom bits are 0
             if field_value % (1 << field_bits[0]) != 0:
-                raise ValueError('Field can not store value, bottom bits would be truncated')
+                raise ValueError(f'{field_name} can not store value, bottom bits would be truncated')
 
             #ensure value fits in field
             if field_value % (1 << field_bits[1]) != field_value:
-                raise ValueError('Field can not store value, top bits would be truncated')
+                raise ValueError(f'{field_name} can not store value, top bits would be truncated')
 
-            kwargs[field_name] = Field(field_value >> field_bits[0])
-        elif Field is not None:
+            kwargs[field_name] = field_type(field_value >> field_bits[0])
+        elif field_type is not None:
             kwargs[field_name] = getattr(data, field_name)
 
 
-    data = Data(**kwargs)
+    data = data_type(**kwargs)
     sub_inst = constructor(data, tag)
+    assert isinstance(sub_inst, inst_type)
     new_inst = isa.Inst(sub_inst)
     return new_inst
+
+
+def get_fields(inst: isa.Inst) -> tp.Mapping[str, tp.Optional[int]]:
+    data, *_ = _unpack(inst)
+    data_type = type(data)
+    kwargs = dict(rs1=None, rs2=None, rd=None, imm=None)
+    for field_name, field_type in data_type.field_dict.items():
+        field_value = getattr(data, field_name).as_uint()
+
+        if field_name == 'imm':
+            field_value <<= IMM_BITS[data_type][0]
+        assert field_name in kwargs
+        kwargs[field_name] = field_value
+    return kwargs
