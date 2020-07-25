@@ -111,7 +111,7 @@ def test_riscv_smt():
         ('ADD', 'SUB', 'SLT', 'SLTU', 'AND', 'OR', 'XOR', 'SLL', 'SRL', 'SRA',)
     )
 @pytest.mark.parametrize('use_imm', (False, True))
-def test_set_fields(op_name, use_imm):
+def test_get_set_fields(op_name, use_imm):
     # SUBI doesn't techinicaly exist
     if op_name == 'SUB' and use_imm:
         return
@@ -122,29 +122,32 @@ def test_set_fields(op_name, use_imm):
     # because I need a do while loop
     inst1 = 0
     inst2 = 0
+    KWARG_SCHEMA = {
+        'rs1': None,
+        'rs2': None,
+        'rd': None,
+        'imm': None,
+    }
+
+
     while inst1 == inst2:
-        rs1  = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-        rs1_ = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
+        kwargs1 = KWARG_SCHEMA.copy()
+        kwargs2 = KWARG_SCHEMA.copy()
+        for d in (kwargs1, kwargs2):
+            for key in KWARG_SCHEMA:
+                if use_imm and key == 'rs2':
+                    continue
+                elif not use_imm and key == 'imm':
+                    continue
+                d[key] = random.randrange(0, 1 << isa.Idx.size)
 
-        rd  = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-        rd_ = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-        if use_imm:
-            imm  = random.randrange(0, 1 << 5)
-            imm_ = random.randrange(0, 1 << 5)
-            rs2  = None
-            rs2_ = None
-        else:
-            imm  = None
-            imm_ = None
-            rs2  = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-            rs2_ = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
-
-        inst1 = asm_f(rs1=rs1,  rs2=rs2,  imm=imm,  rd=rd)
-        inst2 = asm_f(rs1=rs1_, rs2=rs2_, imm=imm_, rd=rd_)
-        assert ((rs1 == rs1_ and  rs2 == rs2_ and imm == imm_ and rd == rd_)
-                or inst1 != inst2)
+        inst1 = asm_f(**kwargs1)
+        inst2 = asm_f(**kwargs2)
+        assert  (inst1 == inst2) == (kwargs1 == kwargs2)
+        assert asm.get_fields(inst1) == kwargs1
+        assert asm.get_fields(inst2) == kwargs2
 
     assert inst1 != inst2
+    assert asm.set_fields(inst1, **kwargs2) == inst2
+    assert asm.set_fields(inst2, **kwargs1) == inst1
 
-    assert asm.set_fields(inst1, rs1=rs1_, rs2=rs2_, imm=imm_, rd=rd_) == inst2
-    assert asm.set_fields(inst2, rs1=rs1,  rs2=rs2,  imm=imm,  rd=rd)  == inst1
