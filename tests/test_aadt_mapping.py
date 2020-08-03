@@ -8,12 +8,15 @@ from peak import family
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import AssembledADT
 from peak.mapper import ArchMapper, RewriteRule
-from peak.mapper.utils import pretty_print_binding
 
-from examples.reg_file import sim as regsim, isa as regisa
+from examples.reg_file import sim as regsim
 from examples.smallir import gen_SmallIR
 from examples.sum_pe.sim import PE_fc as PE_fc_s, ISA_fc as ISA_fc_s
 from examples.tagged_pe.sim import PE_fc as PE_fc_t, ISA_fc as ISA_fc_t
+
+from examples.riscv import family as riscv_family
+from examples.riscv import sim as riscv_sim
+
 
 num_test_vectors = 16
 
@@ -49,9 +52,9 @@ def test_automapper(external_loop, arch_fc):
 @pytest.mark.parametrize('external_loop', [True, False])
 def test_reg(external_loop):
     IR = gen_SmallIR(32)
-    family = regsim.family
+    family = riscv_family
     arch_bv = regsim.RegPE_fc.Py()
-    arch_mapper = ArchMapper(regsim.RegPE_mappable_fc)
+    arch_mapper = ArchMapper(regsim.RegPE_mappable_fc, family=riscv_family)
     expect_found = frozenset(('Add', 'Nor', 'Not'))
     expect_not_found = IR.instructions.keys() - expect_found
 
@@ -417,3 +420,18 @@ def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
             }
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
 
+def test_riscv_rr():
+    @family_closure
+    def ir_fc(family):
+        Data = family.BitVector[32]
+        @family.assemble(locals(), globals())
+        class i32_add(Peak):
+            def __call__(self, in0: Data, in1: Data) -> Data:
+                return in0 + in1
+        return i32_add
+
+    arch_fc = riscv_sim.R32I_mappable_fc
+    arch_mapper = ArchMapper(arch_fc, family=riscv_family)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    assert rewrite_rule is not None
