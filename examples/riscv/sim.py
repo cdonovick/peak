@@ -77,14 +77,14 @@ def R32I_fc(family):
                     rd = op_imm_shift_inst.data.rd
 
             elif inst[isa.LUI].match:
-                lui_inst = inst[isa.LUI].value
+                lui_inst = inst[isa.LUI].value.data
                 a = Word(0)
                 b = lui_inst.imm.sext(12) << 12
                 rd = lui_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
             elif inst[isa.AUIPC].match:
-                auipc_inst = inst[isa.AUIPC].value
+                auipc_inst = inst[isa.AUIPC].value.data
                 a = pc
                 b = auipc_inst.imm.sext(12) << 12
                 rd = auipc_inst.rd
@@ -92,7 +92,7 @@ def R32I_fc(family):
 
             elif inst[isa.JAL].match:
                 is_jump = Bit(1)
-                jal_inst = inst[isa.JAL].value
+                jal_inst = inst[isa.JAL].value.data
                 a = pc
                 b = jal_inst.imm.sext(12) << 1
                 rd = jal_inst.rd
@@ -101,7 +101,7 @@ def R32I_fc(family):
             elif inst[isa.JALR].match:
                 is_jump = Bit(1)
                 lsb_mask = ~Word(1)
-                jalr_inst = inst[isa.JALR].value
+                jalr_inst = inst[isa.JALR].value.data
                 a = self.register_file.load1(jalr_inst.rs1)
                 b = jalr_inst.imm.sext(20)
                 rd = jalr_inst.rd

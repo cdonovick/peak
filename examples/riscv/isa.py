@@ -125,15 +125,20 @@ def ISA_fc(family):
 
     # LUI / AUIPC each define there own opcode so I don't merging them
     # with the tag / data style
-    class LUI(U): pass
+    # HACK don't just inherit U because it breaks rebind
+    class LUI(Product):
+        data = U
 
-    class AUIPC(U): pass
+    class AUIPC(Product):
+        data = U
 
     # Similar to above as JAL/JALR are distinguished by opcode I don't
     # create a tagged union with JAL=J; JALR=I
-    class JAL(J): pass
+    class JAL(Product):
+        data = J
 
-    class JALR(I): pass
+    class JALR(Product):
+        data = I
 
     class Branch(Product):
         data = B

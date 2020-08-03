@@ -100,8 +100,8 @@ def _gen(T) -> _CONSTRUCTOR_T:
         def constructor(data: _LAYOUT_T, tag: _TAG_T):
             tag_type = type(tag)
             return T(**{attrs[tag_type]: containers[tag_type](data, tag)})
-    elif hasattr(T, 'data'):
-        assert hasattr(T, 'tag')
+    elif hasattr(T, 'tag'):
+        assert hasattr(T, 'data')
         # case for AluInst
         if issubclass(T.tag, TaggedUnion):
             assert T.tag is isa.AluInst
@@ -112,9 +112,10 @@ def _gen(T) -> _CONSTRUCTOR_T:
             def constructor(data: _LAYOUT_T, tag: _TAG_T):
                 return T(data, tag)
     else:
-        assert not hasattr(T, 'tag')
+        assert hasattr(T, 'data')
         def constructor(data: _LAYOUT_T, tag: _TAG_T):
             return T(data)
+
     return constructor
 
 
@@ -154,9 +155,9 @@ def _unpack(inst: isa.Inst) -> tp.Tuple[
                     # Should always break
                     raise AssertionError('Unreachable code')
 
-            if hasattr(inst_, 'data'):
-                assert hasattr(inst_, 'tag')
-                data = inst_.data
+            assert hasattr(inst_, 'data')
+            data = inst_.data
+            if hasattr(inst_, 'tag'):
                 tag = inst_.tag
                 # case for AluInst
                 if isinstance(tag, TaggedUnion):
@@ -172,7 +173,6 @@ def _unpack(inst: isa.Inst) -> tp.Tuple[
                         raise AssertionError('Unreachable code')
             else:
                 assert not hasattr(inst_, 'tag')
-                data = inst_
                 tag  = None
 
             return data, tag, T
