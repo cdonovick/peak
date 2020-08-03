@@ -5,6 +5,7 @@ import pytest
 
 from examples.riscv import sim as sim_mod, isa as isa_mod, family
 from examples.riscv import asm
+from peak.mapper.utils import rebind_type
 
 
 NTESTS = 16
@@ -150,4 +151,10 @@ def test_get_set_fields(op_name, use_imm):
     assert inst1 != inst2
     assert asm.set_fields(inst1, **kwargs2) == inst2
     assert asm.set_fields(inst2, **kwargs1) == inst1
+
+def test_rebind():
+    isa = isa_mod.ISA_fc.Py
+    Inst_py = isa.Inst
+    Inst_smt = rebind_type(Inst_py, family.SMTFamily())
+
 

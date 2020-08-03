@@ -190,7 +190,7 @@ class AssembledADTMeta(BoundMeta):
         if val is not _MISSING:
             return cls.unbound_t[(val, *cls.fields[1:])]
         else:
-            raise AttributeError(attr)
+            raise AttributeError(f"{attr} not in {cls.adt_t}")
 
     def __contains__(cls, T):
         return T in cls.adt_t
@@ -265,7 +265,7 @@ class AssembledADT(metaclass=AssembledADTMeta):
         elif key is _TAG and not _issubclass(cls.adt_t, Sum):
             raise Error(f"can only get tag from Sum types")
         elif not key is _TAG:
-            raise Error(key)
+            raise Error(f"{key} not in {list(cls.adt_t.field_dict.items())}")
 
         if not _issubclass(cls.adt_t, Sum):
             return field
