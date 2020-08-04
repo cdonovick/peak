@@ -3,7 +3,10 @@ import random
 
 import pytest
 
-from examples.riscv import sim as sim_mod, isa as isa_mod, family
+from examples.riscv import sim as sim_mod_base
+from examples.riscv import isa as isa_mod_base
+from examples.riscv import family as family_base
+from examples.riscv_ext import sim as sim_mod_ext, isa as isa_mod_ext
 from examples.riscv import asm
 from peak.mapper.utils import rebind_type
 
@@ -24,13 +27,16 @@ GOLD = {
 }
 
 
+
+@pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base),
+                                 (sim_mod_ext, isa_mod_ext)])
 @pytest.mark.parametrize('op_name',
         ('ADD', 'SUB', 'SLT', 'SLTU', 'AND', 'OR', 'XOR', 'SLL', 'SRL', 'SRA',)
     )
 @pytest.mark.parametrize('use_imm', (False, True))
-def test_riscv(op_name, use_imm):
-    R32I = sim_mod.R32I_fc.Py
-    isa = isa_mod.ISA_fc.Py
+def test_riscv(fcs, op_name, use_imm):
+    R32I = fcs[0].R32I_fc.Py
+    isa = fcs[1].ISA_fc.Py
     riscv = R32I()
     for i in range(1, 32):
         riscv.register_file.store(isa.Idx(i), isa.Word(i))
@@ -57,9 +63,9 @@ def test_riscv(op_name, use_imm):
 
 
 def test_riscv_smt():
-    fam = family.SMTFamily()
-    R32I = sim_mod.R32I_mappable_fc(fam)
-    isa = isa_mod.ISA_fc.Py
+    fam = family_base.SMTFamily()
+    R32I = sim_mod_base.R32I_mappable_fc(fam)
+    isa = isa_mod_base.ISA_fc.Py
 
     AsmInst = fam.get_adt_t(isa.Inst)
 
@@ -117,7 +123,7 @@ def test_get_set_fields(op_name, use_imm):
     if op_name == 'SUB' and use_imm:
         return
 
-    isa = isa_mod.ISA_fc.Py
+    isa = isa_mod_base.ISA_fc.Py
     asm_f = getattr(asm, f'asm_{op_name}')
 
     # because I need a do while loop
@@ -153,8 +159,8 @@ def test_get_set_fields(op_name, use_imm):
     assert asm.set_fields(inst2, **kwargs1) == inst1
 
 def test_rebind():
-    isa = isa_mod.ISA_fc.Py
+    isa = isa_mod_base.ISA_fc.Py
     Inst_py = isa.Inst
-    Inst_smt = rebind_type(Inst_py, family.SMTFamily())
+    Inst_smt = rebind_type(Inst_py, family_base.SMTFamily())
 
 
