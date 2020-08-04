@@ -157,7 +157,7 @@ def R32I_fc(family):
                 ext_inst = inst[isa.Ext].value
                 _val = self.register_file.load1(ext_inst.data.rs)
                 rd = ext_inst.data.rd
-                a = self.bitcounter(ext_inst.tag, val)
+                a = self.bitcounter(ext_inst.tag, _val)
                 b = Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
@@ -239,7 +239,8 @@ def BitCounter_fc(family):
             if inst == isa.BitInst.POPCNT:
                 cnt = Word(0)
                 for i in unroll(range(Word.size)):
-                    cnt = cnt + (val & (1 << i)) >> i
+                    cnt = cnt + ((val & (1 << i)) >> i)
+                return cnt
             elif inst == isa.BitInst.CNTLZ:
                 if val == 0:
                     return Word(32)
@@ -249,7 +250,7 @@ def BitCounter_fc(family):
                 cnt = Word(0)
                 for i in unroll(range(Word.size.bit_length() - 1)):
                     mask = mask << shft
-                    if val & mask:
+                    if (val & mask) == 0:
                         cnt = cnt + shft
                         val = val << shft
 
@@ -267,7 +268,7 @@ def BitCounter_fc(family):
                 cnt = Word(0)
                 for i in unroll(range(Word.size.bit_length() - 1)):
                     mask = mask >> shft
-                    if val & mask:
+                    if (val & mask) == 0:
                         cnt = cnt + shft
                         val = val >> shft
 
