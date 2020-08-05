@@ -1,36 +1,45 @@
+import functools
 import itertools
+import operator
 import random
 
 import pytest
 
-from examples.riscv import sim as sim_mod, isa as isa_mod, family
+from examples.riscv import sim as sim_mod_base
+from examples.riscv import isa as isa_mod_base
+from examples.riscv import family as family_base
+from examples.riscv_ext import sim as sim_mod_ext, isa as isa_mod_ext
 from examples.riscv import asm
+from examples.riscv_ext import asm as asm_ext
 from peak.mapper.utils import rebind_type
 
 
 NTESTS = 16
 
 GOLD = {
-        'ADD': lambda a, b: a + b,
-        'SUB': lambda a, b: a - b,
+        'ADD': operator.add,
+        'SUB': operator.sub,
         'SLT': lambda a, b: type(a)(a.bvslt(b)),
         'SLTU': lambda a, b: type(a)(a.bvult(b)),
-        'AND': lambda a, b: a & b,
-        'OR': lambda a, b: a | b,
-        'XOR': lambda a, b: a ^ b,
+        'AND': operator.and_,
+        'OR': operator.or_,
+        'XOR': operator.xor,
         'SLL': lambda a, b: a.bvshl(b),
         'SRL': lambda a, b: a.bvlshr(b),
         'SRA': lambda a, b: a.bvashr(b),
 }
 
 
+
+@pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base),
+                                 (sim_mod_ext, isa_mod_ext)])
 @pytest.mark.parametrize('op_name',
         ('ADD', 'SUB', 'SLT', 'SLTU', 'AND', 'OR', 'XOR', 'SLL', 'SRL', 'SRA',)
     )
 @pytest.mark.parametrize('use_imm', (False, True))
-def test_riscv(op_name, use_imm):
-    R32I = sim_mod.R32I_fc.Py
-    isa = isa_mod.ISA_fc.Py
+def test_riscv(fcs, op_name, use_imm):
+    R32I = fcs[0].R32I_fc.Py
+    isa = fcs[1].ISA_fc.Py
     riscv = R32I()
     for i in range(1, 32):
         riscv.register_file.store(isa.Idx(i), isa.Word(i))
@@ -57,9 +66,9 @@ def test_riscv(op_name, use_imm):
 
 
 def test_riscv_smt():
-    fam = family.SMTFamily()
-    R32I = sim_mod.R32I_mappable_fc(fam)
-    isa = isa_mod.ISA_fc.Py
+    fam = family_base.SMTFamily()
+    R32I = sim_mod_base.R32I_mappable_fc(fam)
+    isa = isa_mod_base.ISA_fc.Py
 
     AsmInst = fam.get_adt_t(isa.Inst)
 
@@ -117,7 +126,7 @@ def test_get_set_fields(op_name, use_imm):
     if op_name == 'SUB' and use_imm:
         return
 
-    isa = isa_mod.ISA_fc.Py
+    isa = isa_mod_base.ISA_fc.Py
     asm_f = getattr(asm, f'asm_{op_name}')
 
     # because I need a do while loop
@@ -153,8 +162,54 @@ def test_get_set_fields(op_name, use_imm):
     assert asm.set_fields(inst2, **kwargs1) == inst1
 
 def test_rebind():
-    isa = isa_mod.ISA_fc.Py
+    isa = isa_mod_base.ISA_fc.Py
     Inst_py = isa.Inst
-    Inst_smt = rebind_type(Inst_py, family.SMTFamily())
+    Inst_smt = rebind_type(Inst_py, family_base.SMTFamily())
+
+
+def compose(f, g):
+    def fog(*args):
+        return f(g(*args))
+    return fog
+
+def _enumerate_length(x):
+    l = -1
+    for l, _ in enumerate(x): pass
+    return l + 1
+
+_cnt_bits = compose(sum, functools.partial(map, int))
+
+_cnt_zeros = compose(
+        _enumerate_length,
+        functools.partial(itertools.takewhile, operator.not_),
+        )
+
+GOLD_EXT = {
+        'POPCNT': _cnt_bits,
+        'CNTLZ': compose(_cnt_zeros, reversed),
+        'CNTTZ': _cnt_zeros,
+}
+
+
+@pytest.mark.parametrize('op_name', ('POPCNT', 'CNTLZ', 'CNTTZ',))
+def test_ext(op_name):
+    R32I = sim_mod_ext.R32I_fc.Py
+    isa = isa_mod_ext.ISA_fc.Py
+    riscv = R32I()
+    for i in range(1, 32):
+        riscv.register_file.store(isa.Idx(i), isa.Word(i))
+
+    asm_f = getattr(asm_ext, f'asm_{op_name}')
+    for _ in range(NTESTS):
+        rs1 = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
+        rd = isa.Idx(random.randrange(1, 1 << isa.Idx.size))
+        a = riscv.register_file.load1(rs1)
+        inst = asm_f(rs1=rs1, rd=rd)
+        pc = isa.Word(random.randrange(0, 1 << isa.Word.size, 4))
+        pc_next = riscv(inst, pc)
+        assert pc_next == pc + 4
+        assert GOLD_EXT[op_name](a) == riscv.register_file.load1(rd)
+
+
 
 
