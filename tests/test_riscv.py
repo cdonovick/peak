@@ -9,8 +9,10 @@ from examples.riscv import sim as sim_mod_base
 from examples.riscv import isa as isa_mod_base
 from examples.riscv import family as family_base
 from examples.riscv_ext import sim as sim_mod_ext, isa as isa_mod_ext
+from examples.riscv_m import sim as sim_mod_m, isa as isa_mod_m
 from examples.riscv import asm
 from examples.riscv_ext import asm as asm_ext
+from examples.riscv_m import asm as asm_m
 from peak.mapper.utils import rebind_type
 
 
@@ -31,8 +33,10 @@ GOLD = {
 
 
 
-@pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base),
-                                 (sim_mod_ext, isa_mod_ext)])
+@pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base, asm),
+                                 (sim_mod_ext, isa_mod_ext, asm_ext),
+                                 (sim_mod_m, isa_mod_m, asm_m)
+                                 ])
 @pytest.mark.parametrize('op_name',
         ('ADD', 'SUB', 'SLT', 'SLTU', 'AND', 'OR', 'XOR', 'SLL', 'SRL', 'SRA',)
     )
@@ -40,6 +44,7 @@ GOLD = {
 def test_riscv(fcs, op_name, use_imm):
     R32I = fcs[0].R32I_fc.Py
     isa = fcs[1].ISA_fc.Py
+    asm = fcs[2]
     riscv = R32I()
     for i in range(1, 32):
         riscv.register_file.store(isa.Idx(i), isa.Word(i))
@@ -65,10 +70,17 @@ def test_riscv(fcs, op_name, use_imm):
         assert GOLD[op_name](a, b) == riscv.register_file.load1(rd)
 
 
-def test_riscv_smt():
-    fam = family_base.SMTFamily()
-    R32I = sim_mod_base.R32I_mappable_fc(fam)
-    isa = isa_mod_base.ISA_fc.Py
+@pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base, asm),
+                                 (sim_mod_ext, isa_mod_ext, asm_ext),
+                                 (sim_mod_m, isa_mod_m, asm_m)
+                                 ])
+def test_riscv_smt(fcs):
+    sim_mod = fcs[0]
+    isa_mod = fcs[1]
+    asm_mod = fcs[2]
+    fam = isa_mod.family.SMTFamily()
+    R32I = sim_mod.R32I_mappable_fc(fam)
+    isa = isa_mod.ISA_fc.Py
 
     AsmInst = fam.get_adt_t(isa.Inst)
 
