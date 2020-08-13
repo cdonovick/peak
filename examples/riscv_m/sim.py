@@ -1,5 +1,3 @@
-from ast_tools.macros import unroll
-
 from peak import Peak, name_outputs, family_closure, Const
 
 
@@ -7,8 +5,6 @@ from .isa import ISA_fc
 from .util import Initial
 from . import family
 
-
-# Unfortunately not any great way to share code
 @family_closure(family)
 def R32I_fc(family):
     Bit = family.Bit
@@ -21,7 +17,6 @@ def R32I_fc(family):
 
     isa = ISA_fc.Py
     RegisterFile = family.get_register_file()
-    BitCounter = BitCounter_fc(family)
 
     ExecInst = family.get_constructor(isa.AluInst)
 
@@ -29,7 +24,6 @@ def R32I_fc(family):
     class R32I(Peak):
         def __init__(self):
             self.register_file = RegisterFile()
-            self.bitcounter = BitCounter()
 
         @name_outputs(pc_next=Word)
         def __call__(self,
@@ -68,7 +62,6 @@ def R32I_fc(family):
                     # do ADDI -imm.  However blocking in the ISA would
                     # radically increase its complexity.
                     assert op_imm_arith_inst.tag != isa.ArithInst.SUB
-
                     a = self.register_file.load1(op_imm_arith_inst.data.rs1)
                     b = op_imm_arith_inst.data.imm.sext(20)
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
@@ -147,16 +140,9 @@ def R32I_fc(family):
                 a = Word(0)
                 b = Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
-            elif inst[isa.Store].match:
-                a = Word(0)
-                b = Word(0)
-                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
             else:
-                assert inst[isa.Ext].match
-                ext_inst = inst[isa.Ext].value
-                _val = self.register_file.load1(ext_inst.data.rs)
-                rd = ext_inst.data.rd
-                a = self.bitcounter(ext_inst.tag, _val)
+                assert inst[isa.Store].match
+                a = Word(0)
                 b = Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
@@ -183,8 +169,7 @@ def R32I_fc(family):
                 else:
                     assert arith_inst == isa.ArithInst.XOR
                     c = a ^ b
-            else:
-                assert exec_inst.shift.match
+            elif exec_inst.shift.match:
                 shift_inst = exec_inst.shift.value
                 if shift_inst == isa.ShiftInst.SLL:
                     c = a.bvshl(b)
@@ -193,6 +178,28 @@ def R32I_fc(family):
                 else:
                     assert shift_inst == isa.ShiftInst.SRA
                     c = a.bvashr(b)
+            else:
+                assert exec_inst.muldiv.match
+                muldiv_inst =  exec_inst.muldiv.value
+                if muldiv_inst == isa.MulDivInst.MUL:
+                    c = a * b
+                elif muldiv_inst == isa.MulDivInst.MULH:
+                    c = (a.sext(Word.size) * b.sext(Word.size))[Word.size:]
+                elif muldiv_inst == isa.MulDivInst.MULHU:
+                    c = (a.zext(Word.size) * b.zext(Word.size))[Word.size:]
+                elif muldiv_inst == isa.MulDivInst.MULHSU:
+                    c = (a.sext(Word.size) * b.zext(Word.size))[Word.size:]
+                elif muldiv_inst == isa.MulDivInst.DIV:
+                    c = a.bvsdiv(b)
+                elif muldiv_inst == isa.MulDivInst.DIVU:
+                    c = a.bvudiv(b)
+                elif muldiv_inst == isa.MulDivInst.REM:
+                    c = a.bvsrem(b)
+                else:
+                    assert muldiv_inst == isa.MulDivInst.REMU
+                    c = a.bvurem(b)
+
+
 
             c = c & lsb_mask # clear bottom bit for jalr
 
@@ -225,58 +232,6 @@ def R32I_fc(family):
             self.register_file.store(rd, out)
             return pc_next
     return R32I
-
-
-@family_closure(family)
-def BitCounter_fc(family):
-    isa = ISA_fc.Py
-    Word = family.Word
-
-    @family.assemble(locals(), globals())
-    class BitCounter(Peak):
-        def __call__(self, inst: isa.BitInst, val: Word) -> Word:
-            if inst == isa.BitInst.POPCNT:
-                cnt = Word(0)
-                for i in unroll(range(Word.size)):
-                    cnt = cnt + ((val & (1 << i)) >> i)
-                return cnt
-            elif inst == isa.BitInst.CNTLZ:
-                if val == 0:
-                    return Word(32)
-
-                mask = Word(-1)
-                shft = Word(16)
-                cnt = Word(0)
-                for i in unroll(range(Word.size.bit_length() - 1)):
-                    mask = mask << shft
-                    if (val & mask) == 0:
-                        cnt = cnt + shft
-                        val = val << shft
-
-                    shft = shft >> 1
-
-                assert shft == 0
-                return cnt
-            else:
-                assert inst == isa.BitInst.CNTTZ
-                if val == 0:
-                    return Word(32)
-
-                mask = Word(-1)
-                shft = Word(16)
-                cnt = Word(0)
-                for i in unroll(range(Word.size.bit_length() - 1)):
-                    mask = mask >> shft
-                    if (val & mask) == 0:
-                        cnt = cnt + shft
-                        val = val >> shft
-
-                    shft = shft >> 1
-
-                assert shft == 0
-                return cnt
-
-    return BitCounter
 
 
 @family_closure(family)
