@@ -1,9 +1,33 @@
+from hwtypes import BitVector as pyBitVector, Bit as pyBit
+
 from peak import Peak, name_outputs, family_closure, Const
 
 
 from .isa import ISA_fc
 from .util import Initial
 from . import family
+
+class RegisterFileHack:
+    def __init__(self):
+        self.rf = {}
+
+    def _load(self, idx):
+        if idx == 0:
+            return 0
+
+        return self.rf[idx]
+
+    load1 = _load
+    load2 = _load
+
+    def store(self, idx, value):
+        if idx == 0:
+            return
+        self.rf[idx] = value
+
+
+
+
 
 @family_closure(family)
 def R32I_fc(family):
@@ -13,9 +37,17 @@ def R32I_fc(family):
     Signed = family.Signed
     Word = family.Word
     Idx = family.Idx
-
-
     isa = ISA_fc.Py
+    smt_isa = ISA_fc.SMT
+
+    def cast(v):
+        if isinstance(v, (pyBitVector, int)):
+            t = smt_isa.Word(int(v))
+            return t
+        else:
+            assert isinstance(v, smt_isa.Word)
+            return v
+
     RegisterFile = family.get_register_file()
 
     ExecInst = family.get_constructor(isa.AluInst)
@@ -23,7 +55,7 @@ def R32I_fc(family):
     @family.assemble(locals(), globals())
     class R32I(Peak):
         def __init__(self):
-            self.register_file = RegisterFile()
+            self.register_file = RegisterFileHack()
 
         @name_outputs(pc_next=Word)
         def __call__(self,
@@ -48,8 +80,8 @@ def R32I_fc(family):
 
             if inst[isa.OP].match:
                 op_inst = inst[isa.OP].value
-                a = self.register_file.load1(op_inst.data.rs1)
-                b = self.register_file.load2(op_inst.data.rs2)
+                a = cast(self.register_file.load1(op_inst.data.rs1))
+                b = cast(self.register_file.load2(op_inst.data.rs2))
                 exec_inst = op_inst.tag
                 rd = op_inst.data.rd
 
@@ -63,30 +95,30 @@ def R32I_fc(family):
                     # radically increase its complexity.
                     assert op_imm_arith_inst.tag != isa.ArithInst.SUB
 
-                    a = self.register_file.load1(op_imm_arith_inst.data.rs1)
-                    b = op_imm_arith_inst.data.imm.sext(20)
+                    a = cast(self.register_file.load1(op_imm_arith_inst.data.rs1))
+                    b = cast(op_imm_arith_inst.data.imm.sext(20))
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
                     rd = op_imm_arith_inst.data.rd
 
                 else:
                     assert op_imm_inst.shift.match
                     op_imm_shift_inst = op_imm_inst.shift.value
-                    a = self.register_file.load1(op_imm_shift_inst.data.rs1)
-                    b = op_imm_shift_inst.data.imm.zext(27)
+                    a = cast(self.register_file.load1(op_imm_shift_inst.data.rs1))
+                    b = cast(op_imm_shift_inst.data.imm.zext(27))
                     exec_inst = ExecInst(shift=op_imm_shift_inst.tag)
                     rd = op_imm_shift_inst.data.rd
 
             elif inst[isa.LUI].match:
                 lui_inst = inst[isa.LUI].value.data
                 a = Word(0)
-                b = lui_inst.imm.sext(12) << 12
+                b = cast(lui_inst.imm.sext(12) << 12)
                 rd = lui_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
             elif inst[isa.AUIPC].match:
                 auipc_inst = inst[isa.AUIPC].value.data
                 a = pc
-                b = auipc_inst.imm.sext(12) << 12
+                b = cast(auipc_inst.imm.sext(12) << 12)
                 rd = auipc_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
@@ -94,7 +126,7 @@ def R32I_fc(family):
                 is_jump = Bit(1)
                 jal_inst = inst[isa.JAL].value.data
                 a = pc
-                b = jal_inst.imm.sext(12) << 1
+                b = cast(jal_inst.imm.sext(12) << 1)
                 rd = jal_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
@@ -102,16 +134,16 @@ def R32I_fc(family):
                 is_jump = Bit(1)
                 lsb_mask = ~Word(1)
                 jalr_inst = inst[isa.JALR].value.data
-                a = self.register_file.load1(jalr_inst.rs1)
-                b = jalr_inst.imm.sext(20)
+                a = cast(self.register_file.load1(jalr_inst.rs1))
+                b = cast(jalr_inst.imm.sext(20))
                 rd = jalr_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
             elif inst[isa.Branch].match:
                 is_branch = Bit(1)
                 branch_inst = inst[isa.Branch].value
-                a = self.register_file.load1(branch_inst.data.rs1)
-                b = self.register_file.load2(branch_inst.data.rs2)
+                a = cast(self.register_file.load1(branch_inst.data.rs1))
+                b = cast(self.register_file.load2(branch_inst.data.rs2))
                 branch_offset = branch_inst.data.imm.sext(20) << 1
 
                 # hand coded common sub-expr elimin
@@ -138,14 +170,17 @@ def R32I_fc(family):
                     invert = cmp_ge
 
             elif inst[isa.Load].match:
-                a = Word(0)
-                b = Word(0)
+                a = smt_isa.Word(0)
+                b = smt_isa.Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
             else:
                 assert inst[isa.Store].match
-                a = Word(0)
-                b = Word(0)
+                a = smt_isa.Word(0)
+                b = smt_isa.Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+
+            a = cast(a)
+            b = cast(b)
 
             # Execute
             # Inputs:
@@ -160,9 +195,9 @@ def R32I_fc(family):
                 elif arith_inst == isa.ArithInst.SUB:
                     c = a - b
                 elif arith_inst == isa.ArithInst.SLT:
-                    c = Word(a.bvslt(b))
+                    c = smt_isa.Word(a.bvslt(b))
                 elif arith_inst == isa.ArithInst.SLTU:
-                    c = Word(a.bvult(b))
+                    c = smt_isa.Word(a.bvult(b))
                 elif arith_inst == isa.ArithInst.AND:
                     c = a & b
                 elif arith_inst == isa.ArithInst.OR:
