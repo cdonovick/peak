@@ -316,7 +316,7 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=self.family.SMTFamily())
+        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=self.family.PyFamily())
 
         #Removes any invalid bindings
         def constraint_filter(binding):
@@ -325,7 +325,7 @@ class IRMapper(SMTMapper):
                     return False
             return True
 
-        ir_path_to_adt = self.path_to_adt(input=True, family=self.family.SMTFamily())
+        ir_path_to_adt = self.path_to_adt(input=True, family=self.family.PyFamily())
         #Verify all paths are the same
         assert set(ir_path_to_adt.keys()) == set(self.input_varmap.keys())
         for af in archmapper.input_forms:
@@ -355,6 +355,7 @@ class IRMapper(SMTMapper):
         self.has_bindings = len(output_bindings) > 0
         if not self.has_bindings:
             logger.debug("Early out, no output binidngs")
+            assert 0
             return
 
         form_var = archmapper.input_form_var
