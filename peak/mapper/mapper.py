@@ -12,7 +12,7 @@ from .utils import Unbound, Match
 from .utils import create_bindings, pretty_print_binding
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
-from .utils import rebind_binding
+from .utils import rebind_binding, rebind_type
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
@@ -142,7 +142,8 @@ class ArchMapper(SMTMapper):
                 raise ValueError(f"{path} is either invalid or not an adt leaf")
             assert path in self.input_varmap
             adt = path_to_adt[path]
-            aadt = self.family.SMTFamily().get_adt_t(adt)
+            aadt = self.family.SMTFamily().get_adt_t(rebind_type(adt, self.family.SMTFamily()))
+            #aadt = self.family.PyFamily().get_adt_t(adt)
             try:
                 constraints = tuple((aadt(c) for c in constraints))
             except Exception as e:
