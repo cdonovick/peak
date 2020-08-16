@@ -26,9 +26,6 @@ class RegisterFileHack:
         self.rf[idx] = value
 
 
-
-
-
 @family_closure(family)
 def R32I_fc(family):
     Bit = family.Bit

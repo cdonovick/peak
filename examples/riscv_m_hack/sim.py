@@ -34,6 +34,7 @@ def R32I_fc(family):
     Signed = family.Signed
     Word = family.Word
     Idx = family.Idx
+    smt_isa = ISA_fc.SMT
 
 
     isa = ISA_fc.Py
@@ -78,8 +79,8 @@ def R32I_fc(family):
 
             if inst[isa.OP].match:
                 op_inst = inst[isa.OP].value
-                a = self.register_file.load1(op_inst.data.rs1)
-                b = self.register_file.load2(op_inst.data.rs2)
+                a = cast(self.register_file.load1(op_inst.data.rs1))
+                b = cast(self.register_file.load2(op_inst.data.rs2))
                 exec_inst = op_inst.tag
                 rd = op_inst.data.rd
 
@@ -91,15 +92,15 @@ def R32I_fc(family):
                     # for mapping there is no SUBI because but can always
                     # do ADDI -imm.  However blocking in the ISA would
                     # radically increase its complexity.
-                    assert op_imm_arith_inst.tag != isa.ArithInst.SUB
-                    a = self.register_file.load1(op_imm_arith_inst.data.rs1)
-                    b = op_imm_arith_inst.data.imm.sext(20)
+                    if op_imm_arith_inst.tag == isa.ArithInst.SUB:
+                        a = Word(0)
+                        b = Word(0)
+                    else:
+                        a = cast(self.register_file.load1(op_imm_arith_inst.data.rs1))
+                        b = cast(op_imm_arith_inst.data.imm.sext(20))
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
                     rd = op_imm_arith_inst.data.rd
 
-
-                    a = cast(a)
-                    b = cast(b)
                 else:
                     assert op_imm_inst.shift.match
                     op_imm_shift_inst = op_imm_inst.shift.value
@@ -183,18 +184,14 @@ def R32I_fc(family):
                 b = cast(b)
 
             elif inst[isa.Load].match:
-                a = Word(0)
-                b = Word(0)
+                a = smt_isa.Word(0)
+                b = smt_isa.Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
-                a = cast(a)
-                b = cast(b)
             else:
                 assert inst[isa.Store].match
-                a = Word(0)
-                b = Word(0)
+                a = smt_isa.Word(0)
+                b = smt_isa.Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
-                a = cast(a)
-                b = cast(b)
 
             a = cast(a)
             b = cast(b)
