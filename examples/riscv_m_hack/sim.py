@@ -53,7 +53,7 @@ def R32I_fc(family):
     @family.assemble(locals(), globals())
     class R32I(Peak):
         def __init__(self):
-            self.register_file = RegisterFile()
+            self.register_file = RegisterFileHack()
 
         @name_outputs(pc_next=Word)
         def __call__(self,
@@ -82,7 +82,8 @@ def R32I_fc(family):
                 b = self.register_file.load2(op_inst.data.rs2)
                 exec_inst = op_inst.tag
                 rd = op_inst.data.rd
-
+                a = cast(a)
+                b = cast(b)
             elif inst[isa.OP_IMM].match:
                 op_imm_inst = inst[isa.OP_IMM].value
                 if op_imm_inst.arith.match:
