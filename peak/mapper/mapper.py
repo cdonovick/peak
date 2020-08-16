@@ -470,7 +470,7 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'btor',
         external_loop : bool = False,
-        itr_limit = 10
+        itr_limit = 20
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
