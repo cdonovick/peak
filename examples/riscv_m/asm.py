@@ -88,6 +88,7 @@ def _gen(T) -> _CONSTRUCTOR_T:
     attrs = {
         isa.ArithInst: 'arith',
         isa.ShiftInst: 'shift',
+        isa.MulDivInst: 'muldiv'
     }
 
     containers = {
