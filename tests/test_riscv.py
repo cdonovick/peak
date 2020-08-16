@@ -13,6 +13,8 @@ from examples.riscv_m import sim as sim_mod_m, isa as isa_mod_m
 from examples.riscv import asm
 from examples.riscv_ext import asm as asm_ext
 from examples.riscv_m import asm as asm_m
+from examples.riscv_hack import asm as asm_hack, isa as isa_hack, sim as sim_hack
+
 from peak.mapper.utils import rebind_type
 
 
@@ -68,6 +70,33 @@ def test_riscv(fcs, op_name, use_imm):
         pc_next = riscv(inst, pc)
         assert pc_next == pc + 4
         assert GOLD[op_name](a, b) == riscv.register_file.load1(rd)
+
+
+def test_verify():
+    isa = isa_hack.ISA_fc.Py
+    smt_isa = isa_hack.ISA_fc.SMT
+    R32I = sim_hack.R32I_fc.Py
+    riscv = R32I()
+    initial_values = [smt_isa.Word(name=f'r{i}') for i in range(32)]
+    for i in range(32):
+        riscv.register_file.store(isa.Idx(i), initial_values[i])
+
+    inst = asm_hack.asm_XOR(rs1=1, rs2=2, rd=3)
+    pc = smt_isa.Word(0)
+    pc_next = riscv(inst, pc)
+    expect = initial_values[1] ^ initial_values[2]
+
+
+    assert isinstance(riscv.register_file.load1(isa.Idx(3)), smt_isa.Word)
+    assert riscv.register_file.load1(isa.Idx(3)).value == expect.value
+    assert riscv.register_file.load1(isa.Idx(2)).value != expect.value
+
+    inst = asm_hack.asm_SLTU(rs1=0, rs2=3, rd=4)
+    pc_next = riscv(inst, pc)
+    expect = smt_isa.Word(smt_isa.Word(0).bvult(expect))
+
+    assert isinstance(riscv.register_file.load1(isa.Idx(4)), smt_isa.Word)
+    assert riscv.register_file.load1(isa.Idx(4)).value == expect.value
 
 
 @pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base, asm),

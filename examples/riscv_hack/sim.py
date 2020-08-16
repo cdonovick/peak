@@ -1,14 +1,34 @@
-from ast_tools.macros import unroll
+from hwtypes import BitVector as pyBitVector, Bit as pyBit
 
 from peak import Peak, name_outputs, family_closure, Const
 
 
 from .isa import ISA_fc
-from .util import Initial, PCT
+from .util import Initial
 from . import family
 
+class RegisterFileHack:
+    def __init__(self):
+        self.rf = {}
 
-# Unfortunately not any great way to share code
+    def _load(self, idx):
+        if idx == 0:
+            return 0
+
+        return self.rf[idx]
+
+    load1 = _load
+    load2 = _load
+
+    def store(self, idx, value):
+        if idx == 0:
+            return
+        self.rf[idx] = value
+
+
+
+
+
 @family_closure(family)
 def R32I_fc(family):
     Bit = family.Bit
@@ -17,24 +37,30 @@ def R32I_fc(family):
     Signed = family.Signed
     Word = family.Word
     Idx = family.Idx
-
-
     isa = ISA_fc.Py
+    smt_isa = ISA_fc.SMT
+
+    def cast(v):
+        if isinstance(v, (pyBitVector, int)):
+            t = smt_isa.Word(int(v))
+            return t
+        else:
+            assert isinstance(v, smt_isa.Word)
+            return v
+
     RegisterFile = family.get_register_file()
-    BitCounter = BitCounter_fc(family)
 
     ExecInst = family.get_constructor(isa.AluInst)
 
     @family.assemble(locals(), globals())
     class R32I(Peak):
         def __init__(self):
-            self.register_file = RegisterFile()
-            self.bitcounter = BitCounter()
+            self.register_file = RegisterFileHack()
 
-        @name_outputs(pc_next=isa.Word)
+        @name_outputs(pc_next=Word)
         def __call__(self,
                      inst: isa.Inst,
-                     pc: isa.Word) -> isa.Word:
+                     pc: Word) -> Word:
             # Decode
             # Inputs:
             #   inst, pc
@@ -54,8 +80,8 @@ def R32I_fc(family):
 
             if inst[isa.OP].match:
                 op_inst = inst[isa.OP].value
-                a = self.register_file.load1(op_inst.data.rs1)
-                b = self.register_file.load2(op_inst.data.rs2)
+                a = cast(self.register_file.load1(op_inst.data.rs1))
+                b = cast(self.register_file.load2(op_inst.data.rs2))
                 exec_inst = op_inst.tag
                 rd = op_inst.data.rd
 
@@ -71,30 +97,30 @@ def R32I_fc(family):
                         a = Word(0)
                         b = Word(0)
                     else:
-                        a = self.register_file.load1(op_imm_arith_inst.data.rs1)
-                        b = op_imm_arith_inst.data.imm.sext(20)
+                        a = cast(self.register_file.load1(op_imm_arith_inst.data.rs1))
+                        b = cast(op_imm_arith_inst.data.imm.sext(20))
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
                     rd = op_imm_arith_inst.data.rd
 
                 else:
                     assert op_imm_inst.shift.match
                     op_imm_shift_inst = op_imm_inst.shift.value
-                    a = self.register_file.load1(op_imm_shift_inst.data.rs1)
-                    b = op_imm_shift_inst.data.imm.zext(27)
+                    a = cast(self.register_file.load1(op_imm_shift_inst.data.rs1))
+                    b = cast(op_imm_shift_inst.data.imm.zext(27))
                     exec_inst = ExecInst(shift=op_imm_shift_inst.tag)
                     rd = op_imm_shift_inst.data.rd
 
             elif inst[isa.LUI].match:
                 lui_inst = inst[isa.LUI].value.data
                 a = Word(0)
-                b = lui_inst.imm.sext(12) << 12
+                b = cast(lui_inst.imm.sext(12) << 12)
                 rd = lui_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
             elif inst[isa.AUIPC].match:
                 auipc_inst = inst[isa.AUIPC].value.data
                 a = pc
-                b = auipc_inst.imm.sext(12) << 12
+                b = cast(auipc_inst.imm.sext(12) << 12)
                 rd = auipc_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
@@ -102,7 +128,7 @@ def R32I_fc(family):
                 is_jump = Bit(1)
                 jal_inst = inst[isa.JAL].value.data
                 a = pc
-                b = jal_inst.imm.sext(12) << 1
+                b = cast(jal_inst.imm.sext(12) << 1)
                 rd = jal_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
@@ -110,16 +136,16 @@ def R32I_fc(family):
                 is_jump = Bit(1)
                 lsb_mask = ~Word(1)
                 jalr_inst = inst[isa.JALR].value.data
-                a = self.register_file.load1(jalr_inst.rs1)
-                b = jalr_inst.imm.sext(20)
+                a = cast(self.register_file.load1(jalr_inst.rs1))
+                b = cast(jalr_inst.imm.sext(20))
                 rd = jalr_inst.rd
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
 
             elif inst[isa.Branch].match:
                 is_branch = Bit(1)
                 branch_inst = inst[isa.Branch].value
-                a = self.register_file.load1(branch_inst.data.rs1)
-                b = self.register_file.load2(branch_inst.data.rs2)
+                a = cast(self.register_file.load1(branch_inst.data.rs1))
+                b = cast(self.register_file.load2(branch_inst.data.rs2))
                 branch_offset = branch_inst.data.imm.sext(20) << 1
 
                 # hand coded common sub-expr elimin
@@ -146,21 +172,17 @@ def R32I_fc(family):
                     invert = cmp_ge
 
             elif inst[isa.Load].match:
-                a = Word(0)
-                b = Word(0)
-                exec_inst = ExecInst(arith=isa.ArithInst.ADD)
-            elif inst[isa.Store].match:
-                a = Word(0)
-                b = Word(0)
+                a = smt_isa.Word(0)
+                b = smt_isa.Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
             else:
-                assert inst[isa.Ext].match
-                ext_inst = inst[isa.Ext].value
-                _val = self.register_file.load1(ext_inst.data.rs)
-                rd = ext_inst.data.rd
-                a = self.bitcounter(ext_inst.tag, _val)
-                b = Word(0)
+                assert inst[isa.Store].match
+                a = smt_isa.Word(0)
+                b = smt_isa.Word(0)
                 exec_inst = ExecInst(arith=isa.ArithInst.ADD)
+
+            a = cast(a)
+            b = cast(b)
 
             # Execute
             # Inputs:
@@ -175,9 +197,9 @@ def R32I_fc(family):
                 elif arith_inst == isa.ArithInst.SUB:
                     c = a - b
                 elif arith_inst == isa.ArithInst.SLT:
-                    c = Word(a.bvslt(b))
+                    c = smt_isa.Word(a.bvslt(b))
                 elif arith_inst == isa.ArithInst.SLTU:
-                    c = Word(a.bvult(b))
+                    c = smt_isa.Word(a.bvult(b))
                 elif arith_inst == isa.ArithInst.AND:
                     c = a & b
                 elif arith_inst == isa.ArithInst.OR:
@@ -230,58 +252,6 @@ def R32I_fc(family):
 
 
 @family_closure(family)
-def BitCounter_fc(family):
-    isa = ISA_fc.Py
-    Word = family.Word
-
-    @family.assemble(locals(), globals())
-    class BitCounter(Peak):
-        def __call__(self, inst: isa.BitInst, val: isa.Word) -> isa.Word:
-            if inst == isa.BitInst.POPCNT:
-                cnt = Word(0)
-                for i in unroll(range(Word.size)):
-                    cnt = cnt + ((val & (1 << i)) >> i)
-                return cnt
-            elif inst == isa.BitInst.CNTLZ:
-                if val == 0:
-                    return Word(32)
-
-                mask = Word(-1)
-                shft = Word(16)
-                cnt = Word(0)
-                for i in unroll(range(Word.size.bit_length() - 1)):
-                    mask = mask << shft
-                    if (val & mask) == 0:
-                        cnt = cnt + shft
-                        val = val << shft
-
-                    shft = shft >> 1
-
-                assert shft == 0
-                return cnt
-            else:
-                assert inst == isa.BitInst.CNTTZ
-                if val == 0:
-                    return Word(32)
-
-                mask = Word(-1)
-                shft = Word(16)
-                cnt = Word(0)
-                for i in unroll(range(Word.size.bit_length() - 1)):
-                    mask = mask >> shft
-                    if (val & mask) == 0:
-                        cnt = cnt + shft
-                        val = val >> shft
-
-                    shft = shft >> 1
-
-                assert shft == 0
-                return cnt
-
-    return BitCounter
-
-
-@family_closure(family)
 def R32I_mappable_fc(family):
     R32I = R32I_fc(family)
     Word = family.Word
@@ -293,14 +263,14 @@ def R32I_mappable_fc(family):
         def __init__(self):
             self.riscv = R32I()
 
-        @name_outputs(pc_next=PCT(isa.Word), rd=isa.Word)
+        @name_outputs(pc_next=Word, rd=Word)
         def __call__(self,
                      inst: Const(isa.Inst),
-                     pc: PCT(isa.Word),
-                     rs1: isa.Word,
-                     rs2: isa.Word,
-                     rd: Initial(isa.Word),
-                     ) -> (PCT(isa.Word), isa.Word):
+                     pc: Word,
+                     rs1: Word,
+                     rs2: Word,
+                     rd: Initial(Word),
+                     ) -> (Word, Word):
 
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)

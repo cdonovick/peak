@@ -2,7 +2,7 @@ from peak import Peak, name_outputs, family_closure, Const
 
 
 from .isa import ISA_fc
-from .util import Initial
+from .util import Initial, PCT
 from . import family
 
 @family_closure(family)
@@ -25,10 +25,10 @@ def R32I_fc(family):
         def __init__(self):
             self.register_file = RegisterFile()
 
-        @name_outputs(pc_next=Word)
+        @name_outputs(pc_next=isa.Word)
         def __call__(self,
                      inst: isa.Inst,
-                     pc: Word) -> Word:
+                     pc: isa.Word) -> isa.Word:
             # Decode
             # Inputs:
             #   inst, pc
@@ -61,9 +61,12 @@ def R32I_fc(family):
                     # for mapping there is no SUBI because but can always
                     # do ADDI -imm.  However blocking in the ISA would
                     # radically increase its complexity.
-                    assert op_imm_arith_inst.tag != isa.ArithInst.SUB
-                    a = self.register_file.load1(op_imm_arith_inst.data.rs1)
-                    b = op_imm_arith_inst.data.imm.sext(20)
+                    if op_imm_arith_inst.tag == isa.ArithInst.SUB:
+                        a = Word(0)
+                        b = Word(0)
+                    else:
+                        a = self.register_file.load1(op_imm_arith_inst.data.rs1)
+                        b = op_imm_arith_inst.data.imm.sext(20)
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
                     rd = op_imm_arith_inst.data.rd
 
@@ -246,14 +249,14 @@ def R32I_mappable_fc(family):
         def __init__(self):
             self.riscv = R32I()
 
-        @name_outputs(pc_next=Word, rd=Word)
+        @name_outputs(pc_next=PCT(isa.Word), rd=isa.Word)
         def __call__(self,
                      inst: Const(isa.Inst),
-                     pc: Word,
-                     rs1: Word,
-                     rs2: Word,
-                     rd: Initial(Word),
-                     ) -> (Word, Word):
+                     pc: PCT(isa.Word),
+                     rs1: isa.Word,
+                     rs2: isa.Word,
+                     rd: Initial(isa.Word),
+                     ) -> (PCT(isa.Word), isa.Word):
 
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)

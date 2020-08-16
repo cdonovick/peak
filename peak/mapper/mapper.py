@@ -12,7 +12,7 @@ from .utils import Unbound, Match
 from .utils import create_bindings, pretty_print_binding
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
-from .utils import rebind_binding
+from .utils import rebind_binding, rebind_type
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
-from pysmt.logics import BV
+from pysmt.logics import BV, QF_BV
 
 import operator
 from functools import partial, reduce, lru_cache
@@ -142,7 +142,8 @@ class ArchMapper(SMTMapper):
                 raise ValueError(f"{path} is either invalid or not an adt leaf")
             assert path in self.input_varmap
             adt = path_to_adt[path]
-            aadt = self.family.SMTFamily().get_adt_t(adt)
+            aadt = self.family.SMTFamily().get_adt_t(rebind_type(adt, self.family.SMTFamily()))
+            #aadt = self.family.PyFamily().get_adt_t(adt)
             try:
                 constraints = tuple((aadt(c) for c in constraints))
             except Exception as e:
@@ -316,7 +317,7 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=self.family.SMTFamily())
+        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=self.family.PyFamily())
 
         #Removes any invalid bindings
         def constraint_filter(binding):
@@ -325,7 +326,7 @@ class IRMapper(SMTMapper):
                     return False
             return True
 
-        ir_path_to_adt = self.path_to_adt(input=True, family=self.family.SMTFamily())
+        ir_path_to_adt = self.path_to_adt(input=True, family=self.family.PyFamily())
         #Verify all paths are the same
         assert set(ir_path_to_adt.keys()) == set(self.input_varmap.keys())
         for af in archmapper.input_forms:
@@ -355,6 +356,7 @@ class IRMapper(SMTMapper):
         self.has_bindings = len(output_bindings) > 0
         if not self.has_bindings:
             logger.debug("Early out, no output binidngs")
+            assert 0
             return
 
         form_var = archmapper.input_form_var
@@ -466,7 +468,7 @@ class IRMapper(SMTMapper):
             logger.debug(f"  {var}")
 
     def solve(self,
-        solver_name : str = 'z3',
+        solver_name : str = 'btor',
         external_loop : bool = False,
         itr_limit = 10
     ) -> tp.Union[None, RewriteRule]:
@@ -474,7 +476,7 @@ class IRMapper(SMTMapper):
             return None
 
         if external_loop:
-            return external_loop_solve(self.forall_vars, self.formula_wo_forall, BV, itr_limit, solver_name, self)
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, QF_BV, itr_limit, solver_name, self)
 
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)
@@ -517,7 +519,7 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
-def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
+def external_loop_solve(y, phi, logic = QF_BV, maxloops = 10, solver_name = "btor", irmapper = None):
 
     y = set(y)
     x = phi.get_free_variables() - y
@@ -528,6 +530,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
 
         while maxloops is None or loops <= maxloops:
             loops += 1
+            print(loops, "tick",flush=True)
             eres = solver.solve()
 
             if not eres:
@@ -535,6 +538,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
             else:
                 tau = {v: solver.get_value(v) for v in x}
                 sub_phi = phi.substitute(tau).simplify()
+                print(loops, "tock",flush=True)
                 model = smt.get_model(smt.Not(sub_phi), solver_name = solver_name, logic = logic)
 
                 if model is None:
