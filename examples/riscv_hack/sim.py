@@ -93,10 +93,12 @@ def R32I_fc(family):
                     # for mapping there is no SUBI because but can always
                     # do ADDI -imm.  However blocking in the ISA would
                     # radically increase its complexity.
-                    assert op_imm_arith_inst.tag != isa.ArithInst.SUB
-
-                    a = cast(self.register_file.load1(op_imm_arith_inst.data.rs1))
-                    b = cast(op_imm_arith_inst.data.imm.sext(20))
+                    if op_imm_arith_inst.tag == isa.ArithInst.SUB:
+                        a = Word(0)
+                        b = Word(0)
+                    else:
+                        a = cast(self.register_file.load1(op_imm_arith_inst.data.rs1))
+                        b = cast(op_imm_arith_inst.data.imm.sext(20))
                     exec_inst = ExecInst(arith=op_imm_arith_inst.tag)
                     rd = op_imm_arith_inst.data.rd
 

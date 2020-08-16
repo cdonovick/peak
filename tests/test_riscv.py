@@ -99,9 +99,6 @@ def test_verify():
     assert riscv.register_file.load1(isa.Idx(4)).value == expect.value
 
 
-
-
-
 @pytest.mark.parametrize('fcs', [(sim_mod_base, isa_mod_base, asm),
                                  (sim_mod_ext, isa_mod_ext, asm_ext),
                                  (sim_mod_m, isa_mod_m, asm_m)
