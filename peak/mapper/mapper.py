@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
-from pysmt.logics import BV
+from pysmt.logics import BV, QF_BV
 
 import operator
 from functools import partial, reduce, lru_cache
@@ -468,7 +468,7 @@ class IRMapper(SMTMapper):
             logger.debug(f"  {var}")
 
     def solve(self,
-        solver_name : str = 'z3',
+        solver_name : str = 'btor',
         external_loop : bool = False,
         itr_limit = 10
     ) -> tp.Union[None, RewriteRule]:
@@ -476,7 +476,7 @@ class IRMapper(SMTMapper):
             return None
 
         if external_loop:
-            return external_loop_solve(self.forall_vars, self.formula_wo_forall, BV, itr_limit, solver_name, self)
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, QF_BV, itr_limit, solver_name, self)
 
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)
@@ -519,7 +519,7 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
-def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
+def external_loop_solve(y, phi, logic = QF_BV, maxloops = 10, solver_name = "btor", irmapper = None):
 
     y = set(y)
     x = phi.get_free_variables() - y
@@ -530,6 +530,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
 
         while maxloops is None or loops <= maxloops:
             loops += 1
+            print(loops, "tick",flush=True)
             eres = solver.solve()
 
             if not eres:
@@ -537,6 +538,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
             else:
                 tau = {v: solver.get_value(v) for v in x}
                 sub_phi = phi.substitute(tau).simplify()
+                print(loops, "tock",flush=True)
                 model = smt.get_model(smt.Not(sub_phi), solver_name = solver_name, logic = logic)
 
                 if model is None:
