@@ -31,10 +31,10 @@ def R32I_fc(family):
             self.register_file = RegisterFile()
             self.bitcounter = BitCounter()
 
-        @name_outputs(pc_next=Word)
+        @name_outputs(pc_next=isa.Word)
         def __call__(self,
                      inst: isa.Inst,
-                     pc: Word) -> Word:
+                     pc: isa.Word) -> isa.Word:
             # Decode
             # Inputs:
             #   inst, pc
@@ -234,7 +234,7 @@ def BitCounter_fc(family):
 
     @family.assemble(locals(), globals())
     class BitCounter(Peak):
-        def __call__(self, inst: isa.BitInst, val: Word) -> Word:
+        def __call__(self, inst: isa.BitInst, val: isa.Word) -> isa.Word:
             if inst == isa.BitInst.POPCNT:
                 cnt = Word(0)
                 for i in unroll(range(Word.size)):
@@ -291,14 +291,14 @@ def R32I_mappable_fc(family):
         def __init__(self):
             self.riscv = R32I()
 
-        @name_outputs(pc_next=Word, rd=Word)
+        @name_outputs(pc_next=isa.Word, rd=isa.Word)
         def __call__(self,
                      inst: Const(isa.Inst),
-                     pc: Word,
-                     rs1: Word,
-                     rs2: Word,
-                     rd: Initial(Word),
-                     ) -> (Word, Word):
+                     pc: isa.Word,
+                     rs1: isa.Word,
+                     rs2: isa.Word,
+                     rd: Initial(isa.Word),
+                     ) -> (isa.Word, isa.Word):
 
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)

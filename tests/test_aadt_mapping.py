@@ -426,7 +426,7 @@ def test_riscv_rr():
         Data = family.BitVector[32]
         @family.assemble(locals(), globals())
         class i32_add(Peak):
-            def __call__(self, in0: Data, in1: Data) -> Data:
+            def __call__(self, in0: BitVector[32], in1: BitVector[32]) -> BitVector[32]:
                 return in0 + in1
         return i32_add
 
