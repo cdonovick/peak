@@ -6,6 +6,7 @@ from .peak import Peak
 from .features import name_outputs, family_closure
 import itertools as it
 from hwtypes.adt_util import rebind_type
+from peak import family as peak_family
 
 _TAB_SIZE = 4
 class IR:
@@ -19,7 +20,7 @@ class IR:
         self.instructions[name] = peak_fc
 
     #fun should have the form def fun(family, *args)
-    def add_peak_instruction(self, name : str, input_interface : Product, output_interface : Product, fun : tp.Callable, cls_name=None):
+    def add_peak_instruction(self, name : str, input_interface : Product, output_interface : Product, fun : tp.Callable, cls_name=None, family=peak_family):
         if cls_name is None:
             cls_name = name
         #Assuming for now that abstract bitvectors are used in the interfaces

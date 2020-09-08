@@ -91,7 +91,8 @@ class SMTMapper:
         output_forms = []
         self.const_valid_conditions = []
         const_fields = [field for field, T in input_t.field_dict.items() if issubclass(T, Const)]
-
+        print(const_fields)
+        print(list(input_t.field_dict.items()))
         for input_form in input_forms:
             inputs = aadt_product_to_dict(input_form.value)
             self.const_valid_conditions.append([is_valid(inputs[field]) for field in const_fields])
@@ -517,8 +518,7 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
-def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
-
+def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "z3", irmapper = None):
     y = set(y)
     x = phi.get_free_variables() - y
 
