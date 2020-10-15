@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
-from pysmt.logics import BV, QF_BV
+from pysmt.logics import BV
 
 import operator
 from functools import partial, reduce, lru_cache
@@ -519,15 +519,16 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 10
+        itr_limit = 10,
+        logic = BV
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
 
         if external_loop:
-            return external_loop_solve(self.forall_vars, self.formula_wo_forall, QF_BV, itr_limit, solver_name, self)
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, logic, itr_limit, solver_name, self)
 
-        with smt.Solver(solver_name, logic=BV) as solver:
+        with smt.Solver(solver_name, logic=logic) as solver:
             solver.add_assertion(self.formula)
             is_solved = solver.solve()
             if not is_solved:
