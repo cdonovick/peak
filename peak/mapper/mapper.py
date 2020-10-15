@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
-from pysmt.logics import BV
+from pysmt.logics import BV, QF_BV
 
 import operator
 from functools import partial, reduce, lru_cache
@@ -290,6 +290,57 @@ class RewriteRule:
                 arch_ce = {path: solved_to_bv(var, solver) for path, var in arch_values.items()}
                 return ir_ce, arch_ce
 
+    def serialize_bindings(self):
+        rrule_out = {}
+        rrule_out["ibinding"] = []
+        for t in self.ibinding:
+            if isinstance(t[0], BitVector):
+                rrule_out["ibinding"].append(tuple([{'type':'BitVector', 'width':len(t[0]), 'value':t[0].value}, t[1]]))
+            elif isinstance(t[0], Bit):
+                rrule_out["ibinding"].append(tuple([{'type':'Bit', 'width':1, 'value':t[0]._value}, t[1]]))
+            elif t[0] == Unbound:
+                rrule_out["ibinding"].append(tuple(["unbound", t[1]]))
+            else:
+                rrule_out["ibinding"].append(t)
+
+        rrule_out["obinding"] = []
+        for t in self.obinding:
+            if t[0] == Unbound:
+                rrule_out["obinding"].append(tuple(["unbound", t[1]]))
+            else:
+                rrule_out["obinding"].append(t)
+
+        return rrule_out
+
+def read_serialized_bindings(serialized_rr, ir_fc, arch_fc):
+
+    input_binding = []
+    output_binding = []
+
+    for i in serialized_rr["ibinding"]:
+        if isinstance(i[0], dict):
+            u = i[0]
+            v = i[1]
+            if u['type'] == "BitVector":
+                u = (BitVector[u['width']](u['value']))
+            elif u['type'] == "Bit":
+                u = (Bit(u['value']))
+
+            input_binding.append(tuple([u, tuple(v) ])) 
+        elif i[0] == "unbound":
+            input_binding.append(tuple([Unbound, tuple(i[1])]))
+        else:
+            input_binding.append(tuple([tuple(i[0]), tuple(i[1])]))
+            
+    for o in serialized_rr["obinding"]:
+        if o[0] == "unbound":
+            output_binding.append(tuple([Unbound, tuple(o[1])]))
+        else:
+            output_binding.append(tuple([tuple(o[0]), tuple(o[1])]))
+
+    return RewriteRule(input_binding, output_binding, ir_fc, arch_fc)
+
+
 def _free_var_from_t(T, family):
     if issubclass(T, (SBV, SMTBit)):
         return T()
@@ -474,7 +525,7 @@ class IRMapper(SMTMapper):
             return None
 
         if external_loop:
-            return external_loop_solve(self.forall_vars, self.formula_wo_forall, BV, itr_limit, solver_name, self)
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, QF_BV, itr_limit, solver_name, self)
 
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(self.formula)

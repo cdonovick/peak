@@ -1,4 +1,5 @@
 from .peak import Peak
+from .family import AbstractFamily
 from .features import family_closure, name_outputs
 from hwtypes import BitVector
 import magma as m
@@ -6,7 +7,7 @@ from hwtypes.adt_util import rebind_type
 
 def gen_register(T, init=0):
     @family_closure
-    def Register_fc(family):
+    def Register_fc(family: AbstractFamily):
         T_f = rebind_type(T, family)
         init_f = T_f(init)
 
