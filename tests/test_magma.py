@@ -12,6 +12,7 @@ import fault
 import magma
 import itertools
 
+
 def test_assemble():
     @family_closure
     def PE_fc(family):
@@ -150,7 +151,6 @@ def test_composition():
 
 
 def test_register():
-
     @family_closure
     def PE_fc(family):
         T = family.BitVector[8]
@@ -161,9 +161,11 @@ def test_register():
                 self.register: Reg = Reg()
 
             def __call__(self, en: family.Bit) -> T:
-                val = self.register(0, 0)
+                val = self.register.prev()
                 self.register(val+1, en)
                 return val
+
+        return CounterPe
 
     PE_magma = PE_fc(family.MagmaFamily())
     PE_py = PE_fc(family.PyFamily())()
