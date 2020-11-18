@@ -3,6 +3,7 @@ from peak import Peak, family_closure, Const
 from peak.assembler import Assembler, AssembledADT
 from peak.rtl_utils import wrap_with_disassembler
 from peak import family
+from peak.register import gen_register
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
@@ -147,3 +148,29 @@ def test_composition():
         tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
+
+def test_register():
+
+    @family_closure
+    def PE_fc(family):
+        T = family.BitVector[8]
+        Reg = gen_register(T, 0)(family)
+        @family.assemble(locals(), globals())
+        class CounterPe(Peak):
+            def __init__(self):
+                self.register: Reg = Reg()
+
+            def __call__(self, en: family.Bit) -> T:
+                val = self.register(0, 0)
+                self.register(val+1, en)
+                return val
+
+    PE_magma = PE_fc(family.MagmaFamily())
+    PE_py = PE_fc(family.PyFamily())()
+    tester = fault.Tester(PE_magma)
+
+    for en in BitVector.random(32):
+        gold = PE_py(en)
+        tester.circuit.en = en
+        tester.eval()
+        tester.circuit.O.expect(gold)
