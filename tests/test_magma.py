@@ -170,9 +170,16 @@ def test_register():
     PE_magma = PE_fc(family.MagmaFamily())
     PE_py = PE_fc(family.PyFamily())()
     tester = fault.Tester(PE_magma)
+    tester.circuit.ASYNCRESET = 0
+    tester.step(2)
+    tester.circuit.ASYNCRESET = 1
+    tester.step(2)
+    tester.circuit.ASYNCRESET = 0
+    tester.step(2)
 
     for en in BitVector.random(32):
         gold = PE_py(en)
         tester.circuit.en = en
-        tester.eval()
         tester.circuit.O.expect(gold)
+        tester.step(2)
+    tester.compile_and_run("verilator", flags=["-Wno-fatal"])

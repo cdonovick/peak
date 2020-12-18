@@ -12,24 +12,27 @@ def gen_register(T, init=0):
         init_f = T_f(init)
 
         if isinstance(family, MagmaFamily):
-            return m.Register(T_f, init_f, has_enable=True)
+            return m.Register(T_f, init_f,
+                    has_enable=True,
+                    name_map=m.generator.ParamDict(CE='en', I='value'))
 
         @family.assemble(locals(), globals())
         class Register(Peak):
             def __init__(self):
-                self._prev = init_f
                 self.value: T_f = init_f
 
             def __call__(self, value: T_f, en: family.Bit) -> T_f:
                 assert value is not None
                 retvalue = self.value
-                self._prev = retvalue
                 if en:
                     self.value = value
                 return retvalue
 
             def prev(self) -> T_f:
-                return self._prev
+                # This is not quite right and doesn't match
+                # magma semantics completely. May only be used
+                # as a peak method prior to __call__
+                return self.value
 
         return Register
 
