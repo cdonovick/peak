@@ -170,12 +170,6 @@ def test_register():
     PE_magma = PE_fc(family.MagmaFamily())
     PE_py = PE_fc(family.PyFamily())()
     tester = fault.Tester(PE_magma, PE_magma.CLK)
-    tester.circuit.ASYNCRESET = 0
-    tester.step(2)
-    tester.circuit.ASYNCRESET = 1
-    tester.step(2)
-    tester.circuit.ASYNCRESET = 0
-    tester.step(2)
 
     for en in BitVector.random(32):
         gold = PE_py(en)

@@ -15,12 +15,6 @@ def test_registeer():
     m_Reg = gen_register(Data, 0)(m_family)
     py_reg = gen_register(Data, 0)(py_family)()
     tester = fault.Tester(m_Reg, m_Reg.CLK)
-    # tester.circuit.ASYNCRESET = 0
-    # tester.step(2)
-    # tester.circuit.ASYNCRESET = 1
-    # tester.step(2)
-    # tester.circuit.ASYNCRESET = 0
-    # tester.step(2)
 
 
     for _ in range(32):
