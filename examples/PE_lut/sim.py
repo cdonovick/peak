@@ -25,7 +25,7 @@ def gen_sub_modules(width):
                 b = isa.SData(b)
                 op = alu_inst.op
                 if op == OP.imm:
-                    res = alu_inst.imm
+                    res = isa.SData(alu_inst.imm)
                 elif op == OP.Add:
                     res = a + b
                 else: # op == OP.Mux:

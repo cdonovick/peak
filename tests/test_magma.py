@@ -3,7 +3,6 @@ from peak import Peak, family_closure, Const
 from peak.assembler import Assembler, AssembledADT
 from peak.rtl_utils import wrap_with_disassembler
 from peak import family
-from peak.register import gen_register
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
@@ -154,7 +153,7 @@ def test_register():
     @family_closure
     def PE_fc(family):
         T = family.BitVector[8]
-        Reg = gen_register(T, 0)(family)
+        Reg = family.gen_register(T, 0)
         @family.assemble(locals(), globals())
         class CounterPe(Peak):
             def __init__(self):
