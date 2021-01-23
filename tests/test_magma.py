@@ -11,6 +11,7 @@ import fault
 import magma
 import itertools
 
+
 def test_assemble():
     @family_closure
     def PE_fc(family):
@@ -147,3 +148,31 @@ def test_composition():
         tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
+
+def test_register():
+    @family_closure
+    def PE_fc(family):
+        T = family.BitVector[8]
+        Reg = family.gen_register(T, 0)
+        @family.assemble(locals(), globals())
+        class CounterPe(Peak):
+            def __init__(self):
+                self.register: Reg = Reg()
+
+            def __call__(self, en: family.Bit) -> T:
+                val = self.register.prev()
+                self.register(val+1, en)
+                return val
+
+        return CounterPe
+
+    PE_magma = PE_fc(family.MagmaFamily())
+    PE_py = PE_fc(family.PyFamily())()
+    tester = fault.Tester(PE_magma, PE_magma.CLK)
+
+    for en in BitVector.random(32):
+        gold = PE_py(en)
+        tester.circuit.en = en
+        tester.circuit.O.expect(gold)
+        tester.step(2)
+    tester.compile_and_run("verilator", flags=["-Wno-fatal"])

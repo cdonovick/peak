@@ -14,7 +14,7 @@ setup(
         "hwtypes >= 1.4.1",
         "astor",
         "pysmt",
-        "magma-lang",
+        "magma-lang >= 2.1.23",
         "coreir",
         "ast-tools",
     ],

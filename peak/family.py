@@ -55,6 +55,10 @@ class AbstractFamily(metaclass=ABCMeta):
     @abstractmethod
     def get_constructor(self, adt_t): pass
 
+    @abstractmethod
+    def gen_register(self, T, init): pass
+
+
 class _AsmFamily(AbstractFamily):
     '''
     Defines get_adt_t as the assembled version
@@ -87,6 +91,7 @@ class _AsmFamily(AbstractFamily):
         return 2*hash(self._assembler) + 3*hash(self._aadt_t) + 5*hash(self._asm_extras)
 
     __ne__ = AbstractFamily.__ne__
+
 
 class _RewriterFamily(AbstractFamily):
     '''
@@ -121,7 +126,43 @@ class _RewriterFamily(AbstractFamily):
 
     __ne__ = AbstractFamily.__ne__
 
-class PyFamily(AbstractFamily):
+
+_REG_CACHE = {}
+class _RegFamily(AbstractFamily):
+    def gen_register(self, T, init):
+        key = (type(self), T, init)
+        try:
+            return _REG_CACHE[key]
+        except KeyError:
+            pass
+
+        family = self
+
+        # avoids circular import
+        from peak import Peak
+
+        @family.assemble(locals(), globals())
+        class Register(Peak):
+            def __init__(self):
+                self.value: T = T(init)
+
+            def __call__(self, value: T, en: family.Bit) -> T:
+                assert value is not None
+                retvalue = self.value
+                if en:
+                    self.value = value
+                return retvalue
+
+            def prev(self) -> T:
+                # This is not quite right and doesn't match
+                # magma semantics completely. May only be used
+                # as a peak method prior to __call__
+                return self.value
+
+        return _REG_CACHE.setdefault(key, Register)
+
+
+class PyFamily(_RegFamily):
     '''
     Pure python family
     Doesn't perform any transformation or do anything special
@@ -153,8 +194,9 @@ class PyFamily(AbstractFamily):
     def get_constructor(self, adt_t):
         return adt_t
 
+
 # Strategically put _AsmFamily first so eq dispatches to it
-class SMTFamily(_AsmFamily, _RewriterFamily):
+class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
     '''
     Rewrites __call__ to ssa
     Also assembles adts
@@ -193,6 +235,7 @@ class SMTFamily(_AsmFamily, _RewriterFamily):
             return cls
         return deco
 
+
 class MagmaFamily(_AsmFamily):
     '''
     Family for magma
@@ -210,8 +253,7 @@ class MagmaFamily(_AsmFamily):
 
     @property
     def BitVector(self):
-        # Because this is how every other impl of BitVector works
-        return m.UInt
+        return m.Bits
 
     @property
     def Signed(self):
@@ -220,6 +262,12 @@ class MagmaFamily(_AsmFamily):
     @property
     def Unsigned(self):
         return m.UInt
+
+    def gen_register(self, T, init):
+        return m.Register(T, init,
+                has_enable=True,
+                reset_type=m.AsyncReset,
+                name_map=m.generator.ParamDict(CE='en', I='value'))
 
     def assemble(self, locals, globals):
         def adtify(t_):
@@ -236,7 +284,9 @@ class MagmaFamily(_AsmFamily):
             annotations = {}
             for arg, t_ in call.__annotations__.items():
                 annotations[arg] = adtify(t_)
-            call.__annotations__ = annotations
-            cls = m.circuit.sequential(cls, env=env)
+            cls = m.sequential2(env=env,
+                    annotations=annotations,
+                    reset_type=m.AsyncReset,
+                    )(cls)
             return cls
         return deco
