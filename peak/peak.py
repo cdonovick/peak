@@ -28,7 +28,11 @@ class PeakMeta(type):
 
         return cls
 
-class Peak(metaclass=PeakMeta): pass
+class Peak(metaclass=PeakMeta):
+    def update_state(self):
+        for v in self.__dict__.values():
+            if isinstance(v, Peak):
+                v.update_state()
 
 class PeakNotImplementedError(NotImplementedError):
     pass
