@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import functools as ft
 
-from ast_tools.passes import begin_rewrite, end_rewrite
+from ast_tools.passes import apply_passes
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
 from ast_tools import SymbolTable
 import hwtypes
@@ -103,15 +103,10 @@ class _RewriterFamily(AbstractFamily):
     def assemble(self, locals, globals):
         env = SymbolTable(locals, globals)
         def deco(cls):
+            # only rewrite if necesarry
             if not self._passes:
                 return cls
-            # only rewrite if necesarry
-            call = cls.__call__
-            call = begin_rewrite(env=env)(call)
-            for dec in self._passes:
-                call = dec(call)
-            call = end_rewrite()(call)
-            cls.__call__ = call
+            cls.__call__ = apply_passes(self._passes)(cls.__call__)
             return cls
         return deco
 
