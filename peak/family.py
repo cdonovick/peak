@@ -106,7 +106,7 @@ class _RewriterFamily(AbstractFamily):
             # only rewrite if necesarry
             if not self._passes:
                 return cls
-            cls.__call__ = apply_passes(self._passes)(cls.__call__)
+            cls.__call__ = apply_passes(self._passes, env=env)(cls.__call__)
             return cls
         return deco
 
