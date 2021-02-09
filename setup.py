@@ -16,7 +16,7 @@ setup(
         "pysmt",
         "magma-lang >= 2.1.28",
         "coreir",
-        "ast-tools >= 0.1.2"
+        "ast-tools >= 0.1.3"
     ],
     python_requires='>=3.7'
 )
