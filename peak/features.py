@@ -2,10 +2,6 @@ from collections import OrderedDict
 import functools
 import types
 
-from ast_tools.passes import begin_rewrite, end_rewrite
-from ast_tools.passes import ssa, bool_to_bit, if_to_phi
-from ast_tools.stack import SymbolTable
-
 from hwtypes import SMTBit
 from hwtypes import is_adt_type
 from hwtypes.adt import Product, Tuple
