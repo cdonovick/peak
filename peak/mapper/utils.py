@@ -345,7 +345,8 @@ def _sort_by_t(path2t : tp.Mapping[tuple, "adt"]) ->tp.Mapping["adt", tp.List[tu
 
     return t2path
 
-def create_bindings(arch_flat: dict, ir_flat: dict):
+def create_bindings(arch_flat: dict, ir_flat: dict, constraints: dict = {}):
+
     arch_by_t = _sort_by_t(arch_flat)
     ir_by_t = _sort_by_t(ir_flat)
     #check early out
@@ -353,8 +354,18 @@ def create_bindings(arch_flat: dict, ir_flat: dict):
         return []
 
     possible_matching = OrderedDict()
+
     for arch_type, arch_paths in arch_by_t.items():
         ir_paths = ir_by_t.setdefault(arch_type, [])
+
+        constrained_paths = []
+        for arch_path in arch_paths:
+            if arch_path in constraints:
+                arch_paths.remove(arch_path)
+                ir_paths.remove(constraints[arch_path])
+                constrained_paths.append((constraints[arch_path], arch_path))
+
+
 
         #ir_poss represents all the possible inputs that could be bound to each arch_input
         ir_poss = tuple(ir_paths) + (Unbound,)
@@ -373,16 +384,21 @@ def create_bindings(arch_flat: dict, ir_flat: dict):
                 if ret is False:
                     return False
             return ret
+
         type_bindings = []
-
         for ir_match in filter(filt, it.product(*[ir_poss for _ in range(len(arch_paths))])):
-
             type_bindings.append(list(zip(ir_match, arch_paths)))
+
+        for constraint in constrained_paths:
+            for binding in type_bindings:
+                binding.append(constraint)
+
         possible_matching[arch_type] = type_bindings
     bindings = []
 
     for l in it.product(*possible_matching.values()):
         bindings.append(list(it.chain(*l)))
+    print(bindings)
     return bindings
 
 def _pretty_path(path):

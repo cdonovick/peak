@@ -129,7 +129,7 @@ class SMTMapper:
         return _create_path_to_adt(adt)
 
 class ArchMapper(SMTMapper):
-    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family):
+    def __init__(self, arch_fc, *, path_constraints= {}, input_constraints= {}, family=peak_family):
         super().__init__(arch_fc, family=family)
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
@@ -151,6 +151,7 @@ class ArchMapper(SMTMapper):
             path_constraints[path] =constraints
 
         self.path_constraints = path_constraints
+        self.input_constraints = input_constraints
 
     def process_ir_instruction(self, ir_fc):
         return IRMapper(self, ir_fc)
@@ -383,7 +384,7 @@ class IRMapper(SMTMapper):
             #Verify all paths of form is subset of all paths
             assert set(arch_input_path_to_adt.keys()).issuperset(set(af.varmap.keys()))
             form_arch_input_path_to_adt = {p:T for p, T in arch_input_path_to_adt.items() if p in af.varmap}
-            bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
+            bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt, constraints = self.archmapper.input_constraints)
             bindings = list(filter(constraint_filter, bindings))
             for i, b in enumerate(bindings):
                 logger.debug(f"Binidng {i}")
@@ -519,11 +520,15 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 10,
-        logic = BV
+        itr_limit = 1000,
+        logic = BV,
+        write_file = None
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
+
+        if write_file != None:
+            smt.write_smtlib(self.formula, write_file)
 
         if external_loop:
             return external_loop_solve(self.forall_vars, self.formula_wo_forall, logic, itr_limit, solver_name, self)
@@ -579,6 +584,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
         loops = 0
 
         while maxloops is None or loops <= maxloops:
+            print(loops)
             loops += 1
             eres = solver.solve()
 
