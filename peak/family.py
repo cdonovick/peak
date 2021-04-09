@@ -6,6 +6,7 @@ from ast_tools.passes import ssa, bool_to_bit, if_to_phi
 from ast_tools import SymbolTable
 import hwtypes
 from hwtypes.modifiers import strip_modifiers
+from hwtypes import Product
 import magma as m
 
 from .assembler import Assembler
@@ -276,12 +277,18 @@ class MagmaFamily(_AsmFamily):
         env = SymbolTable(locals, globals)
         def deco(cls):
             call = cls.__call__
+            output_t = getattr(call, '_output_t', None)
+            kwargs = {}
+            if output_t is not None and issubclass(output_t, Product):
+                kwargs['output_port_names'] = tuple(output_t.field_dict.keys())
+
             annotations = {}
             for arg, t_ in call.__annotations__.items():
                 annotations[arg] = adtify(t_)
             cls = m.sequential2(env=env,
                     annotations=annotations,
                     reset_type=m.AsyncReset,
+                    **kwargs,
                     )(cls)
             return cls
         return deco
