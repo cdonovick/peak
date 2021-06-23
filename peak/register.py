@@ -37,3 +37,35 @@ def gen_register2(family, T, init=0):
     if family.Bit is m.Bit:
         Register = m.circuit.sequential(Register)
     return Register
+
+
+# its really hard (impossible?) to support both call
+# and update_state paradigms
+def gen_update_register(T, init=0):
+    @family_closure
+    def gen_register_fc(family):
+        T_f = rebind_type(T, family)
+        if isinstance(family, MagmaFamily):
+            return family.gen_register(T_f, init)
+        else:
+            @family.assemble(locals(), globals())
+            class Register(Peak, gen_ports=True):
+                def __init__(self):
+                    self._value: T_f = T_f(init)
+                    self._next_value: T_f = T_f(init)
+
+                @name_outputs(out=T)
+                def __call__(self, value: T, en: family.Bit) -> T:
+                    if en:
+                        self._next_value = value
+
+                    return self._value
+
+                def prev(self) -> T:
+                    return self._value
+
+                def _update_state_(self):
+                    self._value = self._next_value
+
+            return Register
+    return gen_register_fc
