@@ -10,6 +10,7 @@ import magma as m
 
 from .assembler import Assembler
 from .assembler import AssembledADT, MagmaADT
+from .black_box import BlackBox
 
 __ALL__ = ['PyFamily', 'SMTFamily', 'MagmaFamily']
 
@@ -191,32 +192,6 @@ class PyFamily(_RegFamily):
     def get_constructor(self, adt_t):
         return adt_t
 
-
-class BlackBox:
-    def __init__(self):
-        self._input_vals = None
-        self._output_vals = None
-
-    def __call__(self, *args):
-        if self._output_vals is None:
-            raise ValueError(f"{self}: Need to call _set_outputs before __call__")
-        self._input_vals = args
-        ret = self._output_vals
-        self._output_vals = None
-        return ret
-
-    def _get_inputs(self):
-        if self._input_vals is None:
-            raise ValueError(f"{self}: Need to call __call__ before _get_inputs")
-        ret = self._input_vals
-        self._input_vals = None
-        return ret
-
-    def _set_outputs(self, *args):
-        if len(args)==1:
-            self._output_vals = args[0]
-        else:
-            self._output_vals = args
 
 
 # Strategically put _AsmFamily first so eq dispatches to it

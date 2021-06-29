@@ -1,10 +1,29 @@
 import examples.fp_pe as fp
 from hwtypes import SMTBitVector as SBV, SMTBit as SBit
-from peak.family import SMTFamily
+from peak.family import SMTFamily, BlackBox
+from peak import Peak
+
+
+def test_fp_pe_bb():
+    PE = fp.PE_fc.Py
+    pe = PE()
+    paths_to_bbs = BlackBox.get_black_boxes(pe)
+    for path in (
+        ("FPU", "add"),
+        ("FPU", "mul"),
+        ("FPU", "sqrt"),
+    ):
+        assert path in paths_to_bbs
+        bb_inst = paths_to_bbs[path]
+        assert bb_inst is BlackBox.get(pe, path)
+        assert isinstance(bb_inst, BlackBox)
+
 
 def test_fp_pe_py():
 
-    pe = fp.PE_fc.Py()
+    PE = fp.PE_fc.Py
+    PE.get_black_boxes()
+    pe = PE()
     Data = fp.Data
     inst = fp.Inst(
         op=fp.Op(alu=fp.ALU_op.Add),
@@ -28,4 +47,7 @@ def test_fp_pe_smt():
     iwidth = AInst._assembler_.width
     inst = AInst(SBV[iwidth](name='i'))
     val = pe(inst, SBV[16](name='a'), SBV[16](name='b'))
+
+
+
 
