@@ -198,10 +198,12 @@ class BlackBox:
         self._output_vals = None
 
     def __call__(self, *args):
-        if self._set_outputs is None:
+        if self._output_vals is None:
             raise ValueError(f"{self}: Need to call _set_outputs before __call__")
         self._input_vals = args
-        return self._output_vals
+        ret = self._output_vals
+        self._output_vals = None
+        return ret
 
     def _get_inputs(self):
         if self._input_vals is None:
