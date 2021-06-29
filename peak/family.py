@@ -180,6 +180,8 @@ class PyFamily(_RegFamily):
 
     def assemble(self, locals, globals):
         def deco(cls):
+            if issubclass(cls, BlackBox):
+                cls.__call__ = BlackBox.__call__
             return cls
         return deco
 
@@ -195,8 +197,18 @@ class BlackBox:
         self._input_vals = None
         self._output_vals = None
 
+    def __call__(self, *args):
+        if self._set_outputs is None:
+            raise ValueError(f"{self}: Need to call _set_outputs before __call__")
+        self._input_vals = args
+        return self._output_vals
+
     def _get_inputs(self):
-        return self._input_vals
+        if self._input_vals is None:
+            raise ValueError(f"{self}: Need to call __call__ before _get_inputs")
+        ret = self._input_vals
+        self._input_vals = None
+        return ret
 
     def _set_outputs(self, *args):
         if len(args)==1:
@@ -240,10 +252,7 @@ class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
             input_t = cls.__call__._input_t
             output_t = cls.__call__._output_t
             if issubclass(cls, BlackBox):
-                def __call__(self, *args):
-                    self._input_vals = args
-                    return self._output_vals
-                cls.__call__ = __call__
+                cls.__call__ = BlackBox.__call__
             else:
                 cls = _rew_deco(cls)
 
