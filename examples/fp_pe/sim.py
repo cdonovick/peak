@@ -60,7 +60,7 @@ def FPU_fc(family: TypeFamily):
         def __call__(self, op: FPU_op, a: Data, b: Data) -> Data:
             add_out = self.add(a, b)
             mul_out = self.mul(a, b)
-            sqrt_out = self.sqrt(a, b)
+            sqrt_out = self.sqrt(a)
             if op == FPU_op.FPAdd:
                 return add_out
             elif op == FPU_op.FPMul:
