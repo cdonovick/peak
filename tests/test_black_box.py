@@ -52,9 +52,7 @@ def test_black_box_py():
     b = [BV[8](i) for i in range(4)]
     x = BV[8](13)
     pe_py = PE_fc.Py()
-    pe_py.BB1._set_outputs(b[1])
-    pe_py.BB2._set_outputs(b[2])
-    pe_py.BB3._set_outputs(b[3])
+
 
     def check(v):
         assert v
@@ -73,6 +71,9 @@ def test_black_box_py():
         b[2],
         ~b[3]
     )):
+        pe_py.BB1._set_outputs(b[1])
+        pe_py.BB2._set_outputs(b[2])
+        pe_py.BB3._set_outputs(b[3])
         v = pe_py(BV[2](i), x)
         check(v==out)
         check_BB_inputs()
@@ -83,9 +84,7 @@ def test_black_box_smt():
     b = [SBV[8](name=f"b{i}") for i in range(4)]
     x = SBV[8](name='x')
     pe_smt = PE_fc.SMT()
-    pe_smt.BB1._set_outputs(b[1])
-    pe_smt.BB2._set_outputs(b[2])
-    pe_smt.BB3._set_outputs(b[3])
+
 
     def check(v):
         assert v.value.is_constant()
@@ -105,6 +104,9 @@ def test_black_box_smt():
         b[2],
         ~b[3]
     )):
+        pe_smt.BB1._set_outputs(b[1])
+        pe_smt.BB2._set_outputs(b[2])
+        pe_smt.BB3._set_outputs(b[3])
         v = pe_smt(SBV[2](i), x)
         check(v==out)
         check_BB_inputs()
