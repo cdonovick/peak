@@ -190,6 +190,21 @@ class PyFamily(_RegFamily):
         return adt_t
 
 
+class BlackBox:
+    def __init__(self):
+        self._input_vals = None
+        self._output_vals = None
+
+    def _get_inputs(self):
+        return self._input_vals
+
+    def _set_outputs(self, *args):
+        if len(args)==1:
+            self._output_vals = args[0]
+        else:
+            self._output_vals = args
+
+
 # Strategically put _AsmFamily first so eq dispatches to it
 class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
     '''
@@ -224,10 +239,18 @@ class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
         def deco(cls):
             input_t = cls.__call__._input_t
             output_t = cls.__call__._output_t
-            cls = _rew_deco(cls)
+            if issubclass(cls, BlackBox):
+                def __call__(self, *args):
+                    self._input_vals = args
+                    return self._output_vals
+                cls.__call__ = __call__
+            else:
+                cls = _rew_deco(cls)
+
             cls.__call__._input_t = input_t
             cls.__call__._output_t = output_t
             return cls
+
         return deco
 
 
