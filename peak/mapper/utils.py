@@ -53,15 +53,19 @@ class BuildAADT(AssembledADTRecursor):
         #Create _TAG
         tag = SMTBitVector[assembler.tag_width]()
 
-        field_to_value = {}
-        for field_name, field in adt_t.field_dict.items():
+        field_dict = {}
+        for field_name in adt_t.field_dict:
             sub_aadt_t = getattr(aadt_t, field_name)
             sub_value = self(sub_aadt_t, path=path + (field_name,))
-            sub_aadt_value = aadt_t.from_fields(tag_bv=tag, **{field_name: sub_value})
-            sub_field_cond = getattr(sub_aadt_value, field_name).match
+            _value = aadt_t.from_fields(tag_bv=tag, **{field_name: sub_value})
+            cond = getattr(_value, field_name).match
+            field_dict[field_name] = (_value, cond)
 
-
-
+        items = list(field_dict.items())
+        ta_value = items[0][0]
+        for field, (value, cond) in items[1:]:
+            ta_value = cond.ite(value, ta_value)
+        return ta_value
 
 
 # SMTForms Constrcuts all the Forms for a particular AssemledADT type
