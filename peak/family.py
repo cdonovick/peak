@@ -10,6 +10,7 @@ import magma as m
 
 from .assembler import Assembler
 from .assembler import AssembledADT, MagmaADT
+from .black_box import BlackBox
 
 __ALL__ = ['PyFamily', 'SMTFamily', 'MagmaFamily']
 
@@ -180,6 +181,8 @@ class PyFamily(_RegFamily):
 
     def assemble(self, locals, globals):
         def deco(cls):
+            if issubclass(cls, BlackBox):
+                cls.__call__ = BlackBox.__call__
             return cls
         return deco
 
@@ -188,6 +191,7 @@ class PyFamily(_RegFamily):
 
     def get_constructor(self, adt_t):
         return adt_t
+
 
 
 # Strategically put _AsmFamily first so eq dispatches to it
@@ -224,10 +228,15 @@ class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
         def deco(cls):
             input_t = cls.__call__._input_t
             output_t = cls.__call__._output_t
-            cls = _rew_deco(cls)
+            if issubclass(cls, BlackBox):
+                cls.__call__ = BlackBox.__call__
+            else:
+                cls = _rew_deco(cls)
+
             cls.__call__._input_t = input_t
             cls.__call__._output_t = output_t
             return cls
+
         return deco
 
 
