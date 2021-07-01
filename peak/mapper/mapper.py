@@ -1,7 +1,6 @@
 import typing as tp
 from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
-from hwtypes import SMTBit, SMTBitVector as SBV
 from hwtypes import Bit, BitVector
 from hwtypes import AbstractBit, AbstractBitVector
 from hwtypes.adt import is_adt_type
@@ -13,6 +12,7 @@ from .utils import create_bindings, pretty_print_binding
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import rebind_binding
+from .utils import rebind_type
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
@@ -110,6 +110,7 @@ class SMTMapper:
         #verify same number of output forms
         assert all(num_output_forms == len(forms) for forms in output_forms)
         self.peak_fc = peak_fc
+        SBV = family.SMTFamily().BitVector
         self.input_form_var = SBV[num_input_forms](prefix=f"{name}_if")
         self.output_form_var = SBV[num_output_forms](prefix=f"{name}_of")
 
@@ -118,11 +119,11 @@ class SMTMapper:
         self.num_output_forms = num_output_forms
         self.num_input_forms = num_input_forms
         self.input_varmap = input_varmap
-        self.const_paths = set(path for path, T in self.path_to_adt(True, family.SMTFamily(), strip=False).items() if issubclass(T, Const))
+        self.const_paths = set(path for path, T in self.path_to_adt(True, strip=False).items() if issubclass(T, Const))
 
     @lru_cache(None)
-    def path_to_adt(self, input, family, strip=False):
-        cls = self.peak_fc(family)
+    def path_to_adt(self, input, strip=False):
+        cls = self.peak_fc.Py
         adt = cls.input_t if input else cls.output_t
         if strip:
             adt = strip_modifiers(adt)
@@ -136,13 +137,13 @@ class ArchMapper(SMTMapper):
 
         #Verify that all the path_constraints are valid
         path_constraints = {path: (c if isinstance(c, tuple) else (c,)) for path, c in path_constraints.items()}
-        path_to_adt = self.path_to_adt(input=True, family=self.family.SMTFamily(), strip=True)
+        path_to_adt = self.path_to_adt(input=True, strip=True)
         for path, constraints in path_constraints.copy().items():
             if path not in path_to_adt:
                 raise ValueError(f"{path} is either invalid or not an adt leaf")
             assert path in self.input_varmap
             adt = path_to_adt[path]
-            aadt = self.family.SMTFamily().get_adt_t(adt)
+            aadt = self.family.SMTFamily().get_adt_t(rebind_type(adt, self.family.SMTFamily()))
             try:
                 constraints = tuple((aadt(c) for c in constraints))
             except Exception as e:
@@ -200,7 +201,7 @@ class RewriteRule:
                 arch_paths.add(arch_path)
         return ir_paths, arch_paths
 
-    def build_inputs(self, ir_inputs : tp.Mapping["path", BitVector], arch_inputs: tp.Mapping["path", BitVector], family):
+    def build_inputs(self, ir_inputs: tp.Mapping["path", BitVector], arch_inputs: tp.Mapping["path", BitVector], family):
         ir_paths, arch_paths = self.get_input_paths()
         if set(ir_inputs.keys()) != set(ir_paths):
             raise ValueError("ir_inputs are wrong")
@@ -226,14 +227,14 @@ class RewriteRule:
         arch_binding = SimplifyBinding()(arch_aadt, arch_binding)
         # internally verify entire binding was simplified to a constant
         assert len(arch_binding) == 1
-        assert arch_binding[0][1] is ()
+        assert arch_binding[0][1] == ()
         arch_input = arch_binding[0][0]
 
         ir_aadt = _input_aadt_t(self.ir_fc, family)
         ir_binding = SimplifyBinding()(ir_aadt, ir_binding)
         #internally verify entire binding was simplified to a constant
         assert len(ir_binding)==1
-        assert ir_binding[0][1] is ()
+        assert ir_binding[0][1] == ()
         ir_input = ir_binding[0][0]
 
         #create dict of input values
@@ -256,6 +257,7 @@ class RewriteRule:
     # Returns a counterexample if found, otherwise None
     def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
         # create free variable for each ir_val
+        # The types are all Py
         ir_path_types = _create_path_to_adt(strip_modifiers(self.ir_fc(self.family.SMTFamily()).input_t))
         arch_path_types = _create_path_to_adt(strip_modifiers(self.arch_fc(self.family.SMTFamily()).input_t))
         ir_paths, arch_paths = self.get_input_paths()
@@ -341,8 +343,10 @@ def read_serialized_bindings(serialized_rr, ir_fc, arch_fc):
     return RewriteRule(input_binding, output_binding, ir_fc, arch_fc)
 
 
+#T is always a Py type
 def _free_var_from_t(T, family):
-    if issubclass(T, (SBV, SMTBit)):
+    T = rebind_type(T, family.SMTFamily())
+    if issubclass(T, (family.SMTFamily().BitVector, family.SMTFamily().Bit)):
         return T()
     aadt_t = family.SMTFamily().get_adt_t(T)
     adt_t, assembler_t, bv_t = aadt_t.fields
@@ -367,7 +371,7 @@ class IRMapper(SMTMapper):
         # Create input bindings
         # binding = [input_form_idx][bidx]
         input_bindings = []
-        arch_input_path_to_adt = archmapper.path_to_adt(input=True, family=self.family.SMTFamily())
+        arch_input_path_to_adt = archmapper.path_to_adt(input=True)
 
         #Removes any invalid bindings
         def constraint_filter(binding):
@@ -376,7 +380,7 @@ class IRMapper(SMTMapper):
                     return False
             return True
 
-        ir_path_to_adt = self.path_to_adt(input=True, family=self.family.SMTFamily())
+        ir_path_to_adt = self.path_to_adt(input=True)
         #Verify all paths are the same
         assert set(ir_path_to_adt.keys()) == set(self.input_varmap.keys())
         for af in archmapper.input_forms:
@@ -396,8 +400,8 @@ class IRMapper(SMTMapper):
             return
 
         # Create output bindings
-        arch_output_path_to_adt = archmapper.path_to_adt(input=False, family=self.family.SMTFamily())
-        ir_path_to_adt = self.path_to_adt(input=False, family=self.family.SMTFamily())
+        arch_output_path_to_adt = archmapper.path_to_adt(input=False)
+        ir_path_to_adt = self.path_to_adt(input=False)
 
         #binding = [bidx]
         output_bindings = create_bindings(arch_output_path_to_adt, ir_path_to_adt)
@@ -427,6 +431,7 @@ class IRMapper(SMTMapper):
 
 
         max_input_bindings = max(len(bindings) for bindings in input_bindings)
+        SBV = self.family.SMTFamily().BitVector
         ib_var = SBV[max_input_bindings](prefix="ib")
         max_output_bindings = len(output_bindings)
         ob_var = SBV[max_output_bindings](prefix="ob")

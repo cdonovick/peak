@@ -35,7 +35,7 @@ class IR:
         class_src = [f"@_family_closure"]
         class_src.append(f"def peak_fc(family):")
         for t, tname in t_to_tname.items():
-            class_src.append(f"{tab*1}_{tname} = _rebind_type({tname}, family)")
+            class_src.append(f"{tab*1}_{tname} = {tname}")
         class_src.append(f"{tab*1}class {cls_name}(Peak):")
         output_types = ", ".join([f"{field} = _{t_to_tname[t]}" for field, t in outputs.items()])
         input_types = ", ".join([f"{field} : _{t_to_tname[t]}" for field, t in inputs.items()])
@@ -52,7 +52,6 @@ class IR:
             Peak=Peak,
             name_outputs=name_outputs,
             _fun_=fun,
-            _rebind_type=rebind_type,
             _family_closure=family_closure
         ))
         exec(class_src, exec_gs, exec_ls)

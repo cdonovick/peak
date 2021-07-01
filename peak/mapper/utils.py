@@ -195,8 +195,8 @@ def check_leaf(required=False):
         def method(self, aadt_t, binding):
             if required:
                 assert len(binding) == 1
-                assert binding[0][1] is ()
-            if len(binding)==1 and binding[0][1] is ():
+                assert binding[0][1] == ()
+            if len(binding)==1 and binding[0][1] == ():
                 return binding
             return f(self, aadt_t, binding)
         return method
@@ -243,7 +243,7 @@ class SimplifyBinding(AssembledADTRecursor):
         #Completely simplified if only one binding and ir_path is a value instead of a path
         if len(simplified_binding)==1 and not isinstance(simplified_binding[0][0], tuple):
             sub_value, arch_path = simplified_binding[0]
-            assert arch_path is ()
+            assert arch_path == ()
             value = builder(sub_field, sub_value)
             return [(value, ())]
         else:
@@ -323,7 +323,7 @@ def rebind_value(val, _family):
 def rebind_binding(binding, _family):
     ret_binding = []
     for ir_path, arch_path in binding:
-        arch_path = tuple(rebind_type(t, _family) for t in arch_path)
+        arch_path = arch_path[:-1] + (rebind_type(arch_path[-1], _family),)
         if not (isinstance(ir_path, tuple) or ir_path is Unbound):
             ir_path = rebind_value(ir_path, _family)
         ret_binding.append((ir_path, arch_path))

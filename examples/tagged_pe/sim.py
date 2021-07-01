@@ -6,7 +6,7 @@ from peak import Peak, name_outputs, family_closure, Const
 
 @family_closure
 def PE_fc(family):
-    isa = ISA_fc(family)
+    isa = ISA_fc.Py
     @family.assemble(locals(), globals())
     class PE(Peak):
 
