@@ -323,7 +323,6 @@ def rebind_value(val, _family):
 def rebind_binding(binding, _family):
     ret_binding = []
     for ir_path, arch_path in binding:
-        #arch_path = tuple(rebind_type(t, _family) for t in arch_path)
         arch_path = arch_path[:-1] + (rebind_type(arch_path[-1], _family),)
         if not (isinstance(ir_path, tuple) or ir_path is Unbound):
             ir_path = rebind_value(ir_path, _family)
