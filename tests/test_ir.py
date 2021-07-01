@@ -1,12 +1,9 @@
 from peak import family_closure
 from peak.ir import IR
 from hwtypes import BitVector, Bit, UIntVector
-from hwtypes import AbstractBitVector as ABV
-from hwtypes import AbstractBit as ABit
 from hwtypes import SMTBit
 from hwtypes.adt import Product, Sum, Enum
 from examples.smallir import gen_SmallIR
-from examples.alu import gen_alu
 import pytest
 from random import randint
 from hwtypes.adt_util import rebind_type
@@ -14,19 +11,15 @@ from hwtypes.adt_util import rebind_type
 def rand_value(width):
     return randint(0, 2**width-1)
 
-#from examples.simple_sum import gen_simple_sum
-#from peak.mapper import ArchMapper, binding_pretty_print, Unbound
-
-
 def test_add_peak_instruction():
     class Input(Product):
-        a = ABV[16]
-        b = ABV[16]
-        c = ABit
+        a = BitVector[16]
+        b = BitVector[16]
+        c = Bit
 
     class Output(Product):
-        x = ABV[16]
-        y = ABit
+        x = BitVector[16]
+        y = Bit
 
     ir = IR()
     def fun(family, a, b, c):

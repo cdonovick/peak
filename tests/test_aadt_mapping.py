@@ -344,7 +344,7 @@ def run_constraint_test(arch_fc, ir_fc, constraints, solved):
 def test_const_constraint(arch_fc, ISA_fc, is_sum):
     @family_closure
     def ir_fc(family):
-        Data = family.BitVector[8]
+        Data = BitVector[8]
 
         @family.assemble(locals(), globals())
         class IR(Peak):
@@ -354,7 +354,7 @@ def test_const_constraint(arch_fc, ISA_fc, is_sum):
 
         return IR
 
-    isa = ISA_fc(family.SMTFamily())
+    isa = ISA_fc.Py
 
     for constraint, solved in (
         (4, True),
@@ -399,7 +399,7 @@ def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
 
         return IR
 
-    isa = ISA_fc(family.SMTFamily())
+    isa = ISA_fc.Py
     OpT = isa.Op
     for in0_constraint, solved in (
         (-5, True),

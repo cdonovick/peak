@@ -44,7 +44,7 @@ def RegPE_fc(family):
 def RegPE_mappable_fc(family):
     RegPE = RegPE_fc(family)
     isa = ISA_fc.Py
-    Word = family.Word
+    Word = isa.Word
 
 
     @family.assemble(locals(), globals())
