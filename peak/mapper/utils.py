@@ -20,6 +20,50 @@ class Match: pass
 class Unbound: pass
 Form = namedtuple("Form", ["value", "path_dict", "varmap"])
 
+class BuildAADT(AssembledADTRecursor):
+    def bv(self, aadt_t, path):
+        # Leaf node
+        bv_value = aadt_t(prefix=str(path))
+        return bv_value
+
+    def enum(self, aadt_t, path):
+        # Leaf node
+        adt_t, assembler_t, bv_t = aadt_t.fields
+        assembler = assembler_t(adt_t)
+        bv_value = bv_t[assembler.width](prefix=str(path))
+        aadt_value = aadt_t(bv_value)
+        return aadt_value
+
+    def product(self, aadt_t, path):
+        adt_t, assembler_t, bv_t = aadt_t.fields
+        # Needed to guarentee order is consistent
+
+        field_to_value = {}
+        adt_items = list(adt_t.field_dict.items())
+        for field in adt_items:
+            sub_aadt_t = aadt_t[field]
+            field_to_value[field] = self(sub_aadt_t, path=path + (field,))
+
+        value = aadt_t.from_fields(**field_to_value)
+        return value
+
+    def tagged_union(self, aadt_t, path):
+        adt_t, assembler_t, bv_t = aadt_t.fields
+        assembler = aadt_t._assembler_
+        #Create _TAG
+        tag = SMTBitVector[assembler.tag_width]()
+
+        field_to_value = {}
+        for field_name, field in adt_t.field_dict.items():
+            sub_aadt_t = getattr(aadt_t, field_name)
+            sub_value = self(sub_aadt_t, path=path + (field_name,))
+            sub_aadt_value = aadt_t.from_fields(tag_bv=tag, **{field_name: sub_value})
+            sub_field_cond = getattr(sub_aadt_value, field_name).match
+
+
+
+
+
 # SMTForms Constrcuts all the Forms for a particular AssemledADT type
 # A Form represents a single 'product' when the ADT type is simplified to 'Sum of Products' form.
 # Form contains
