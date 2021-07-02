@@ -21,6 +21,40 @@ from examples.riscv import sim as riscv_sim
 num_test_vectors = 16
 
 
+def test_simple():
+
+    #This is like a CoreIR Add
+    @family_closure
+    def coreir_add_fc(family):
+        Data = family.BitVector[16]
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in0: Data, in1: Data):
+                return in0 + in1
+        return IR
+
+    #Simple PE that can only add or not
+    @family_closure
+    def PE_fc(family):
+        Data = family.BitVector[16]
+        class Inst(Product):
+            class Op(Enum):
+                add = 1
+                not_ = 2
+        @family.assemble(locals(), globals())
+        class Arch(Peak):
+            def __call__(self, inst : Const(Inst), a: Data, b: Data) -> Data:
+                if inst.Op == Inst.Op.add:
+                    ret = a + b
+                else: #inst == Inst.sub
+                    ret = a - b
+                if inst.sel:
+                    return ret, ret
+                else:
+                    return ~ret, ~ret
+        return Arch, Inst
+
 #@pytest.mark.parametrize('external_loop', [True, False])
 #@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
 @pytest.mark.parametrize('external_loop', [False])

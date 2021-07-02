@@ -671,7 +671,6 @@ def rr_from_solver(solver, irmapper):
     #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
     pretty_print_binding(bv_ibinding)
-    assert 0
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
