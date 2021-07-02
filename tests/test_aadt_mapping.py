@@ -22,11 +22,10 @@ num_test_vectors = 16
 
 
 def test_simple():
-
-    #This is like a CoreIR Add
+    print()
     @family_closure
-    def coreir_add_fc(family):
-        Data = family.BitVector[16]
+    def ir_fc(family):
+        Data = BitVector[8]
         @family.assemble(locals(), globals())
         class IR(Peak):
             @name_outputs(out=Data)
@@ -36,30 +35,44 @@ def test_simple():
 
     #Simple PE that can only add or not
     @family_closure
-    def PE_fc(family):
-        Data = family.BitVector[16]
+    def arch_fc(family):
+        Data = BitVector[8]
         class Inst(Product):
             class Op(Enum):
                 add = 1
                 not_ = 2
+
         @family.assemble(locals(), globals())
         class Arch(Peak):
-            def __call__(self, inst : Const(Inst), a: Data, b: Data) -> Data:
+            def __call__(self, inst: Const(Inst), a: Data, b: Data) -> Data:
                 if inst.Op == Inst.Op.add:
-                    ret = a + b
-                else: #inst == Inst.sub
-                    ret = a - b
-                if inst.sel:
-                    return ret, ret
-                else:
-                    return ~ret, ~ret
-        return Arch, Inst
+                    return a + b
+                else: #inst == Inst.not_
+                    return ~a
+        return Arch
 
-#@pytest.mark.parametrize('external_loop', [True, False])
+    arch_mapper = ArchMapper(arch_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    assert rewrite_rule is not None
+
+    #verify the mapping works
+    counter_example = rewrite_rule.verify()
+    assert counter_example is None
+    #ir_bv = ir_fc(family.PyFamily())
+    #ir_paths, arch_paths = rewrite_rule.get_input_paths()
+    #for _ in range(num_test_vectors):
+    #    ir_vals = {path: BitVector.random(8) for path in ir_paths}
+    #    arch_vals = {path: BitVector.random(8) for path in arch_paths}
+    #    ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
+    #    assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
+
+
+@pytest.mark.parametrize('external_loop', [True, False])
 #@pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
-@pytest.mark.parametrize('external_loop', [False])
 @pytest.mark.parametrize('arch_fc', [PE_fc_t])
 def test_automapper(external_loop, arch_fc):
+    print()
     IR = gen_SmallIR(8)
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
@@ -74,7 +87,6 @@ def test_automapper(external_loop, arch_fc):
             assert ir_name in expect_not_found
             continue
         assert ir_name in expect_found
-
         #verify the mapping works
         counter_example = rewrite_rule.verify()
         assert counter_example is None

@@ -101,7 +101,7 @@ class SMTForms(AssembledADTRecursor):
         #Leaf node
         if value is None:
             #bv_value = aadt_t(prefix=str(path))
-            bv_value = aadt_t(prefix=str(path))
+            bv_value = aadt_t(prefix=".".join(str(n) for n in path))
         else:
             bv_value = value
         varmap = {path: bv_value}
@@ -112,7 +112,7 @@ class SMTForms(AssembledADTRecursor):
         if value is None:
             adt_t, assembler_t, bv_t = aadt_t.fields
             assembler = assembler_t(adt_t)
-            bv_value = bv_t[assembler.width](prefix=str(path))
+            bv_value = bv_t[assembler.width](prefix=".".join(str(n) for n in path))
             aadt_value = aadt_t(bv_value)
         else:
             assert isinstance(value, aadt_t)
@@ -373,7 +373,7 @@ class SimplifyBinding(AssembledADTRecursor):
 
 def log2(x):
     #verify it is a power of 2
-    assert x & (x-1) == 0
+    assert x !=0 and (x & (x-1) == 0)
     return x.bit_length() - 1
 
 def solved_to_bv(var, solver):

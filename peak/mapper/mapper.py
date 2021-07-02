@@ -83,6 +83,7 @@ class SMTMapper:
         stripped_input_t = strip_modifiers(input_t)
         stripped_output_t = strip_modifiers(output_t)
         input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
+        self.input_aadt_t = input_aadt_t
         output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
         self.output_aadt_t = output_aadt_t
         input_forms, input_varmap, input_value = SMTForms()(input_aadt_t)
@@ -446,13 +447,35 @@ class IRMapper(SMTMapper):
 
         #--------------------------------------------
         if simple_formula:
+            #The issue is that the const_valid_conditions (And match conditions!) should always be valid (Anded in the beginning)
+            #TODO these are wrong once the Exists intersect FOrall issue shows up
+            const_fields = [field for field, T in archmapper.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
+            inputs = aadt_product_to_dict(archmapper.input_value)
+
+            const_valid_conditions = [is_valid(inputs[field]) for field in const_fields]
+            preconditions = [and_reduce(const_valid_conditions)]
+            # Create the form_conditions (preconditions) based off of the arch_forms
+            # [input_form_idx]
+            form_conditions = []
+            for fi, form in enumerate(archmapper.input_forms):
+                conditions = [form_var == 2**fi]
+                for path, choice in form.path_dict.items():
+                    match_path = path + (Match,)
+                    assert match_path in archmapper.input_varmap
+                    conditions.append(archmapper.input_varmap[match_path][choice])
+                form_conditions.append(and_reduce(conditions))
+            preconditions.append(or_reduce(form_conditions))
+
             #Alternate formula construction
             #indexed by (fi, bi)
             forall_vars_dict = {}
             exists_vars_dict = {}
             fb_conditions = {} #form/binding conditions in a list
             for fi, ibindings in enumerate(input_bindings):
-                fi_conditions = list(form_conditions[fi]) # Includes fi
+                fi_conditions = [form_var==2**fi]
+                print(f"CON: {fi}")
+                for c in fi_conditions:
+                    print(f"  {c.value.serialize()}")
                 form_varmap = archmapper.input_forms[fi].varmap
                 for bi, ibinding in enumerate(ibindings):
                     forall_vars = {}
@@ -491,6 +514,9 @@ class IRMapper(SMTMapper):
                 raise NotImplementedError()
                 #Will need to do an input transformation
 
+            pysmt_forall_vars = set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()])
+            print("FORALL", pysmt_forall_vars)
+
             #Create F
             def run_peak(mapper):
                 obj = mapper.peak_fc.SMT()
@@ -502,11 +528,9 @@ class IRMapper(SMTMapper):
 
             arch_output_dict = run_peak(archmapper)
             ir_output_dict = run_peak(self)
-            print("A", arch_output_dict)
-            print("I", ir_output_dict)
             if len(output_bindings) != 1:
                 raise NotImplementedError()
-            F_conds = []
+            F_conds = [ob_var==1]
             obinding = output_bindings[0]
             for ir_path, arch_path in obinding:
                 if ir_path is Unbound:
@@ -514,17 +538,24 @@ class IRMapper(SMTMapper):
                 ir_out = ir_output_dict[ir_path]
                 arch_out = arch_output_dict[arch_path]
                 F_conds.append(ir_out == arch_out)
+            assert len(F_conds) > 0
             F = and_reduce(F_conds)
-
             impl_conds = []
+            fb_conds = []
+
             for (f,b), conds in fb_conditions.items():
+                print(f"F{f},{b}")
+                fb_conds.append((form_var == 2**f) & (ib_var == 2**b) & (ob_var == 2**0))
+                for cond in conds:
+                    print(f"  {cond.value.serialize()}")
                 fb_cond = and_reduce(conds)
                 impl_conds.append(fb_cond)
+            fb_cond = or_reduce(fb_conds)
+            preconditions.append(or_reduce(fb_conds))
             F_cond = or_reduce(impl_conds)
             def impl(p, q):
                 return (~p) | q
-            formula = impl(F_cond, F)
-            pysmt_forall_vars = set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()])
+            formula = and_reduce(preconditions) & impl(F_cond, F)
             self.formula = smt.ForAll(list(pysmt_forall_vars), formula.value)
             self.forall_vars = pysmt_forall_vars
             self.formula_wo_forall = formula.value
@@ -536,8 +567,8 @@ class IRMapper(SMTMapper):
         #    print("  E")
         #    for v in exists_vars_dict[fi_bi]:
         #        print(f"    {v.value.symbol_name()}")
+        # --------------------------------------------------------------
         else:
-            #--------------------------------------------
 
             constraints = []
             #Build the constraint
@@ -647,13 +678,12 @@ def _input_aadt_t(fc, family):
 def rr_from_solver(solver, irmapper):
     im = irmapper
     am = irmapper.archmapper
-
     arch_input_form_val = log2(int(solved_to_bv(am.input_form_var, solver)))
     ib_val = log2(int(solved_to_bv(im.ib_var, solver)))
     ob_val = log2(int(solved_to_bv(im.ob_var, solver)))
-
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
+    print(f"(f,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
 
     #extract, simplify, and convert constants to BV in the input binding
     bv_ibinding = []
@@ -671,6 +701,7 @@ def rr_from_solver(solver, irmapper):
     #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
     pretty_print_binding(bv_ibinding)
+
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
