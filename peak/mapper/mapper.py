@@ -84,9 +84,9 @@ class SMTMapper:
         stripped_output_t = strip_modifiers(output_t)
         input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
         output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
-
-        input_forms, input_varmap = SMTForms()(input_aadt_t)
-
+        self.output_aadt_t = output_aadt_t
+        input_forms, input_varmap, input_value = SMTForms()(input_aadt_t)
+        self.input_value = input_value
         #output_form = output_forms[input_form_idx][output_form_idx]
         output_forms = []
         self.const_valid_conditions = []
@@ -99,7 +99,7 @@ class SMTMapper:
             outputs = Peak_cls()(**inputs)
             output_value = wrap_outputs(outputs, output_aadt_t)
 
-            forms, output_varmap = SMTForms()(output_aadt_t, value=output_value)
+            forms, output_varmap, _ = SMTForms()(output_aadt_t, value=output_value)
             #Check consistency of SMTForms
             for f in forms:
                 assert f.value == output_value
@@ -244,14 +244,14 @@ class RewriteRule:
         output_t = self.ir_fc(self.family.SMTFamily()).output_t
         output_aadt = self.family.SMTFamily().get_adt_t(output_t)
         output_value = wrap_outputs(outputs, output_aadt)
-        _, values = SMTForms()(output_aadt, value=output_value)
+        _, values, _ = SMTForms()(output_aadt, value=output_value)
         return values
 
     def parse_arch_output(self, outputs):
         output_t = self.arch_fc(self.family.SMTFamily()).output_t
         output_aadt = self.family.SMTFamily().get_adt_t(output_t)
         output_value = wrap_outputs(outputs, output_aadt)
-        _, values = SMTForms()(output_aadt, value=output_value)
+        _, values, _ = SMTForms()(output_aadt, value=output_value)
         return values
 
     # Returns a counterexample if found, otherwise None
@@ -436,90 +436,188 @@ class IRMapper(SMTMapper):
         max_output_bindings = len(output_bindings)
         ob_var = SBV[max_output_bindings](prefix="ob")
 
-
-        constraints = []
-        #Build the constraint
-        forall_vars = set()
-        for fi, ibindings in enumerate(input_bindings):
-            conditions = list(form_conditions[fi])
-            for bi, ibinding in enumerate(ibindings):
-                bi_match = (ib_var == 2**bi)
-                #Build substitution map
-                submap = []
-                for ir_path, arch_path in ibinding:
-                    arch_var = archmapper.input_varmap[arch_path]
-                    is_unbound = ir_path is Unbound
-                    is_constrained = arch_path in self.archmapper.path_constraints
-                    is_const = issubclass(arch_input_path_to_adt[arch_path], Const)
-                    if is_constrained:
-                        assert is_unbound
-                        continue
-
-                    if is_unbound and not is_const:
-                        #add arch_var to list of forall vars
-                        forall_vars.add(arch_var.value)
-                    elif not is_unbound and not is_constrained:
-                        #substitue arch_var with ir_var add ir_var to forall list
-                        ir_var = self.input_varmap[ir_path]
-                        submap.append((arch_var, ir_var))
-                        forall_vars.add(ir_var.value)
-
-                for bo, obinding in enumerate(output_bindings):
-                    bo_match = (ob_var == 2**bo)
-                    conditions = list(form_conditions[fi]) + [bi_match, bo_match]
-                    for ir_path, arch_path in obinding:
-                        if ir_path is Unbound:
-                            continue
-                        ir_out = self.output_forms[0][0].varmap[ir_path]
-                        arch_out = archmapper.output_forms[fi][0].varmap[arch_path]
-                        arch_out = arch_out.substitute(*submap)
-                        conditions.append(ir_out == arch_out)
-                    constraints.append(conditions)
-
-        logger.debug("Unconstrained Formula")
-        for c in constraints:
-            logger.debug("  [")
-            for cond in c:
-                logger.debug(f"    {cond.value},")
-            logger.debug("  ],")
-        formula = or_reduce([and_reduce(conds) for conds in constraints])
-
-        # Adding in the constraints:
-
-        # Start with the non-const constraints.
-        # This is basically doing universal qualifier over a limited set of values
-        #   To do this, evaluate the formula with each possible value,
-        #   then 'and' together the resulting partially-evaluted formulas
-        for path, constraints in archmapper.path_constraints.items():
-            is_const = issubclass(arch_input_path_to_adt[path], Const)
-            if is_const:
-                continue
-            arch_var = archmapper.input_varmap[path]
-            formula = and_reduce((formula.substitute((arch_var, c)) for c in constraints))
-
-        # Then deal with the const constraints.
-        # This is saying only allow a set of values for the existential quantifier
-        # Thus just create an additional constraint that arch_var is either c1 or c2 or c3
-        for path, constraints in archmapper.path_constraints.items():
-            is_const = issubclass(arch_input_path_to_adt[path], Const)
-            if not is_const:
-                continue
-            arch_var = archmapper.input_varmap[path]
-            constraint = or_reduce((arch_var == c for c in constraints))
-            formula &= constraint
-
-
         self.ib_var = ib_var
         self.ob_var = ob_var
         self.input_bindings = input_bindings
         self.output_bindings = output_bindings
-        self.formula = smt.ForAll(list(forall_vars), formula.value)
-        self.forall_vars = forall_vars
-        self.formula_wo_forall = formula.value
 
-        logger.debug("Universally Quantified Vars")
-        for var in forall_vars:
-            logger.debug(f"  {var}")
+        #simple_formula = False
+        simple_formula = True
+
+        #--------------------------------------------
+        if simple_formula:
+            #Alternate formula construction
+            #indexed by (fi, bi)
+            forall_vars_dict = {}
+            exists_vars_dict = {}
+            fb_conditions = {} #form/binding conditions in a list
+            for fi, ibindings in enumerate(input_bindings):
+                fi_conditions = list(form_conditions[fi]) # Includes fi
+                form_varmap = archmapper.input_forms[fi].varmap
+                for bi, ibinding in enumerate(ibindings):
+                    forall_vars = {}
+                    exists_vars = {}
+                    conditions = fi_conditions + [(ib_var == 2 ** bi)]
+                    for ir_path, arch_path in ibinding:
+                        ir_name = str(ir_path)
+                        arch_name = str(arch_path)
+                        arch_var = form_varmap[arch_path]
+                        is_unbound = ir_path is Unbound
+                        is_constrained = arch_path in self.archmapper.path_constraints
+                        is_const = issubclass(arch_input_path_to_adt[arch_path], Const)
+                        if is_constrained:
+                            raise NotImplementedError()
+                            assert is_unbound
+                            continue
+
+                        if is_unbound and not is_const:
+                            forall_vars[arch_name] = arch_var
+                        elif is_unbound and is_const:
+                            exists_vars[arch_name] = arch_var
+                        elif not is_unbound:
+                            assert not is_unbound
+                            ir_var = self.input_varmap[ir_path]
+                            forall_vars[arch_name] = arch_var
+                            forall_vars[ir_name] = ir_var
+                            conditions.append(arch_var==ir_var)
+                    forall_vars_dict[(fi, bi)] = forall_vars
+                    exists_vars_dict[(fi, bi)] = exists_vars
+                    fb_conditions[(fi, bi)] = conditions
+
+            # Check if there is any overlap between forall_vars and exist vars
+            foralls = set([name for vars in forall_vars_dict.values() for name in vars])
+            exists = set([name for vars in exists_vars_dict.values() for name in vars])
+            if len(foralls.intersection(exists)) > 0:
+                raise NotImplementedError()
+                #Will need to do an input transformation
+
+            #Create F
+            def run_peak(mapper):
+                obj = mapper.peak_fc.SMT()
+                input_dict = aadt_product_to_dict(mapper.input_value)
+                outputs = obj(**input_dict)
+                output = wrap_outputs(outputs, mapper.output_aadt_t)
+                output_dict = aadt_product_to_dict(output)
+                return {(k,):v for k,v in output_dict.items()}
+
+            arch_output_dict = run_peak(archmapper)
+            ir_output_dict = run_peak(self)
+            print("A", arch_output_dict)
+            print("I", ir_output_dict)
+            if len(output_bindings) != 1:
+                raise NotImplementedError()
+            F_conds = []
+            obinding = output_bindings[0]
+            for ir_path, arch_path in obinding:
+                if ir_path is Unbound:
+                    continue
+                ir_out = ir_output_dict[ir_path]
+                arch_out = arch_output_dict[arch_path]
+                F_conds.append(ir_out == arch_out)
+            F = and_reduce(F_conds)
+
+            impl_conds = []
+            for (f,b), conds in fb_conditions.items():
+                fb_cond = and_reduce(conds)
+                impl_conds.append(fb_cond)
+            F_cond = or_reduce(impl_conds)
+            def impl(p, q):
+                return (~p) | q
+            formula = impl(F_cond, F)
+            pysmt_forall_vars = set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()])
+            self.formula = smt.ForAll(list(pysmt_forall_vars), formula.value)
+            self.forall_vars = pysmt_forall_vars
+            self.formula_wo_forall = formula.value
+        #for fi_bi in forall_vars_dict:
+        #    print(fi_bi)
+        #    print("  A")
+        #    for v in forall_vars_dict[fi_bi]:
+        #        print(f"    {v.value.symbol_name()}")
+        #    print("  E")
+        #    for v in exists_vars_dict[fi_bi]:
+        #        print(f"    {v.value.symbol_name()}")
+        else:
+            #--------------------------------------------
+
+            constraints = []
+            #Build the constraint
+            forall_vars = set()
+            for fi, ibindings in enumerate(input_bindings):
+                conditions = list(form_conditions[fi])
+                for bi, ibinding in enumerate(ibindings):
+                    bi_match = (ib_var == 2**bi)
+                    #Build substitution map
+                    submap = []
+                    for ir_path, arch_path in ibinding:
+                        arch_var = archmapper.input_varmap[arch_path]
+                        is_unbound = ir_path is Unbound
+                        is_constrained = arch_path in self.archmapper.path_constraints
+                        is_const = issubclass(arch_input_path_to_adt[arch_path], Const)
+                        if is_constrained:
+                            assert is_unbound
+                            continue
+
+                        if is_unbound and not is_const:
+                            #add arch_var to list of forall vars
+                            forall_vars.add(arch_var.value)
+                        elif not is_unbound and not is_constrained:
+                            #substitue arch_var with ir_var add ir_var to forall list
+                            ir_var = self.input_varmap[ir_path]
+                            submap.append((arch_var, ir_var))
+                            forall_vars.add(ir_var.value)
+
+                    for bo, obinding in enumerate(output_bindings):
+                        bo_match = (ob_var == 2**bo)
+                        conditions = list(form_conditions[fi]) + [bi_match, bo_match]
+                        for ir_path, arch_path in obinding:
+                            if ir_path is Unbound:
+                                continue
+                            ir_out = self.output_forms[0][0].varmap[ir_path]
+                            arch_out = archmapper.output_forms[fi][0].varmap[arch_path]
+                            arch_out = arch_out.substitute(*submap)
+                            conditions.append(ir_out == arch_out)
+                        constraints.append(conditions)
+
+            logger.debug("Unconstrained Formula")
+            for c in constraints:
+                logger.debug("  [")
+                for cond in c:
+                    logger.debug(f"    {cond.value},")
+                logger.debug("  ],")
+            formula = or_reduce([and_reduce(conds) for conds in constraints])
+
+            # Adding in the constraints:
+
+            # Start with the non-const constraints.
+            # This is basically doing universal qualifier over a limited set of values
+            #   To do this, evaluate the formula with each possible value,
+            #   then 'and' together the resulting partially-evaluted formulas
+            for path, constraints in archmapper.path_constraints.items():
+                is_const = issubclass(arch_input_path_to_adt[path], Const)
+                if is_const:
+                    continue
+                arch_var = archmapper.input_varmap[path]
+                formula = and_reduce((formula.substitute((arch_var, c)) for c in constraints))
+
+            # Then deal with the const constraints.
+            # This is saying only allow a set of values for the existential quantifier
+            # Thus just create an additional constraint that arch_var is either c1 or c2 or c3
+            for path, constraints in archmapper.path_constraints.items():
+                is_const = issubclass(arch_input_path_to_adt[path], Const)
+                if not is_const:
+                    continue
+                arch_var = archmapper.input_varmap[path]
+                constraint = or_reduce((arch_var == c for c in constraints))
+                formula &= constraint
+
+            self.formula = smt.ForAll(list(forall_vars), formula.value)
+            self.forall_vars = forall_vars
+            self.formula_wo_forall = formula.value
+
+            logger.debug("Universally Quantified Vars")
+            for var in forall_vars:
+                logger.debug(f"  {var}")
+
 
     def solve(self,
         solver_name : str = 'z3',
@@ -572,6 +670,8 @@ def rr_from_solver(solver, irmapper):
 
     #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
+    pretty_print_binding(bv_ibinding)
+    assert 0
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
