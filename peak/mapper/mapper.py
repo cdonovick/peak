@@ -450,9 +450,12 @@ class IRMapper(SMTMapper):
             #TODO these are wrong once the Exists intersect FOrall issue shows up
             const_fields = [field for field, T in archmapper.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
             inputs = aadt_product_to_dict(archmapper.input_value)
-
             const_valid_conditions = [is_valid(inputs[field]) for field in const_fields]
             preconditions = [and_reduce(const_valid_conditions)]
+
+            #Alternative correct (but slower) precondition
+            #preconditions = [is_valid(archmapper.input_value), is_valid(self.input_value)]
+
             # Create the form_conditions (preconditions) based off of the arch_forms
             # [input_form_idx]
             form_conditions = []
@@ -472,22 +475,19 @@ class IRMapper(SMTMapper):
             fb_conditions = {} #form/binding conditions in a list
             for fi, ibindings in enumerate(input_bindings):
                 fi_conditions = [form_var==2**fi]
-                form_varmap = archmapper.input_forms[fi].varmap
                 for bi, ibinding in enumerate(ibindings):
                     forall_vars = {}
                     exists_vars = {}
                     conditions = fi_conditions + [(ib_var == 2 ** bi)]
                     for ir_path, arch_path in ibinding:
                         arch_name = ".".join(["A"] + [str(p) for p in arch_path])
-                        arch_var = form_varmap[arch_path]
+                        arch_var = archmapper.input_varmap[arch_path]
                         is_unbound = ir_path is Unbound
                         is_constrained = arch_path in self.archmapper.path_constraints
                         is_const = issubclass(arch_input_path_to_adt[arch_path], Const)
                         if is_constrained:
-                            raise NotImplementedError()
-                            assert is_unbound
-                            continue
-
+                            if not is_unbound:
+                                raise NotImplementedError()
                         if is_unbound and not is_const:
                             forall_vars[arch_name] = arch_var
                         elif is_unbound and is_const:
@@ -547,25 +547,26 @@ class IRMapper(SMTMapper):
                     logger.debug(f"  {cond.value.serialize()}")
                 fb_cond = and_reduce(conds)
                 impl_conds.append(fb_cond)
+
+            exist_constraints = []
+            forall_constraints = []
+            for path, constraints in archmapper.path_constraints.items():
+                is_const = issubclass(arch_input_path_to_adt[path], Const)
+                arch_var = archmapper.input_varmap[path]
+                if is_const:
+                    exist_constraints.append(or_reduce((arch_var==c for c in constraints)))
+                else:
+                    forall_constraints.append(or_reduce((arch_var==c for c in constraints)))
+            preconditions += exist_constraints
             preconditions.append(or_reduce(fb_conds))
-            F_cond = or_reduce(impl_conds)
+            F_cond = and_reduce(forall_constraints + [or_reduce(impl_conds)])
             def impl(p, q):
                 return (~p) | q
             formula = and_reduce(preconditions) & impl(F_cond, F)
             self.formula = smt.ForAll(list(pysmt_forall_vars), formula.value)
             self.forall_vars = pysmt_forall_vars
             self.formula_wo_forall = formula.value
-        #for fi_bi in forall_vars_dict:
-        #    print(fi_bi)
-        #    print("  A")
-        #    for v in forall_vars_dict[fi_bi]:
-        #        print(f"    {v.value.symbol_name()}")
-        #    print("  E")
-        #    for v in exists_vars_dict[fi_bi]:
-        #        print(f"    {v.value.symbol_name()}")
-        # --------------------------------------------------------------
         else:
-
             constraints = []
             #Build the constraint
             forall_vars = set()
