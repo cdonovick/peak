@@ -521,28 +521,36 @@ class IRMapper(SMTMapper):
                 output_dict = aadt_product_to_dict(output)
                 return {(k,):v for k,v in output_dict.items()}
 
+
+            def impl(p, q):
+                return (~p) | q
             arch_output_dict = run_peak(archmapper)
             ir_output_dict = run_peak(self)
-            if len(output_bindings) != 1:
-                raise NotImplementedError()
-            F_conds = [ob_var==1]
-            obinding = output_bindings[0]
-            for ir_path, arch_path in obinding:
-                if ir_path is Unbound:
-                    continue
-                ir_out = ir_output_dict[ir_path]
-                arch_out = arch_output_dict[arch_path]
-                F_conds.append(ir_out == arch_out)
+            F_conds = []
+            o_preconditions = []
+            for bo, obinding in enumerate(output_bindings):
+                ob_cond = (ob_var == 2**bo)
+                o_conds = [ob_cond]
+                o_preconditions.append(ob_cond)
+                for ir_path, arch_path in obinding:
+                    if ir_path is Unbound:
+                        continue
+                    ir_out = ir_output_dict[ir_path]
+                    arch_out = arch_output_dict[arch_path]
+                    o_conds.append(ir_out == arch_out)
+                F_conds.append(and_reduce(o_conds))
             assert len(F_conds) > 0
-            F = and_reduce(F_conds)
+            preconditions.append(or_reduce(o_preconditions))
+            F = or_reduce(F_conds)
             impl_conds = []
             fb_conds = []
+
 
             logger.debug("Formula conditions")
             for (f,b), conds in fb_conditions.items():
                 logger.debug(f"F{f},{b}")
-                fb_conds.append((form_var == 2**f) & (ib_var == 2**b) & (ob_var == 2**0))
-                logger.debug("  FA", "| ".join(f"{p}->{v.value}" for p, v in forall_vars_dict[(f,b)].items()))
+                fb_conds.append((form_var == 2**f) & (ib_var == 2**b))
+                logger.debug("  Forall: " + " | ".join(f"{p}->{v.value}" for p, v in forall_vars_dict[(f,b)].items()))
                 for cond in conds:
                     logger.debug(f"  {cond.value.serialize()}")
                 fb_cond = and_reduce(conds)
@@ -560,8 +568,7 @@ class IRMapper(SMTMapper):
             preconditions += exist_constraints
             preconditions.append(or_reduce(fb_conds))
             F_cond = and_reduce(forall_constraints + [or_reduce(impl_conds)])
-            def impl(p, q):
-                return (~p) | q
+
             formula = and_reduce(preconditions) & impl(F_cond, F)
             self.formula = smt.ForAll(list(pysmt_forall_vars), formula.value)
             self.forall_vars = pysmt_forall_vars
@@ -694,7 +701,6 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = rebind_binding(bv_ibinding, fam)
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, fam)
 
-    #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
     logger.debug(f"(f,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
     pretty_print_binding(bv_ibinding, logger.debug)

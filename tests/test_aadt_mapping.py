@@ -468,6 +468,9 @@ def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
 
 def test_riscv_rr():
+    #import logging
+    #root = logging.getLogger()
+    #root.setLevel(logging.DEBUG)
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[32]
