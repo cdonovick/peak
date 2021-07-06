@@ -391,7 +391,7 @@ class IRMapper(SMTMapper):
             bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
             bindings = list(filter(constraint_filter, bindings))
             for i, b in enumerate(bindings):
-                logger.debug(f"Binidng {i}")
+                logger.debug(f"Binding {i}")
                 pretty_print_binding(b, logger.debug)
             input_bindings.append(bindings)
         # Check Early out
@@ -447,7 +447,6 @@ class IRMapper(SMTMapper):
 
         #--------------------------------------------
         if simple_formula:
-            #The issue is that the const_valid_conditions (And match conditions!) should always be valid (Anded in the beginning)
             #TODO these are wrong once the Exists intersect FOrall issue shows up
             const_fields = [field for field, T in archmapper.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
             inputs = aadt_product_to_dict(archmapper.input_value)
@@ -473,17 +472,13 @@ class IRMapper(SMTMapper):
             fb_conditions = {} #form/binding conditions in a list
             for fi, ibindings in enumerate(input_bindings):
                 fi_conditions = [form_var==2**fi]
-                print(f"CON: {fi}")
-                for c in fi_conditions:
-                    print(f"  {c.value.serialize()}")
                 form_varmap = archmapper.input_forms[fi].varmap
                 for bi, ibinding in enumerate(ibindings):
                     forall_vars = {}
                     exists_vars = {}
                     conditions = fi_conditions + [(ib_var == 2 ** bi)]
                     for ir_path, arch_path in ibinding:
-                        ir_name = str(ir_path)
-                        arch_name = str(arch_path)
+                        arch_name = ".".join(["A"] + [str(p) for p in arch_path])
                         arch_var = form_varmap[arch_path]
                         is_unbound = ir_path is Unbound
                         is_constrained = arch_path in self.archmapper.path_constraints
@@ -499,6 +494,7 @@ class IRMapper(SMTMapper):
                             exists_vars[arch_name] = arch_var
                         elif not is_unbound:
                             assert not is_unbound
+                            ir_name = ".".join(["I"] + [str(p) for p in ir_path])
                             ir_var = self.input_varmap[ir_path]
                             forall_vars[arch_name] = arch_var
                             forall_vars[ir_name] = ir_var
@@ -515,7 +511,6 @@ class IRMapper(SMTMapper):
                 #Will need to do an input transformation
 
             pysmt_forall_vars = set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()])
-            print("FORALL", pysmt_forall_vars)
 
             #Create F
             def run_peak(mapper):
@@ -543,14 +538,15 @@ class IRMapper(SMTMapper):
             impl_conds = []
             fb_conds = []
 
+            logger.debug("Formula conditions")
             for (f,b), conds in fb_conditions.items():
-                print(f"F{f},{b}")
+                logger.debug(f"F{f},{b}")
                 fb_conds.append((form_var == 2**f) & (ib_var == 2**b) & (ob_var == 2**0))
+                logger.debug("  FA", "| ".join(f"{p}->{v.value}" for p, v in forall_vars_dict[(f,b)].items()))
                 for cond in conds:
-                    print(f"  {cond.value.serialize()}")
+                    logger.debug(f"  {cond.value.serialize()}")
                 fb_cond = and_reduce(conds)
                 impl_conds.append(fb_cond)
-            fb_cond = or_reduce(fb_conds)
             preconditions.append(or_reduce(fb_conds))
             F_cond = or_reduce(impl_conds)
             def impl(p, q):
@@ -683,7 +679,6 @@ def rr_from_solver(solver, irmapper):
     ob_val = log2(int(solved_to_bv(im.ob_var, solver)))
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
-    print(f"(f,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
 
     #extract, simplify, and convert constants to BV in the input binding
     bv_ibinding = []
@@ -700,8 +695,8 @@ def rr_from_solver(solver, irmapper):
 
     #bv_ibinding = SimplifyBinding()(arch_input_aadt_t, bv_ibinding)
     bv_ibinding = strip_aadt(bv_ibinding)
-    pretty_print_binding(bv_ibinding)
-
+    logger.debug(f"(f,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
+    pretty_print_binding(bv_ibinding, logger.debug)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
