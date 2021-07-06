@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import functools as ft
+import logging
 
 from ast_tools.passes import apply_passes
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
@@ -13,9 +14,26 @@ from .assembler import Assembler
 from .assembler import AssembledADT, MagmaADT
 from .black_box import BlackBox
 
+logger = logging.getLogger(__name__)
+
 __ALL__ = ['PyFamily', 'SMTFamily', 'MagmaFamily']
 
+def _compose(f, g):
+    def wrapped(*args, **kwargs):
+        return f(g(*args, **kwargs))
+    return wrapped
+
+
 class AbstractFamily(metaclass=ABCMeta):
+    # init accepts **kwargs to allow specific families to specify options
+    # particular to them without needing to thread them through all families.
+    def __init__(self, **kwargs):
+        if kwargs:
+            msg = [f"Unused init kwargs for familiy of {type(self)}"]
+            for k, v in kwargs.items():
+                msg.append(f"\t{k} = {v} :: {type(v)}")
+            logger.debug('\n'.join(msg))
+
     def __eq__(self, other):
         if isinstance(other, type(self)):
             return True
@@ -48,8 +66,16 @@ class AbstractFamily(metaclass=ABCMeta):
     @abstractmethod
     def Signed(self): pass
 
+    # assemble accepts kwargs for similar reasons to init
     @abstractmethod
-    def assemble(self, locals, globals): pass
+    def assemble(self, locals, globals, **kwargs):
+        if kwargs:
+            msg = [f"Unused assemble kwargs for familiy of {type(self)}"]
+            for k, v in kwargs.items():
+                msg.append(f"\t{k} = {v} :: {type(v)}")
+            logger.debug('\n'.join(msg))
+        def deco(cls): return cls
+        return deco
 
     @abstractmethod
     def get_adt_t(self, adt_t): pass
@@ -65,7 +91,8 @@ class _AsmFamily(AbstractFamily):
     '''
     Defines get_adt_t as the assembled version
     '''
-    def  __init__(self, assembler, aadt_t, *asm_extras):
+    def  __init__(self, assembler, aadt_t, asm_extras=(), **kwargs):
+        super().__init__(**kwargs)
         self._assembler = assembler
         self._aadt_t = aadt_t
         self._asm_extras = asm_extras
@@ -99,18 +126,20 @@ class _RewriterFamily(AbstractFamily):
     '''
     Family that applies ast_tools passes to __call__
     '''
-    def __init__(self, passes=()):
+    def __init__(self, passes=(), **kwargs):
+        super().__init__(**kwargs)
         self._passes = passes
 
-    def assemble(self, locals, globals):
+    def assemble(self, locals, globals, **kwargs):
         env = SymbolTable(locals, globals)
+        s_deco = super().assemble(locals, globals, **kwargs)
         def deco(cls):
             # only rewrite if necesarry
             if not self._passes:
                 return cls
             cls.__call__ = apply_passes(self._passes, env=env)(cls.__call__)
             return cls
-        return deco
+        return _compose(deco, s_deco)
 
     def __eq__(self, other):
         if isinstance(other, type(self)):
@@ -159,7 +188,17 @@ class _RegFamily(AbstractFamily):
         return _REG_CACHE.setdefault(key, Register)
 
 
-class PyFamily(_RegFamily):
+class _BBFamily(AbstractFamily):
+    def assemble(self, locals, globals, **kwargs):
+        s_deco = super().assemble(locals, globals, **kwargs)
+        def deco(cls):
+            if issubclass(cls, BlackBox):
+                cls.__call__ = BlackBox.__call__
+            return cls
+        return _compose(deco, s_deco)
+
+
+class PyFamily(_BBFamily, _RegFamily):
     '''
     Pure python family
     Doesn't perform any transformation or do anything special
@@ -180,13 +219,6 @@ class PyFamily(_RegFamily):
     def Unsigned(self):
         return hwtypes.UIntVector
 
-    def assemble(self, locals, globals):
-        def deco(cls):
-            if issubclass(cls, BlackBox):
-                cls.__call__ = BlackBox.__call__
-            return cls
-        return deco
-
     def get_adt_t(self, adt_t):
         return adt_t
 
@@ -196,17 +228,20 @@ class PyFamily(_RegFamily):
 
 
 # Strategically put _AsmFamily first so eq dispatches to it
-class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
+# Put _BBFamily second it switch out the __call__ after its been ssa'd
+class SMTFamily(_AsmFamily, _BBFamily, _RewriterFamily, _RegFamily):
     '''
     Rewrites __call__ to ssa
     Also assembles adts
     '''
-    def __init__(self, assembler=None):
+    def __init__(self, assembler=None, **kwargs):
         if assembler is None:
             assembler=Assembler
 
-        _AsmFamily.__init__(self, assembler, AssembledADT)
-        _RewriterFamily.__init__(self, (ssa(), bool_to_bit(), if_to_phi(self.Bit.ite)))
+        assert "assembler" not in kwargs
+
+        passes = (ssa(), bool_to_bit(), if_to_phi(self.Bit.ite))
+        super().__init__(assembler, AssembledADT, passes=passes, **kwargs)
 
     @property
     def Bit(self):
@@ -224,15 +259,13 @@ class SMTFamily(_AsmFamily, _RewriterFamily, _RegFamily):
     def Unsigned(self):
         return hwtypes.SMTUIntVector
 
-    def assemble(self, locals, globals):
-        _rew_deco = _RewriterFamily.assemble(self, locals, globals)
+    def assemble(self, locals, globals, **kwargs):
+        s_deco = super().assemble(locals, globals, **kwargs)
         def deco(cls):
             input_t = cls.__call__._input_t
             output_t = cls.__call__._output_t
-            if issubclass(cls, BlackBox):
-                cls.__call__ = BlackBox.__call__
-            else:
-                cls = _rew_deco(cls)
+
+            cls = s_deco(cls)
 
             cls.__call__._input_t = input_t
             cls.__call__._output_t = output_t
@@ -247,10 +280,10 @@ class MagmaFamily(_AsmFamily):
     Assembles adts and runs sequential
     '''
 
-    def __init__(self, assembler=None):
+    def __init__(self, assembler=None, **kwargs):
         if assembler is None:
             assembler=Assembler
-        super().__init__(assembler, MagmaADT, m.Direction.Undirected)
+        super().__init__(assembler, MagmaADT, (m.Direction.Undirected,), **kwargs)
 
     @property
     def Bit(self):
@@ -274,7 +307,7 @@ class MagmaFamily(_AsmFamily):
                 reset_type=m.AsyncReset,
                 name_map=m.generator.ParamDict(CE='en', I='value'))
 
-    def assemble(self, locals, globals):
+    def assemble(self, locals, globals, set_port_names: bool = False, **kwargs):
         def adtify(t_):
             if isinstance(t_, tuple):
                 return tuple(adtify(t__) for t__ in t_)
@@ -284,11 +317,14 @@ class MagmaFamily(_AsmFamily):
             else:
                 return t_
         env = SymbolTable(locals, globals)
+
+        s_deco = super().assemble(locals, globals, **kwargs)
+
         def deco(cls):
             call = cls.__call__
             output_t = getattr(call, '_output_t', None)
             kwargs = {}
-            if output_t is not None and issubclass(output_t, Product):
+            if output_t is not None and issubclass(output_t, Product) and set_port_names:
                 kwargs['output_port_names'] = tuple(output_t.field_dict.keys())
 
             annotations = {}
@@ -300,4 +336,4 @@ class MagmaFamily(_AsmFamily):
                     **kwargs,
                     )(cls)
             return cls
-        return deco
+        return _compose(deco, s_deco)

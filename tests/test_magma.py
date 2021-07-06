@@ -14,20 +14,21 @@ import magma
 import itertools
 
 
-@pytest.mark.parametrize('named', [True, False])
-def test_basic(named):
+@pytest.mark.parametrize('named_outputs', [True, False])
+@pytest.mark.parametrize('set_port_names', [True, False])
+def test_basic(named_outputs, set_port_names):
     @family_closure
     def PE_fc(family):
         Bit = family.Bit
-        if named:
-            @family.assemble(locals(), globals())
+        if named_outputs:
+            @family.assemble(locals(), globals(), set_port_names=set_port_names)
             class PENamed(Peak, typecheck=True):
                     @name_outputs(out=Bit)
                     def __call__(self, in0: Bit, in1: Bit) -> Bit:
                         return in0 & in1
             return PENamed
         else:
-            @family.assemble(locals(), globals())
+            @family.assemble(locals(), globals(), set_port_names=set_port_names)
             class PEAnon(Peak, typecheck=True):
                 def __call__(self, in0: Bit, in1: Bit) -> Bit:
                     return in0 & in1
@@ -47,7 +48,7 @@ def test_basic(named):
 
     #verify magma works
     PE_magma = PE_fc(family.MagmaFamily())
-
+    named = named_outputs and set_port_names
     if named:
         assert 'O' not in PE_magma.interface.ports
         assert PE_magma.interface.ports.keys() >= {'in0', 'in1', 'out',}
