@@ -41,7 +41,7 @@ def test_SMTForms():
     AT = AssembledADT[T, Assembler, SBV]
     aadt_val = free_var(AT)
     for value in (None, aadt_val):
-        forms, varmap = SMTForms()(AT, value=value)
+        forms, varmap, _ = SMTForms()(AT, value=value)
         if value is not None:
             for form in forms:
                 assert form.value == value

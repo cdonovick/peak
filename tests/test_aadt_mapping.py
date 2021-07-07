@@ -21,22 +21,62 @@ from examples.riscv import sim as riscv_sim
 num_test_vectors = 16
 
 
+def test_simple():
+    print()
+    @family_closure
+    def ir_fc(family):
+        Data = BitVector[8]
+        @family.assemble(locals(), globals())
+        class IR(Peak):
+            @name_outputs(out=Data)
+            def __call__(self, in0: Data, in1: Data):
+                return in0 + in1
+        return IR
+
+    #Simple PE that can only add or not
+    @family_closure
+    def arch_fc(family):
+        Data = BitVector[8]
+        class Inst(Product):
+            class Op(Enum):
+                add = 1
+                not_ = 2
+
+        @family.assemble(locals(), globals())
+        class Arch(Peak):
+            def __call__(self, inst: Const(Inst), a: Data, b: Data) -> Data:
+                if inst.Op == Inst.Op.add:
+                    return a + b
+                else: #inst == Inst.not_
+                    return ~a
+        return Arch
+
+    arch_mapper = ArchMapper(arch_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    assert rewrite_rule is not None
+
+    #verify the mapping works
+    counter_example = rewrite_rule.verify()
+    assert counter_example is None
+
+
+@pytest.mark.parametrize('simple_formula', [True, False])
 @pytest.mark.parametrize('external_loop', [True, False])
 @pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
-def test_automapper(external_loop, arch_fc):
+def test_automapper(simple_formula, external_loop, arch_fc):
     IR = gen_SmallIR(8)
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor')
     expect_not_found = ('Mul', 'Shftr', 'Shftl', 'Not', 'Neg')
     for ir_name, ir_fc in IR.instructions.items():
-        ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+        ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
         rewrite_rule = ir_mapper.solve('z3', external_loop=external_loop)
         if rewrite_rule is None:
             assert ir_name in expect_not_found
             continue
         assert ir_name in expect_found
-
         #verify the mapping works
         counter_example = rewrite_rule.verify()
         assert counter_example is None
@@ -49,8 +89,9 @@ def test_automapper(external_loop, arch_fc):
             assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
 
 
+@pytest.mark.parametrize('simple_formula', [True, False])
 @pytest.mark.parametrize('external_loop', [True, False])
-def test_reg(external_loop):
+def test_reg(simple_formula, external_loop):
     IR = gen_SmallIR(32)
     family = riscv_family
     arch_bv = regsim.RegPE_fc.Py()
@@ -59,7 +100,7 @@ def test_reg(external_loop):
     expect_not_found = IR.instructions.keys() - expect_found
 
     for ir_name, ir_fc in IR.instructions.items():
-        ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+        ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
         rewrite_rule = ir_mapper.solve('z3', external_loop=external_loop)
         if rewrite_rule is None:
             assert ir_name in expect_not_found
@@ -175,7 +216,8 @@ def test_custom_rr():
 
 
 #This will test the const modifier
-def test_const():
+@pytest.mark.parametrize('simple_formula', [True, False])
+def test_const(simple_formula):
 
     #Testing out something like coreir const
     @family_closure
@@ -213,14 +255,15 @@ def test_const():
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     ir_fc = IR_fc
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
     rr = ir_mapper.solve('z3')
     assert rr is not None
     assert (('const_value',), ('inst', 'imm')) in rr.ibinding
 
 
 #This will test the const modifier without the name_outputs
-def test_const_tuple():
+@pytest.mark.parametrize('simple_formula', [True, False])
+def test_const_tuple(simple_formula):
 
     #Testing out something like coreir const
     @family_closure
@@ -255,7 +298,7 @@ def test_const_tuple():
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     ir_fc = IR_fc
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
     rr = ir_mapper.solve('z3')
     assert rr is not None
     assert (('const_value',), ('inst', 'imm')) in rr.ibinding
@@ -325,10 +368,10 @@ def test_early_out_outputs():
     assert not ir_mapper.has_bindings
 
 
-def run_constraint_test(arch_fc, ir_fc, constraints, solved):
+def run_constraint_test(arch_fc, ir_fc, constraints, solved, simple_formula):
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc, path_constraints=constraints)
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
     assert ir_mapper.has_bindings
     rr = ir_mapper.solve('z3')
     if rr is None:
@@ -337,11 +380,12 @@ def run_constraint_test(arch_fc, ir_fc, constraints, solved):
         assert solved
 
 
+@pytest.mark.parametrize('simple_formula', [True, False])
 @pytest.mark.parametrize('arch_fc, ISA_fc, is_sum', [
     (PE_fc_s, ISA_fc_s, True),
     (PE_fc_t, ISA_fc_t, False),
     ])
-def test_const_constraint(arch_fc, ISA_fc, is_sum):
+def test_const_constraint(simple_formula, arch_fc, ISA_fc, is_sum):
     @family_closure
     def ir_fc(family):
         Data = BitVector[8]
@@ -367,7 +411,7 @@ def test_const_constraint(arch_fc, ISA_fc, is_sum):
         else:
             constraints = {("inst", 'alu', 1): constraint}
 
-        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
+        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved, simple_formula=simple_formula)
 
     OpT = isa.Op
     for constraint, solved in (
@@ -379,14 +423,15 @@ def test_const_constraint(arch_fc, ISA_fc, is_sum):
             constraints = {("inst", isa.ArithOp, 0): constraint}
         else:
             constraints = {("inst", 'alu', 0): constraint}
-        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
+        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved, simple_formula=simple_formula)
 
 
+@pytest.mark.parametrize('simple_formula', [True, False])
 @pytest.mark.parametrize('arch_fc, ISA_fc, is_sum', [
     (PE_fc_s, ISA_fc_s, True),
     (PE_fc_t, ISA_fc_t, False),
     ])
-def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
+def test_non_const_constraint(simple_formula, arch_fc, ISA_fc, is_sum):
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[8]
@@ -418,9 +463,10 @@ def test_non_const_constraint(arch_fc, ISA_fc, is_sum):
                 ("inst", 'alu', 1): 5,  # Const
                 ("in0",): in0_constraint,  # Not Const
             }
-        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved)
+        run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved, simple_formula=simple_formula)
 
-def test_riscv_rr():
+@pytest.mark.parametrize('simple_formula', [True, False])
+def test_riscv_rr(simple_formula):
     @family_closure
     def ir_fc(family):
         Data = family.BitVector[32]
@@ -432,6 +478,6 @@ def test_riscv_rr():
 
     arch_fc = riscv_sim.R32I_mappable_fc
     arch_mapper = ArchMapper(arch_fc, family=riscv_family)
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=simple_formula)
     rewrite_rule = ir_mapper.solve('z3', external_loop=True)
     assert rewrite_rule is not None
