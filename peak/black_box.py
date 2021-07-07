@@ -2,17 +2,17 @@
 class BlackBox:
 
     @staticmethod
-    def get_black_boxes(pe, path=()):
+    def get_black_boxes(obj, path=()):
         """Gets references to all the black boxes in the hierarchical circuit"""
 
         #Hack to avoid circular import
         from .peak import Peak
 
-        assert isinstance(pe, Peak)
+        assert isinstance(obj, Peak)
+        if isinstance(obj, BlackBox):
+            return {path: obj}
         ret = {}
-        for field, obj in pe.__dict__.items():
-            if isinstance(obj, BlackBox):
-                ret[path + (field,)] = obj
+        for field, obj in obj.__dict__.items():
             if isinstance(obj, Peak):
                 ret = {**ret, **BlackBox.get_black_boxes(obj, path + (field,))}
         return ret
@@ -37,11 +37,24 @@ class BlackBox:
         self._input_vals = None
         self._output_vals = None
 
-    def __call__(self, *args):
-        if self._output_vals is None:
-            raise ValueError(f"{self}: Need to call _set_outputs before __call__")
-        self._input_vals = args
-        return self._output_vals
+    @staticmethod
+    def create_call():
+        def __call__(self, *args, **kwargs):
+            input_t = type(self).input_t
+            if self._output_vals is None:
+                raise ValueError(f"{self}: Need to call _set_outputs before __call__")
+            if (len(args) > 0) == (len(kwargs) > 0):
+                raise ValueError(f"{self}: Can only call with either *args or **kwargs")
+            if len(args) > 0:
+                if len(args) != len(input_t.field_dict):
+                    raise ValueError(f"{self} need to call with input_t {list(input_t.field_dict.items())}")
+                self._input_vals = tuple(args)
+            else:
+                if kwargs.keys() != input_t.field_dict.keys():
+                    raise ValueError(f"{self} need to call with input_t {list(input_t.field_dict.items())}")
+                self._input_vals = tuple(kwargs.values())
+            return self._output_vals
+        return __call__
 
     def _get_inputs(self):
         if self._input_vals is None:
@@ -49,6 +62,9 @@ class BlackBox:
         return self._input_vals
 
     def _set_outputs(self, *args):
+        output_t = type(self).output_t
+        if len(args) != len(output_t.field_dict):
+            raise ValueError(f"{self} need to set outputs with output_t {list(output_t.field_dict.items())}")
         if len(args)==1:
             self._output_vals = args[0]
         else:
