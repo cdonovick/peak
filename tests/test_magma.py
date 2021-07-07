@@ -3,6 +3,8 @@ from peak import Peak, family_closure, Const
 from peak.assembler import Assembler, AssembledADT
 from peak.rtl_utils import wrap_with_disassembler
 from peak import family
+from peak import name_outputs
+
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
@@ -12,17 +14,25 @@ import magma
 import itertools
 
 
-def test_assemble():
+@pytest.mark.parametrize('named_outputs', [True, False])
+@pytest.mark.parametrize('set_port_names', [True, False])
+def test_basic(named_outputs, set_port_names):
     @family_closure
     def PE_fc(family):
         Bit = family.Bit
-
-        @family.assemble(locals(), globals())
-        class PESimple(Peak, typecheck=True):
-            def __call__(self, in0: Bit, in1: Bit) -> Bit:
-                return in0 & in1
-
-        return PESimple
+        if named_outputs:
+            @family.assemble(locals(), globals(), set_port_names=set_port_names)
+            class PENamed(Peak, typecheck=True):
+                    @name_outputs(out=Bit)
+                    def __call__(self, in0: Bit, in1: Bit) -> Bit:
+                        return in0 & in1
+            return PENamed
+        else:
+            @family.assemble(locals(), globals(), set_port_names=set_port_names)
+            class PEAnon(Peak, typecheck=True):
+                def __call__(self, in0: Bit, in1: Bit) -> Bit:
+                    return in0 & in1
+            return PEAnon
 
     #verify BV works
     PE_bv = PE_fc(family.PyFamily())
@@ -38,13 +48,24 @@ def test_assemble():
 
     #verify magma works
     PE_magma = PE_fc(family.MagmaFamily())
+    named = named_outputs and set_port_names
+    if named:
+        assert 'O' not in PE_magma.interface.ports
+        assert PE_magma.interface.ports.keys() >= {'in0', 'in1', 'out',}
+    else:
+        assert 'out' not in PE_magma.interface.ports
+        assert PE_magma.interface.ports.keys() >= {'in0', 'in1', 'O',}
+
     tester = fault.Tester(PE_magma)
     vals = [0, 1]
     for i0, i1 in itertools.product(vals, vals):
         tester.circuit.in0 = i0
         tester.circuit.in1 = i1
         tester.eval()
-        tester.circuit.O.expect(i0 & i1)
+        if named:
+            tester.circuit.out.expect(i0 & i1)
+        else:
+            tester.circuit.O.expect(i0 & i1)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
 
