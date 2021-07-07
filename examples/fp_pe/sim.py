@@ -1,42 +1,9 @@
-from types import SimpleNamespace
-
-from peak import Peak, family_closure, family
+from peak import Peak, family_closure, family, Const
 from hwtypes import TypeFamily
 from hwtypes.adt import TaggedUnion, Product, Enum
 from hwtypes import BitVector, Bit
-from peak.family import BlackBox
+from peak.float import Float
 
-MagmaFamily = family.MagmaFamily
-
-def Float(frac, exp):
-    width = frac + exp + 1
-    Data = BitVector[width]
-
-    @family_closure
-    def add_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class add(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return add
-
-    @family_closure
-    def mul_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class mul(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return mul
-
-    @family_closure
-    def sqrt_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class sqrt(Peak, BlackBox):
-            def __call__(self, in_: Data) -> Data:
-                ...
-        return sqrt
-
-    return SimpleNamespace(**locals())
 
 Data = BitVector[16]
 
@@ -46,11 +13,13 @@ class FPU_op(Enum):
     FPSqrt = 3
 
 BFloat16 = Float(7, 8)
+
 @family_closure
 def FPU_fc(family: TypeFamily):
     Add = BFloat16.add_fc(family)
     Mul = BFloat16.mul_fc(family)
     Sqrt = BFloat16.sqrt_fc(family)
+    @family.assemble(locals(), globals())
     class FPU(Peak):
         def __init__(self):
             self.add: Add = Add()
@@ -79,6 +48,8 @@ class ALU_op(Enum):
 
 @family_closure
 def ALU_fc(family: TypeFamily):
+
+    @family.assemble(locals(), globals())
     class ALU(Peak):
         def __call__(self, op : ALU_op, a : Data, b : Data) -> Data:
             if op == ALU_op.Add:
@@ -115,11 +86,11 @@ def PE_fc(family: TypeFamily):
             self.FPU: FPU = FPU()
             self.ALU: ALU = ALU()
 
-        def __call__(self, inst: Inst, a: Data, b: Data) -> Data:
+        def __call__(self, inst: Const(Inst), a: Data, b: Data) -> Data:
             if inst.use_imm:
                 b = inst.imm
-            alu_out = self.ALU(inst.op.alu, a, b)
-            fpu_out = self.FPU(inst.op.fpu, a, b)
+            alu_out = self.ALU(inst.op.alu.value, a, b)
+            fpu_out = self.FPU(inst.op.fpu.value, a, b)
             if inst.op.alu.match:
                 ret = alu_out
             else:
