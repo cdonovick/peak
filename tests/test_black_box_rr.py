@@ -32,25 +32,6 @@ def test_fp_pe_bb():
         assert bb_inst is BlackBox.get_black_box(pe, path)
         assert isinstance(bb_inst, BlackBox)
 
-
-def test_fp_pe_py():
-
-    PE = fp.PE_fc.Py
-    pe = PE()
-    paths_to_bbs = BlackBox.get_black_boxes(pe)
-    for bb in paths_to_bbs.values():
-        bb._set_outputs(fp.Data(0))
-    inst = fp.Inst(
-        op=fp.Op(alu=fp.ALU_op.Add),
-        imm=fp.Data(10),
-        use_imm=fp.Bit(1)
-    )
-    val = pe(inst, fp.Data(5), fp.Data(2))
-    assert val == fp.Data(15)
-    assert paths_to_bbs[("FPU", "add")]._get_inputs() == (fp.Data(5), fp.Data(10))
-    assert paths_to_bbs[("FPU", "mul")]._get_inputs() == (fp.Data(5), fp.Data(10))
-    assert paths_to_bbs[("FPU", "sqrt")]._get_inputs() == (fp.Data(5),)
-
 def test_fp_pe_smt():
     pe = fp.PE_fc.SMT()
     AInst = SMTFamily().get_adt_t(fp.Inst)
