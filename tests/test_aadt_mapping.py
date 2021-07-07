@@ -59,26 +59,19 @@ def test_simple():
     #verify the mapping works
     counter_example = rewrite_rule.verify()
     assert counter_example is None
-    #ir_bv = ir_fc(family.PyFamily())
-    #ir_paths, arch_paths = rewrite_rule.get_input_paths()
-    #for _ in range(num_test_vectors):
-    #    ir_vals = {path: BitVector.random(8) for path in ir_paths}
-    #    arch_vals = {path: BitVector.random(8) for path in arch_paths}
-    #    ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
-    #    assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]
 
 
+@pytest.mark.parametrize('simple_formula', [True, False])
 @pytest.mark.parametrize('external_loop', [True, False])
 @pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
-def test_automapper(external_loop, arch_fc):
-    print()
+def test_automapper(simple_formula, external_loop, arch_fc):
     IR = gen_SmallIR(8)
     arch_bv = arch_fc(family.PyFamily())
     arch_mapper = ArchMapper(arch_fc)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor')
     expect_not_found = ('Mul', 'Shftr', 'Shftl', 'Not', 'Neg')
     for ir_name, ir_fc in IR.instructions.items():
-        ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+        ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
         rewrite_rule = ir_mapper.solve('z3', external_loop=external_loop)
         if rewrite_rule is None:
             assert ir_name in expect_not_found

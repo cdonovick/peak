@@ -154,8 +154,8 @@ class ArchMapper(SMTMapper):
 
         self.path_constraints = path_constraints
 
-    def process_ir_instruction(self, ir_fc):
-        return IRMapper(self, ir_fc)
+    def process_ir_instruction(self, ir_fc, simple_formula=False):
+        return IRMapper(self, ir_fc, simple_formula)
 
 def is_valid(aadt_value: tp.Union[AssembledADT, AbstractBit, AbstractBitVector]):
     if isinstance(aadt_value, (AbstractBitVector, AbstractBit)):
@@ -356,7 +356,7 @@ def _free_var_from_t(T, family):
 
 
 class IRMapper(SMTMapper):
-    def __init__(self, archmapper, ir_fc):
+    def __init__(self, archmapper, ir_fc, simple_formula=True):
         super().__init__(ir_fc)
         #For now assume that ir input forms and ir output forms is just 1
         if self.num_input_forms > 1:
@@ -442,8 +442,6 @@ class IRMapper(SMTMapper):
         self.input_bindings = input_bindings
         self.output_bindings = output_bindings
 
-        #simple_formula = False
-        simple_formula = True
 
         #--------------------------------------------
         if simple_formula:
