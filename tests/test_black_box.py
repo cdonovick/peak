@@ -18,6 +18,25 @@ def BB_fc(family):
 
     return BB
 
+@family_closure
+def BB2_fc(family):
+    Data = BitVector[8]
+
+    @family.assemble(locals(), globals())
+    class BB2(Peak, BlackBox):
+        def __call__(self, x: Data, y: Data) -> Data:
+            ...
+
+    return BB2
+
+def test_bug1():
+    BB_fc.Py.input_t
+
+def test_bug2():
+    input_t = BB_fc.SMT.input_t
+    assert input_t == BB_fc.SMT.input_t
+    BB2_fc.SMT
+    assert input_t == BB_fc.SMT.input_t
 
 @family_closure
 def PE_fc(family):
