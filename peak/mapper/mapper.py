@@ -528,7 +528,7 @@ class IRMapper(SMTMapper):
             o_preconditions = []
             for bo, obinding in enumerate(output_bindings):
                 ob_cond = (ob_var == 2**bo)
-                o_conds = [ob_cond]
+                o_conds = []
                 o_preconditions.append(ob_cond)
                 for ir_path, arch_path in obinding:
                     if ir_path is Unbound:
@@ -536,10 +536,10 @@ class IRMapper(SMTMapper):
                     ir_out = ir_output_dict[ir_path]
                     arch_out = arch_output_dict[arch_path]
                     o_conds.append(ir_out == arch_out)
-                F_conds.append(and_reduce(o_conds))
+                F_conds.append(impl(ob_cond, and_reduce(o_conds)))
             assert len(F_conds) > 0
             preconditions.append(or_reduce(o_preconditions))
-            F = or_reduce(F_conds)
+            F = and_reduce(F_conds)
             impl_conds = []
             fb_conds = []
 
