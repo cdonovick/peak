@@ -101,11 +101,6 @@ def test_simple():
         else:
             assert rewrite_rule is None
 
-        #verify the mapping works
-        #counter_example = rewrite_rule.verify()
-        #assert counter_example is None
-
-
 ir = gen_SmallIR(16)
 fplib = Float(7, 8)
 
@@ -118,7 +113,6 @@ fplib = Float(7, 8)
     (fplib.sqrt_fc, True),
 ])
 def test_rr(ir_fc, found):
-    print()
     arch_fc = fp.PE_fc
     arch_mapper = ArchMapper(arch_fc)
 
@@ -128,13 +122,3 @@ def test_rr(ir_fc, found):
         assert rewrite_rule is None
         return
     assert rewrite_rule is not None
-    #verify the mapping works
-    #counter_example = rewrite_rule.verify()
-    #assert counter_example is None
-    #ir_bv = ir_fc(family.PyFamily())
-    #ir_paths, arch_paths = rewrite_rule.get_input_paths()
-    #for _ in range(num_test_vectors):
-    #    ir_vals = {path: BitVector.random(8) for path in ir_paths}
-    #    arch_vals = {path: BitVector.random(8) for path in arch_paths}
-    #    ir_inputs, arch_inputs = rewrite_rule.build_inputs(ir_vals, arch_vals, family.PyFamily())
-    #    assert ir_bv()(**ir_inputs) == arch_bv()(**arch_inputs)[0]

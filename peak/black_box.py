@@ -37,8 +37,9 @@ class BlackBox:
         self._input_vals = None
         self._output_vals = None
 
-    @staticmethod
-    def create_call():
+    @classmethod
+    def create_call(cls):
+        old_call = cls.__call__
         def __call__(self, *args, **kwargs):
             input_t = type(self).input_t
             if self._output_vals is None:
@@ -54,7 +55,11 @@ class BlackBox:
                     raise ValueError(f"{self} need to call with input_t {list(input_t.field_dict.items())}")
                 self._input_vals = tuple(kwargs.values())
             return self._output_vals
-        return __call__
+        if hasattr(old_call, "_input_t"):
+            assert hasattr(old_call, "_output_t")
+            __call__._input_t = old_call._input_t
+            __call__._output_t = old_call._output_t
+        cls.__call__ = __call__
 
     def _get_inputs(self):
         if self._input_vals is None:
