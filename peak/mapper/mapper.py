@@ -471,7 +471,6 @@ class IRMapper(SMTMapper):
 
 
         use_input_sub = True
-        #use_output_sub = False
         #--------------------------------------------
         if simple_formula:
             def create_temp(aadt, name):
@@ -481,8 +480,6 @@ class IRMapper(SMTMapper):
                 return value
             temp_arch_in = create_temp(archmapper.input_aadt_t, "Arch_in")
             temp_ir_in = create_temp(self.input_aadt_t, "IR_in")
-            #temp_arch_out = create_temp(archmapper.output_aadt_t, "Arch_out")
-            #temp_ir_out = create_temp(self.output_aadt_t, "IR_out")
             if use_input_sub:
                 arch_in = temp_arch_in
                 ir_in = temp_ir_in
@@ -519,8 +516,6 @@ class IRMapper(SMTMapper):
             for fi, ibindings in enumerate(input_bindings):
                 fi_conditions = [form_var==2**fi]
                 for bi, ibinding in enumerate(ibindings):
-                    print(f"Binding(fi={fi},bi={bi})")
-                    pretty_print_binding(ibinding)
                     forall_vars = {}
                     exists_vars = {}
                     conditions = fi_conditions + [(ib_var == 2 ** bi)]
@@ -640,11 +635,6 @@ class IRMapper(SMTMapper):
                 bb_cond = AND(bb_conds)
                 formula = IMPLIES(bb_cond, formula)
 
-            print("Arch_in := ", archmapper.input_value._value_.value.serialize())
-            print("IR_in := ", self.input_value._value_.value.serialize())
-            forall_str = ", ".join(str(v) for v in pysmt_forall_vars)
-            print(f"Formula = Forall({forall_str})")
-            formula.pretty()
 
             formula = formula.to_smt()
             if use_input_sub:
@@ -785,12 +775,8 @@ def rr_from_solver(solver, irmapper):
 
     fam = am.peak_fc._family_.PyFamily()
     bv_ibinding = rebind_binding(bv_ibinding, fam)
-    arch_input_aadt_t = _input_aadt_t(am.peak_fc, fam)
 
     bv_ibinding = strip_aadt(bv_ibinding)
-    print(f"Found Rewrite Rule")
-    print(f"(fi,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
-    pretty_print_binding(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
