@@ -113,7 +113,8 @@ class SMTForms(AssembledADTRecursor):
         assembler = aadt_t._assembler_
         #Create _TAG
         if value is None:
-            tag = SMTBitVector[assembler.tag_width]()
+            tag_prefix = ".".join([str(p) for p in path] + ["TAG"])
+            tag = SMTBitVector[assembler.tag_width](prefix=tag_prefix)
         else:
             tag = value[_TAG]
 

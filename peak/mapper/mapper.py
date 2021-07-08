@@ -1,5 +1,7 @@
 import itertools
 import typing as tp
+from functools import lru_cache
+
 from peak import family_closure, Const, Peak
 from hwtypes.adt import Product, Tuple
 from hwtypes import Bit, BitVector
@@ -13,7 +15,6 @@ from .utils import create_bindings, pretty_print_binding
 from .utils import aadt_product_to_dict
 from .utils import solved_to_bv, log2
 from .utils import rebind_binding
-from .utils import rebind_type
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
@@ -27,11 +28,8 @@ logger = logging.getLogger(__name__)
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
 
-import operator
-from functools import partial, reduce, lru_cache
+from .formula_constructor import AND, OR, IMPLIES, or_reduce, and_reduce
 
-or_reduce = partial(reduce, operator.or_)
-and_reduce = partial(reduce, operator.and_)
 
 #Helper function to search for the one peak class
 def _get_peak_cls(fc_out):
@@ -79,6 +77,7 @@ class SMTMapper:
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
         Peak_cls = _get_peak_cls(peak_fc(family.SMTFamily()))
         name = Peak_cls.__name__
+        name = ""
         try:
             input_t = Peak_cls.input_t
             output_t = Peak_cls.output_t
@@ -134,8 +133,8 @@ class SMTMapper:
         assert all(num_output_forms == len(forms) for forms in output_forms)
         self.peak_fc = peak_fc
         SBV = family.SMTFamily().BitVector
-        self.input_form_var = SBV[num_input_forms](prefix=f"{name}_if")
-        self.output_form_var = SBV[num_output_forms](prefix=f"{name}_of")
+        self.input_form_var = SBV[num_input_forms](prefix=f"fi")
+        self.output_form_var = SBV[num_output_forms](prefix=f"fo")
 
         self.input_forms = input_forms
         self.output_forms = output_forms
@@ -304,9 +303,9 @@ class RewriteRule:
             if arch_path not in arch_out_values:
                 raise ValueError(f"{arch_path} is not valid")
             outputs.append(ir_out_values[ir_path] != arch_out_values[arch_path])
-        formula = or_reduce(outputs)
+        formula = OR(outputs)
         with smt.Solver(solver_name, logic=BV) as solver:
-            solver.add_assertion(formula.value)
+            solver.add_assertion(formula.to_smt().value)
             verified = not solver.solve()
             if verified:
                 return None
@@ -460,9 +459,9 @@ class IRMapper(SMTMapper):
 
         max_input_bindings = max(len(bindings) for bindings in input_bindings)
         SBV = self.family.SMTFamily().BitVector
-        ib_var = SBV[max_input_bindings](prefix="ib")
+        ib_var = SBV[max_input_bindings](prefix="bi")
         max_output_bindings = len(output_bindings)
-        ob_var = SBV[max_output_bindings](prefix="ob")
+        ob_var = SBV[max_output_bindings](prefix="bo")
 
         self.ib_var = ib_var
         self.ob_var = ob_var
@@ -470,13 +469,32 @@ class IRMapper(SMTMapper):
         self.output_bindings = output_bindings
 
 
+
+        use_input_sub = True
+        #use_output_sub = False
         #--------------------------------------------
         if simple_formula:
+            def create_temp(aadt, name):
+                i_width = aadt._assembler_.width
+                bv = self.family.SMTFamily().BitVector[i_width](prefix=f"{name}")
+                value = aadt(bv)
+                return value
+            temp_arch_in = create_temp(archmapper.input_aadt_t, "Arch_in")
+            temp_ir_in = create_temp(self.input_aadt_t, "IR_in")
+            #temp_arch_out = create_temp(archmapper.output_aadt_t, "Arch_out")
+            #temp_ir_out = create_temp(self.output_aadt_t, "IR_out")
+            if use_input_sub:
+                arch_in = temp_arch_in
+                ir_in = temp_ir_in
+            else:
+                arch_in = archmapper.input_value
+                ir_in = self.input_value
+
             #TODO these are wrong once the Exists intersect FOrall issue shows up
             const_fields = [field for field, T in archmapper.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
-            inputs = aadt_product_to_dict(archmapper.input_value)
+            inputs = aadt_product_to_dict(arch_in)
             const_valid_conditions = [is_valid(inputs[field]) for field in const_fields]
-            preconditions = [and_reduce(const_valid_conditions)]
+            preconditions = [AND(const_valid_conditions)]
 
             #Alternative correct (but slower) precondition
             #preconditions = [is_valid(archmapper.input_value), is_valid(self.input_value)]
@@ -490,8 +508,8 @@ class IRMapper(SMTMapper):
                     match_path = path + (Match,)
                     assert match_path in archmapper.input_varmap
                     conditions.append(archmapper.input_varmap[match_path][choice])
-                form_conditions.append(and_reduce(conditions))
-            preconditions.append(or_reduce(form_conditions))
+                form_conditions.append(AND(conditions))
+            preconditions.append(OR(form_conditions))
 
             #Alternate formula construction
             #indexed by (fi, bi)
@@ -501,6 +519,8 @@ class IRMapper(SMTMapper):
             for fi, ibindings in enumerate(input_bindings):
                 fi_conditions = [form_var==2**fi]
                 for bi, ibinding in enumerate(ibindings):
+                    print(f"Binding(fi={fi},bi={bi})")
+                    pretty_print_binding(ibinding)
                     forall_vars = {}
                     exists_vars = {}
                     conditions = fi_conditions + [(ib_var == 2 ** bi)]
@@ -538,9 +558,9 @@ class IRMapper(SMTMapper):
             pysmt_forall_vars = list(set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()]))
 
             #Create F
-            def run_peak(mapper):
+            def run_peak(mapper, input_value):
                 obj = mapper.peak_obj
-                input_dict = aadt_product_to_dict(mapper.input_value)
+                input_dict = aadt_product_to_dict(input_value)
                 outputs = obj(**input_dict)
                 output = wrap_outputs(outputs, mapper.output_aadt_t)
                 output_dict = {(k,): v for k, v in aadt_product_to_dict(output).items()}
@@ -549,11 +569,8 @@ class IRMapper(SMTMapper):
                     bb_inputs[path] = bb._get_inputs()
                 return output_dict, bb_inputs
 
-
-            def impl(p, q):
-                return (~p) | q
-            arch_output_dict, arch_bb_inputs = run_peak(archmapper)
-            ir_output_dict, ir_bb_inputs = run_peak(self)
+            arch_output_dict, arch_bb_inputs = run_peak(archmapper, arch_in)
+            ir_output_dict, ir_bb_inputs = run_peak(self, ir_in)
             F_conds = []
             o_preconditions = []
             for bo, obinding in enumerate(output_bindings):
@@ -566,22 +583,16 @@ class IRMapper(SMTMapper):
                     ir_out = ir_output_dict[ir_path]
                     arch_out = arch_output_dict[arch_path]
                     o_conds.append(ir_out == arch_out)
-                F_conds.append(impl(ob_cond, and_reduce(o_conds)))
+                F_conds.append(IMPLIES(ob_cond, AND(o_conds)))
             assert len(F_conds) > 0
-            preconditions.append(or_reduce(o_preconditions))
-            F = and_reduce(F_conds)
+            preconditions.append(OR(o_preconditions))
+            F = AND(F_conds)
             impl_conds = []
             fb_conds = []
 
-
-            logger.debug("Formula conditions")
             for (f,b), conds in fb_conditions.items():
-                logger.debug(f"F{f},{b}")
                 fb_conds.append((form_var == 2**f) & (ib_var == 2**b))
-                logger.debug("  Forall: " + " | ".join(f"{p}->{v.value}" for p, v in forall_vars_dict[(f,b)].items()))
-                for cond in conds:
-                    logger.debug(f"  {cond.value.serialize()}")
-                fb_cond = and_reduce(conds)
+                fb_cond = AND(conds)
                 impl_conds.append(fb_cond)
 
             exist_constraints = []
@@ -590,14 +601,14 @@ class IRMapper(SMTMapper):
                 is_const = issubclass(arch_input_path_to_adt[path], Const)
                 arch_var = archmapper.input_varmap[path]
                 if is_const:
-                    exist_constraints.append(or_reduce((arch_var==c for c in constraints)))
+                    exist_constraints.append(OR(arch_var==c for c in constraints))
                 else:
-                    forall_constraints.append(or_reduce((arch_var==c for c in constraints)))
+                    forall_constraints.append(OR(arch_var==c for c in constraints))
             preconditions += exist_constraints
-            preconditions.append(or_reduce(fb_conds))
-            F_cond = and_reduce(forall_constraints + [or_reduce(impl_conds)])
-
-            formula = and_reduce(preconditions) & impl(F_cond, F)
+            preconditions.append(OR(fb_conds))
+            F_cond = AND(forall_constraints + [OR(impl_conds)])
+            valid_conditions = AND(preconditions)
+            formula = AND([valid_conditions, IMPLIES(F_cond, F)])
 
             #Create black box formula if needed
             assert set(arch_bb_inputs.keys()) == set(archmapper.bb_outputs.keys())
@@ -622,12 +633,27 @@ class IRMapper(SMTMapper):
                 for (i0, o0), (i1, o1) in itertools.combinations(v, 2):
                     assert len(i0) == len(i1)
                     assert len(o0) == len(o1)
-                    i_cond = and_reduce((a==b) for a, b in zip(i0, i1))
-                    o_cond = and_reduce((a==b) for a, b in zip(o0, o1))
-                    bb_conds.append(impl(i_cond, o_cond))
+                    i_cond = AND((a==b) for a, b in zip(i0, i1))
+                    o_cond = AND((a==b) for a, b in zip(o0, o1))
+                    bb_conds.append(IMPLIES(i_cond, o_cond))
             if len(bb_conds) > 0:
-                bb_cond = and_reduce(bb_conds)
-                formula = impl(bb_cond, formula)
+                bb_cond = AND(bb_conds)
+                formula = IMPLIES(bb_cond, formula)
+
+            print("Arch_in := ", archmapper.input_value._value_.value.serialize())
+            print("IR_in := ", self.input_value._value_.value.serialize())
+            forall_str = ", ".join(str(v) for v in pysmt_forall_vars)
+            print(f"Formula = Forall({forall_str})")
+            formula.pretty()
+
+            formula = formula.to_smt()
+            if use_input_sub:
+                #Do input substitutions
+                input_subs = [
+                    (temp_arch_in._value_, archmapper.input_value._value_),
+                    (temp_ir_in._value_, self.input_value._value_)
+                ]
+                formula = formula.substitute(*input_subs)
 
             pysmt_forall_vars += bb_forall
             self.formula = smt.ForAll(pysmt_forall_vars, formula.value)
@@ -762,8 +788,9 @@ def rr_from_solver(solver, irmapper):
     arch_input_aadt_t = _input_aadt_t(am.peak_fc, fam)
 
     bv_ibinding = strip_aadt(bv_ibinding)
-    logger.debug(f"(f,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
-    pretty_print_binding(bv_ibinding, logger.debug)
+    print(f"Found Rewrite Rule")
+    print(f"(fi,bi,bo)=({arch_input_form_val},{ib_val},{ob_val})")
+    pretty_print_binding(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
