@@ -1,5 +1,6 @@
+import itertools
 import typing as tp
-from peak import family_closure, Const
+from peak import family_closure, Const, Peak
 from hwtypes.adt import Product, Tuple
 from hwtypes import Bit, BitVector
 from hwtypes import AbstractBit, AbstractBitVector
@@ -17,6 +18,9 @@ from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
 from peak import family as peak_family
+from peak.family import BlackBox
+from hwtypes.adt_util import rebind_type
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -85,9 +89,26 @@ class SMTMapper:
         input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
         self.input_aadt_t = input_aadt_t
         output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
+
+        self.peak_obj: Peak = Peak_cls()
+        #Create Black Box variables
+        self.paths_to_bbs = BlackBox.get_black_boxes(self.peak_obj)
+        path_to_bb_outputs = {}
+        for path, bb in self.paths_to_bbs.items():
+            output_t = type(bb).output_t
+            if not (issubclass(output_t, Tuple) and len(output_t.field_dict)==1):
+                raise NotImplementedError()
+            sbv_t = rebind_type(output_t.field_dict[0], family.SMTFamily())
+            output_val = sbv_t(prefix=".".join(str(p) for p in path))
+            path_to_bb_outputs[path] = output_val
+            bb._set_outputs(output_val)
+        self.bb_outputs = path_to_bb_outputs
+
+
         self.output_aadt_t = output_aadt_t
         input_forms, input_varmap, input_value = SMTForms()(input_aadt_t)
         self.input_value = input_value
+
         #output_form = output_forms[input_form_idx][output_form_idx]
         output_forms = []
         self.const_valid_conditions = []
@@ -97,7 +118,8 @@ class SMTMapper:
             inputs = aadt_product_to_dict(input_form.value)
             self.const_valid_conditions.append([is_valid(inputs[field]) for field in const_fields])
             #Construct output_aadt value
-            outputs = Peak_cls()(**inputs)
+            outputs = self.peak_obj(**inputs)
+
             output_value = wrap_outputs(outputs, output_aadt_t)
 
             forms, output_varmap, _ = SMTForms()(output_aadt_t, value=output_value)
@@ -329,12 +351,12 @@ def read_serialized_bindings(serialized_rr, ir_fc, arch_fc):
             elif u['type'] == "Bit":
                 u = (Bit(u['value']))
 
-            input_binding.append(tuple([u, tuple(v) ])) 
+            input_binding.append(tuple([u, tuple(v) ]))
         elif i[0] == "unbound":
             input_binding.append(tuple([Unbound, tuple(i[1])]))
         else:
             input_binding.append(tuple([tuple(i[0]), tuple(i[1])]))
-            
+
     for o in serialized_rr["obinding"]:
         if o[0] == "unbound":
             output_binding.append(tuple([Unbound, tuple(o[1])]))
@@ -363,6 +385,11 @@ class IRMapper(SMTMapper):
             raise NotImplementedError("Multiple ir input forms")
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
+
+        if len(self.bb_outputs) > 0 or len(archmapper.bb_outputs) > 0:
+            if not simple_formula:
+                raise ValueError("Simple Formula required for black boxes")
+
         ir_input_form = self.input_forms[0]
         ir_output_form = self.output_forms[0][0]
 
@@ -508,22 +535,25 @@ class IRMapper(SMTMapper):
                 raise NotImplementedError()
                 #Will need to do an input transformation
 
-            pysmt_forall_vars = set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()])
+            pysmt_forall_vars = list(set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()]))
 
             #Create F
             def run_peak(mapper):
-                obj = mapper.peak_fc.SMT()
+                obj = mapper.peak_obj
                 input_dict = aadt_product_to_dict(mapper.input_value)
                 outputs = obj(**input_dict)
                 output = wrap_outputs(outputs, mapper.output_aadt_t)
-                output_dict = aadt_product_to_dict(output)
-                return {(k,):v for k,v in output_dict.items()}
+                output_dict = {(k,): v for k, v in aadt_product_to_dict(output).items()}
+                bb_inputs = {}
+                for path, bb in mapper.paths_to_bbs.items():
+                    bb_inputs[path] = bb._get_inputs()
+                return output_dict, bb_inputs
 
 
             def impl(p, q):
                 return (~p) | q
-            arch_output_dict = run_peak(archmapper)
-            ir_output_dict = run_peak(self)
+            arch_output_dict, arch_bb_inputs = run_peak(archmapper)
+            ir_output_dict, ir_bb_inputs = run_peak(self)
             F_conds = []
             o_preconditions = []
             for bo, obinding in enumerate(output_bindings):
@@ -568,7 +598,39 @@ class IRMapper(SMTMapper):
             F_cond = and_reduce(forall_constraints + [or_reduce(impl_conds)])
 
             formula = and_reduce(preconditions) & impl(F_cond, F)
-            self.formula = smt.ForAll(list(pysmt_forall_vars), formula.value)
+
+            #Create black box formula if needed
+            assert set(arch_bb_inputs.keys()) == set(archmapper.bb_outputs.keys())
+            assert set(ir_bb_inputs.keys()) == set(self.bb_outputs.keys())
+            bb_io = {}
+            bb_forall = []
+            for m, inputs in (
+                (archmapper, arch_bb_inputs),
+                (self, ir_bb_inputs)
+            ):
+                for path, bb in m.paths_to_bbs.items():
+                    i = inputs[path]
+                    if not isinstance(i, tuple):
+                        i = (i,)
+                    o = m.bb_outputs[path]
+                    if not isinstance(o, tuple):
+                        o = (o,)
+                    bb_forall += [_o.value for _o in o]
+                    bb_io.setdefault(type(bb), []).append((i, o))
+            bb_conds = []
+            for k, v in bb_io.items():
+                for (i0, o0), (i1, o1) in itertools.combinations(v, 2):
+                    assert len(i0) == len(i1)
+                    assert len(o0) == len(o1)
+                    i_cond = and_reduce((a==b) for a, b in zip(i0, i1))
+                    o_cond = and_reduce((a==b) for a, b in zip(o0, o1))
+                    bb_conds.append(impl(i_cond, o_cond))
+            if len(bb_conds) > 0:
+                bb_cond = and_reduce(bb_conds)
+                formula = impl(bb_cond, formula)
+
+            pysmt_forall_vars += bb_forall
+            self.formula = smt.ForAll(pysmt_forall_vars, formula.value)
             self.forall_vars = pysmt_forall_vars
             self.formula_wo_forall = formula.value
         else:

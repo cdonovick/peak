@@ -21,7 +21,8 @@ from examples.riscv import sim as riscv_sim
 num_test_vectors = 16
 
 
-def test_simple():
+@pytest.mark.parametrize('simple_formula', [True, False])
+def test_simple(simple_formula):
     print()
     @family_closure
     def ir_fc(family):
@@ -52,7 +53,7 @@ def test_simple():
         return Arch
 
     arch_mapper = ArchMapper(arch_fc)
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula)
     rewrite_rule = ir_mapper.solve('z3', external_loop=True)
     assert rewrite_rule is not None
 

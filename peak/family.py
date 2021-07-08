@@ -193,7 +193,7 @@ class _BBFamily(AbstractFamily):
         s_deco = super().assemble(locals, globals, **kwargs)
         def deco(cls):
             if issubclass(cls, BlackBox):
-                cls.__call__ = BlackBox.__call__
+                cls.create_call()
             return cls
         return _compose(deco, s_deco)
 
