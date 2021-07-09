@@ -71,15 +71,12 @@ def ir_const_fc(family):
     return IR
 
 def test_basic():
-    print()
     arch_mapper = ArchMapper(arch_fc)
     for ir_fc, name in (
         (ir_add_fc, "Reg-Reg Addition"),
         (ir_inc_fc, "Reg Increment"),
         (ir_const_fc, "Load Immediate"),
     ):
-        print("-"*80)
-        print(f"Discovering Rewrite rule for {name}")
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
         rewrite_rule = ir_mapper.solve('z3', external_loop=True)
         assert rewrite_rule is not None

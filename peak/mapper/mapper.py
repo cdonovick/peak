@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
 
-from .formula_constructor import AND, OR, IMPLIES, or_reduce, and_reduce
+from .formula_constructor import And, Or, Implies, or_reduce, and_reduce
 
 
 #Helper function to search for the one peak class
@@ -76,8 +76,6 @@ class SMTMapper:
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
         Peak_cls = _get_peak_cls(peak_fc(family.SMTFamily()))
-        name = Peak_cls.__name__
-        name = ""
         try:
             input_t = Peak_cls.input_t
             output_t = Peak_cls.output_t
@@ -303,7 +301,7 @@ class RewriteRule:
             if arch_path not in arch_out_values:
                 raise ValueError(f"{arch_path} is not valid")
             outputs.append(ir_out_values[ir_path] != arch_out_values[arch_path])
-        formula = OR(outputs)
+        formula = Or(outputs)
         with smt.Solver(solver_name, logic=BV) as solver:
             solver.add_assertion(formula.to_smt().value)
             verified = not solver.solve()
@@ -491,7 +489,7 @@ class IRMapper(SMTMapper):
             const_fields = [field for field, T in archmapper.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
             inputs = aadt_product_to_dict(arch_in)
             const_valid_conditions = [is_valid(inputs[field]) for field in const_fields]
-            preconditions = [AND(const_valid_conditions)]
+            preconditions = [And(const_valid_conditions)]
 
             #Alternative correct (but slower) precondition
             #preconditions = [is_valid(archmapper.input_value), is_valid(self.input_value)]
@@ -505,8 +503,8 @@ class IRMapper(SMTMapper):
                     match_path = path + (Match,)
                     assert match_path in archmapper.input_varmap
                     conditions.append(archmapper.input_varmap[match_path][choice])
-                form_conditions.append(AND(conditions))
-            preconditions.append(OR(form_conditions))
+                form_conditions.append(And(conditions))
+            preconditions.append(Or(form_conditions))
 
             #Alternate formula construction
             #indexed by (fi, bi)
@@ -578,16 +576,16 @@ class IRMapper(SMTMapper):
                     ir_out = ir_output_dict[ir_path]
                     arch_out = arch_output_dict[arch_path]
                     o_conds.append(ir_out == arch_out)
-                F_conds.append(IMPLIES(ob_cond, AND(o_conds)))
+                F_conds.append(Implies(ob_cond, And(o_conds)))
             assert len(F_conds) > 0
-            preconditions.append(OR(o_preconditions))
-            F = AND(F_conds)
+            preconditions.append(Or(o_preconditions))
+            F = And(F_conds)
             impl_conds = []
             fb_conds = []
 
             for (f,b), conds in fb_conditions.items():
                 fb_conds.append((form_var == 2**f) & (ib_var == 2**b))
-                fb_cond = AND(conds)
+                fb_cond = And(conds)
                 impl_conds.append(fb_cond)
 
             exist_constraints = []
@@ -596,14 +594,14 @@ class IRMapper(SMTMapper):
                 is_const = issubclass(arch_input_path_to_adt[path], Const)
                 arch_var = archmapper.input_varmap[path]
                 if is_const:
-                    exist_constraints.append(OR(arch_var==c for c in constraints))
+                    exist_constraints.append(Or(arch_var == c for c in constraints))
                 else:
-                    forall_constraints.append(OR(arch_var==c for c in constraints))
+                    forall_constraints.append(Or(arch_var == c for c in constraints))
             preconditions += exist_constraints
-            preconditions.append(OR(fb_conds))
-            F_cond = AND(forall_constraints + [OR(impl_conds)])
-            valid_conditions = AND(preconditions)
-            formula = AND([valid_conditions, IMPLIES(F_cond, F)])
+            preconditions.append(Or(fb_conds))
+            F_cond = And(forall_constraints + [Or(impl_conds)])
+            valid_conditions = And(preconditions)
+            formula = And([valid_conditions, Implies(F_cond, F)])
 
             #Create black box formula if needed
             assert set(arch_bb_inputs.keys()) == set(archmapper.bb_outputs.keys())
@@ -628,15 +626,14 @@ class IRMapper(SMTMapper):
                 for (i0, o0), (i1, o1) in itertools.combinations(v, 2):
                     assert len(i0) == len(i1)
                     assert len(o0) == len(o1)
-                    i_cond = AND((a==b) for a, b in zip(i0, i1))
-                    o_cond = AND((a==b) for a, b in zip(o0, o1))
-                    bb_conds.append(IMPLIES(i_cond, o_cond))
+                    i_cond = And((a == b) for a, b in zip(i0, i1))
+                    o_cond = And((a == b) for a, b in zip(o0, o1))
+                    bb_conds.append(Implies(i_cond, o_cond))
             if len(bb_conds) > 0:
-                bb_cond = AND(bb_conds)
-                formula = IMPLIES(bb_cond, formula)
+                bb_cond = And(bb_conds)
+                formula = Implies(bb_cond, formula)
 
-
-            formula = formula.to_smt()
+            formula = formula.to_hwtypes()
             if use_input_sub:
                 #Do input substitutions
                 input_subs = [
