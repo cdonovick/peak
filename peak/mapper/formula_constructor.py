@@ -20,10 +20,11 @@ def _value_to_str(v, ts, indent):
 
 def _op_to_str(vs, opname, ts, indent):
     new_ts = ts + indent
-    prefix = f"{ts}{opname}(\n"
-    body = ",\n".join([_value_to_str(v, new_ts, indent) for v in vs])
-    suffix = f"\n{ts})"
-    return prefix + body + suffix
+    return "\n".join([
+        f"{ts}{opname}(",
+        ",\n".join([_value_to_str(v, new_ts, indent) for v in vs]),
+        f"{ts})"
+    ])
 
 class And(FormulaConstructor):
     def __init__(self, values: list):

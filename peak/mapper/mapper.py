@@ -303,7 +303,7 @@ class RewriteRule:
             outputs.append(ir_out_values[ir_path] != arch_out_values[arch_path])
         formula = Or(outputs)
         with smt.Solver(solver_name, logic=BV) as solver:
-            solver.add_assertion(formula.to_smt().value)
+            solver.add_assertion(formula.to_hwtypes().value)
             verified = not solver.solve()
             if verified:
                 return None
