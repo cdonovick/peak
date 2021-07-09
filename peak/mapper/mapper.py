@@ -71,7 +71,7 @@ def _create_path_to_adt(adt_t, path=(), mods=[]):
     return flatmap
 
 class SMTMapper:
-    def __init__(self, peak_fc : tp.Callable, family=peak_family):
+    def __init__(self, peak_fc : tp.Callable, family=peak_family, simple_formula=True):
         self.family = family
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
@@ -88,6 +88,9 @@ class SMTMapper:
         output_aadt_t = family.SMTFamily().get_adt_t(stripped_output_t)
 
         self.peak_obj: Peak = Peak_cls()
+
+
+
         #Create Black Box variables
         self.paths_to_bbs = BlackBox.get_black_boxes(self.peak_obj)
         path_to_bb_outputs = {}
@@ -150,7 +153,7 @@ class SMTMapper:
         return _create_path_to_adt(adt)
 
 class ArchMapper(SMTMapper):
-    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family):
+    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family, simple_formula=True):
         super().__init__(arch_fc, family=family)
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
@@ -204,7 +207,7 @@ class RewriteRule:
                     ir_path = ir_path._value_
                 assert isinstance(ir_path, (AbstractBit, AbstractBitVector))
             self.ibinding.append((ir_path, arch_path))
-
+        pretty_print_binding(ibinding)
         self.obinding = obinding
         self.ir_fc = ir_fc
         self.arch_fc = arch_fc
@@ -276,6 +279,7 @@ class RewriteRule:
 
     # Returns a counterexample if found, otherwise None
     def verify(self, solver_name: str = "z3") -> tp.Union[None, "CounterExample"]:
+
         # create free variable for each ir_val
         # The types are all Py
         ir_path_types = _create_path_to_adt(strip_modifiers(self.ir_fc(self.family.SMTFamily()).input_t))
@@ -415,7 +419,7 @@ class IRMapper(SMTMapper):
             bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
             bindings = list(filter(constraint_filter, bindings))
             for i, b in enumerate(bindings):
-                logger.debug(f"Binding {i}")
+                logger.debfug(f"Binding {i}")
                 pretty_print_binding(b, logger.debug)
             input_bindings.append(bindings)
         # Check Early out
@@ -633,6 +637,8 @@ class IRMapper(SMTMapper):
                 bb_cond = And(bb_conds)
                 formula = Implies(bb_cond, formula)
 
+
+            print(formula.serialize())
             formula = formula.to_hwtypes()
             if use_input_sub:
                 #Do input substitutions
@@ -781,7 +787,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
     y = set(y)
     x = phi.get_free_variables() - y
 
-    with smt.Solver (logic = logic, name = solver_name) as solver:
+    with smt.Solver(logic=logic, name=solver_name) as solver:
         solver.add_assertion(smt.Bool(True))
         loops = 0
 
@@ -794,7 +800,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
             else:
                 tau = {v: solver.get_value(v) for v in x}
                 sub_phi = phi.substitute(tau).simplify()
-                model = smt.get_model(smt.Not(sub_phi), solver_name = solver_name, logic = logic)
+                model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
 
                 if model is None:
                     return rr_from_solver(solver, irmapper)
