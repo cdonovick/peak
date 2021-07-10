@@ -59,6 +59,8 @@ def test_simple():
         rewrite_rule = ir_mapper.solve('z3', external_loop=True)
         if found:
             assert rewrite_rule is not None
+            counter_example = rewrite_rule.verify()
+            assert counter_example is None
         else:
             assert rewrite_rule is None
 
@@ -67,11 +69,11 @@ fplib = Float(7, 8)
 
 @pytest.mark.parametrize('ir_fc, found', [
     (ir.instructions["Add"], True),
-    #(ir.instructions["Sub"], True),
-    #(ir.instructions["Mul"], False),
-    #(fplib.add_fc, True),
-    #(fplib.mul_fc, True),
-    #(fplib.sqrt_fc, True),
+    (ir.instructions["Sub"], True),
+    (ir.instructions["Mul"], False),
+    (fplib.add_fc, True),
+    (fplib.mul_fc, True),
+    (fplib.sqrt_fc, True),
 ])
 def test_rr(ir_fc, found):
     arch_fc = fp.PE_fc

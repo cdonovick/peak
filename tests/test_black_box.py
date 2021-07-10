@@ -4,7 +4,8 @@ from peak.family import PyFamily
 from peak.float import Float
 import examples.fp_pe as fp
 from hwtypes import SMTBitVector as SBV, SMTBit as SBit
-from peak.family import SMTFamily, BlackBox
+from peak.family import SMTFamily
+from peak.black_box import BlackBox, get_black_boxes, get_black_box
 
 @family_closure
 def BB_fc(family):
@@ -116,13 +117,13 @@ def test_black_box_smt():
 def test_float():
     fplib = Float(3, 4)
     add_obj = fplib.add_fc.Py()
-    paths_to_bbs = BlackBox.get_black_boxes(add_obj)
+    paths_to_bbs = get_black_boxes(add_obj)
     assert paths_to_bbs == {():add_obj}
 
 def test_fp_pe_bb():
     PE = fp.PE_fc.Py
     pe = PE()
-    paths_to_bbs = BlackBox.get_black_boxes(pe)
+    paths_to_bbs = get_black_boxes(pe)
     for path in (
         ("FPU", "add"),
         ("FPU", "mul"),
@@ -130,7 +131,7 @@ def test_fp_pe_bb():
     ):
         assert path in paths_to_bbs
         bb_inst = paths_to_bbs[path]
-        assert bb_inst is BlackBox.get_black_box(pe, path)
+        assert bb_inst is get_black_box(pe, path)
         assert isinstance(bb_inst, BlackBox)
 
 def test_fp_pe_smt():
@@ -143,7 +144,7 @@ def test_fp_pe_smt():
         imm=SBV[16](10),
         use_imm=SBit(name='ui')
     )
-    paths_to_bbs = BlackBox.get_black_boxes(pe)
+    paths_to_bbs = get_black_boxes(pe)
     for bb in paths_to_bbs.values():
         bb._set_outputs(SBV[16]())
     val = pe(inst, SBV[16](name='a'), SBV[16](2))

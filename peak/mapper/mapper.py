@@ -19,7 +19,7 @@ from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
 from peak import family as peak_family
-from peak.family import BlackBox
+from peak.black_box import get_black_boxes, get_black_box
 from hwtypes.adt_util import rebind_type
 
 import logging
@@ -70,6 +70,28 @@ def _create_path_to_adt(adt_t, path=(), mods=[]):
         flatmap[path] = wrap_modifier(adt_t, mods)
     return flatmap
 
+
+def create_and_set_bb_outputs(peak_obj, family=peak_family, prefix=""):
+    # Create Black Box variables
+    paths_to_bbs = get_black_boxes(peak_obj)
+    path_to_bb_outputs = {}
+    for path, bb in paths_to_bbs.items():
+        output_t = type(bb).output_t
+        if not (issubclass(output_t, Tuple) and len(output_t.field_dict) == 1):
+            raise NotImplementedError()
+        sbv_t = rebind_type(output_t.field_dict[0], family.SMTFamily())
+        output_val = sbv_t(prefix=".".join(str(p) for p in (prefix, *path)))
+        path_to_bb_outputs[path] = output_val
+        bb._set_outputs(output_val)
+    return path_to_bb_outputs
+
+def get_bb_inputs(peak_obj):
+    bb_inputs = {}
+    for path, bb in get_black_boxes(peak_obj).items():
+        bb_inputs[path] = bb._get_inputs()
+    return bb_inputs
+
+
 class SMTMapper:
     def __init__(self, peak_fc : tp.Callable, family=peak_family, simple_formula=True):
         self.family = family
@@ -92,18 +114,7 @@ class SMTMapper:
 
 
         #Create Black Box variables
-        self.paths_to_bbs = BlackBox.get_black_boxes(self.peak_obj)
-        path_to_bb_outputs = {}
-        for path, bb in self.paths_to_bbs.items():
-            output_t = type(bb).output_t
-            if not (issubclass(output_t, Tuple) and len(output_t.field_dict)==1):
-                raise NotImplementedError()
-            sbv_t = rebind_type(output_t.field_dict[0], family.SMTFamily())
-            output_val = sbv_t(prefix=".".join(str(p) for p in path))
-            path_to_bb_outputs[path] = output_val
-            bb._set_outputs(output_val)
-        self.bb_outputs = path_to_bb_outputs
-
+        self.bb_outputs = create_and_set_bb_outputs(self.peak_obj, prefix=f"BB.{Peak_cls.__name__}")
 
         self.output_aadt_t = output_aadt_t
         input_forms, input_varmap, input_value = SMTForms()(input_aadt_t)
@@ -291,8 +302,15 @@ class RewriteRule:
         ir_inputs, arch_inputs = self.build_inputs(ir_values, arch_values, self.family.SMTFamily())
         ir = self.ir_fc(self.family.SMTFamily())()
         arch = self.arch_fc(self.family.SMTFamily())()
+
+        ir_bb_outputs = create_and_set_bb_outputs(ir)
+        arch_bb_outputs = create_and_set_bb_outputs(arch)
+
         ir_out_values = self.parse_ir_output(ir(**ir_inputs))
         arch_out_values = self.parse_arch_output(arch(**arch_inputs))
+
+        ir_bb_inputs = get_bb_inputs(ir)
+        arch_bb_inputs = get_bb_inputs(arch)
 
         outputs = []
         for ir_path, arch_path in self.obinding:
@@ -304,10 +322,21 @@ class RewriteRule:
                 raise ValueError(f"{ir_path} is not valid")
             if arch_path not in arch_out_values:
                 raise ValueError(f"{arch_path} is not valid")
-            outputs.append(ir_out_values[ir_path] != arch_out_values[arch_path])
-        formula = Or(outputs)
+            outputs.append(ir_out_values[ir_path] == arch_out_values[arch_path])
+        formula = And(outputs)
+
+        formula, _ = update_with_bb(
+            formula,
+            get_black_boxes(arch),
+            arch_bb_inputs,
+            arch_bb_outputs,
+            get_black_boxes(ir),
+            ir_bb_inputs,
+            ir_bb_outputs,
+        )
+        formula = ~(formula.to_hwtypes())
         with smt.Solver(solver_name, logic=BV) as solver:
-            solver.add_assertion(formula.to_hwtypes().value)
+            solver.add_assertion(formula.value)
             verified = not solver.solve()
             if verified:
                 return None
@@ -378,6 +407,41 @@ def _free_var_from_t(T, family):
     return bv_t[assembler.width]()
 
 
+#This will update a formula f
+def update_with_bb(f, abbs, ai, ao, ibbs, ii, io):
+    #Create black box formula if needed
+    assert set(ao.keys()) == set(ai.keys())
+    assert set(ii.keys()) == set(io.keys())
+
+    bb_forall = []
+    bb_io = {}
+    for bbs, inputs, outputs in (
+        (abbs, ai, ao),
+        (ibbs, ii, io),
+    ):
+        for path, bb in bbs.items():
+            i = inputs[path]
+            if not isinstance(i, tuple):
+                i = (i,)
+            o = outputs[path]
+            if not isinstance(o, tuple):
+                o = (o,)
+            bb_forall += [_o.value for _o in o]
+            bb_io.setdefault(type(bb), []).append((i, o))
+    bb_conds = []
+    for k, v in bb_io.items():
+        for (i0, o0), (i1, o1) in itertools.combinations(v, 2):
+            assert len(i0) == len(i1)
+            assert len(o0) == len(o1)
+            i_cond = And((a == b) for a, b in zip(i0, i1))
+            o_cond = And((a == b) for a, b in zip(o0, o1))
+            bb_conds.append(Implies(i_cond, o_cond))
+    if len(bb_conds) > 0:
+        bb_cond = And(bb_conds)
+        return Implies(bb_cond, f), bb_forall
+    return f, bb_forall
+
+
 class IRMapper(SMTMapper):
     def __init__(self, archmapper, ir_fc, simple_formula=True):
         super().__init__(ir_fc)
@@ -419,7 +483,7 @@ class IRMapper(SMTMapper):
             bindings = create_bindings(form_arch_input_path_to_adt, ir_path_to_adt)
             bindings = list(filter(constraint_filter, bindings))
             for i, b in enumerate(bindings):
-                logger.debfug(f"Binding {i}")
+                logger.debug(f"Binding {i}")
                 pretty_print_binding(b, logger.debug)
             input_bindings.append(bindings)
         # Check Early out
@@ -561,9 +625,7 @@ class IRMapper(SMTMapper):
                 outputs = obj(**input_dict)
                 output = wrap_outputs(outputs, mapper.output_aadt_t)
                 output_dict = {(k,): v for k, v in aadt_product_to_dict(output).items()}
-                bb_inputs = {}
-                for path, bb in mapper.paths_to_bbs.items():
-                    bb_inputs[path] = bb._get_inputs()
+                bb_inputs = get_bb_inputs(obj)
                 return output_dict, bb_inputs
 
             arch_output_dict, arch_bb_inputs = run_peak(archmapper, arch_in)
@@ -607,38 +669,16 @@ class IRMapper(SMTMapper):
             valid_conditions = And(preconditions)
             formula = And([valid_conditions, Implies(F_cond, F)])
 
-            #Create black box formula if needed
-            assert set(arch_bb_inputs.keys()) == set(archmapper.bb_outputs.keys())
-            assert set(ir_bb_inputs.keys()) == set(self.bb_outputs.keys())
-            bb_io = {}
-            bb_forall = []
-            for m, inputs in (
-                (archmapper, arch_bb_inputs),
-                (self, ir_bb_inputs)
-            ):
-                for path, bb in m.paths_to_bbs.items():
-                    i = inputs[path]
-                    if not isinstance(i, tuple):
-                        i = (i,)
-                    o = m.bb_outputs[path]
-                    if not isinstance(o, tuple):
-                        o = (o,)
-                    bb_forall += [_o.value for _o in o]
-                    bb_io.setdefault(type(bb), []).append((i, o))
-            bb_conds = []
-            for k, v in bb_io.items():
-                for (i0, o0), (i1, o1) in itertools.combinations(v, 2):
-                    assert len(i0) == len(i1)
-                    assert len(o0) == len(o1)
-                    i_cond = And((a == b) for a, b in zip(i0, i1))
-                    o_cond = And((a == b) for a, b in zip(o0, o1))
-                    bb_conds.append(Implies(i_cond, o_cond))
-            if len(bb_conds) > 0:
-                bb_cond = And(bb_conds)
-                formula = Implies(bb_cond, formula)
+            formula, bb_forall = update_with_bb(
+                formula,
+                get_black_boxes(archmapper.peak_obj),
+                arch_bb_inputs,
+                archmapper.bb_outputs,
+                get_black_boxes(self.peak_obj),
+                ir_bb_inputs,
+                self.bb_outputs
+            )
 
-
-            print(formula.serialize())
             formula = formula.to_hwtypes()
             if use_input_sub:
                 #Do input substitutions
