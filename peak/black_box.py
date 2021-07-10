@@ -7,7 +7,8 @@ def get_black_boxes(obj, path=()):
     # Hack to avoid circular import
     from .peak import Peak
 
-    assert isinstance(obj, Peak)
+    if not isinstance(obj, Peak):
+        raise ValueError(f"{obj} needs to be a Peak object")
     if isinstance(obj, BlackBox):
         return {path: obj}
     ret = {}

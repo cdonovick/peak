@@ -77,12 +77,13 @@ def create_and_set_bb_outputs(peak_obj, family=peak_family, prefix=""):
     path_to_bb_outputs = {}
     for path, bb in paths_to_bbs.items():
         output_t = type(bb).output_t
-        if not (issubclass(output_t, Tuple) and len(output_t.field_dict) == 1):
-            raise NotImplementedError()
-        sbv_t = rebind_type(output_t.field_dict[0], family.SMTFamily())
-        output_val = sbv_t(prefix=".".join(str(p) for p in (prefix, *path)))
-        path_to_bb_outputs[path] = output_val
-        bb._set_outputs(output_val)
+        outputs = []
+        for field_name, t in output_t.field_dict.items():
+            sbv_t = rebind_type(t, family.SMTFamily())
+            output_val = sbv_t(prefix=".".join(str(p) for p in (prefix, *path, field_name)))
+            outputs.append(output_val)
+        path_to_bb_outputs[path] = tuple(outputs)
+        bb._set_outputs(*outputs)
     return path_to_bb_outputs
 
 def get_bb_inputs(peak_obj):
@@ -407,24 +408,30 @@ def _free_var_from_t(T, family):
 
 
 #This will update a formula f
-def update_with_bb(f, abbs, ai, ao, ibbs, ii, io):
+def update_with_bb(
+    f,
+    arch_bbs,
+    arch_bb_inputs,
+    arch_bb_outputs,
+    ir_bbs,
+    ir_bb_inputs,
+    ir_bb_outputs
+):
     #Create black box formula if needed
-    assert set(ao.keys()) == set(ai.keys())
-    assert set(ii.keys()) == set(io.keys())
+    assert set(arch_bb_outputs.keys()) == set(arch_bb_inputs.keys())
+    assert set(ir_bb_inputs.keys()) == set(ir_bb_outputs.keys())
 
     bb_forall = []
     bb_io = {}
     for bbs, inputs, outputs in (
-        (abbs, ai, ao),
-        (ibbs, ii, io),
+        (arch_bbs, arch_bb_inputs, arch_bb_outputs),
+        (ir_bbs, ir_bb_inputs, ir_bb_outputs),
     ):
         for path, bb in bbs.items():
             i = inputs[path]
-            if not isinstance(i, tuple):
-                i = (i,)
+            assert isinstance(i, tuple)
             o = outputs[path]
-            if not isinstance(o, tuple):
-                o = (o,)
+            assert isinstance(o, tuple)
             bb_forall += [_o.value for _o in o]
             bb_io.setdefault(type(bb), []).append((i, o))
     bb_conds = []
