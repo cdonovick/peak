@@ -93,7 +93,7 @@ def get_bb_inputs(peak_obj):
 
 
 class SMTMapper:
-    def __init__(self, peak_fc : tp.Callable, family=peak_family, simple_formula=True):
+    def __init__(self, peak_fc : tp.Callable, family=peak_family):
         self.family = family
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
@@ -164,7 +164,7 @@ class SMTMapper:
         return _create_path_to_adt(adt)
 
 class ArchMapper(SMTMapper):
-    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family, simple_formula=True):
+    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family):
         super().__init__(arch_fc, family=family)
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
@@ -218,7 +218,6 @@ class RewriteRule:
                     ir_path = ir_path._value_
                 assert isinstance(ir_path, (AbstractBit, AbstractBitVector))
             self.ibinding.append((ir_path, arch_path))
-        pretty_print_binding(ibinding)
         self.obinding = obinding
         self.ir_fc = ir_fc
         self.arch_fc = arch_fc
