@@ -1,11 +1,11 @@
-#import pytest
-
 from hwtypes import Bit, BitVector
-
-from peak import Const, family_closure, Peak, name_outputs
-from peak.family import BlackBox
-from peak.family import SMTFamily, PyFamily
-#from peak.mapper import ArchMapper, RewriteRule
+from peak import Const, family_closure, Peak
+from peak.family import PyFamily
+from peak.float import Float
+import examples.fp_pe as fp
+from hwtypes import SMTBitVector as SBV, SMTBit as SBit
+from peak.family import SMTFamily
+from peak.black_box import BlackBox, get_black_boxes, get_black_box
 
 @family_closure
 def BB_fc(family):
@@ -112,6 +112,44 @@ def test_black_box_smt():
         check_BB_inputs()
 
 
+
+#Test the floating point libs
+def test_float():
+    fplib = Float(3, 4)
+    add_obj = fplib.add_fc.Py()
+    paths_to_bbs = get_black_boxes(add_obj)
+    assert paths_to_bbs == {():add_obj}
+
+def test_fp_pe_bb():
+    PE = fp.PE_fc.Py
+    pe = PE()
+    paths_to_bbs = get_black_boxes(pe)
+    for path in (
+        ("FPU", "add"),
+        ("FPU", "mul"),
+        ("FPU", "sqrt"),
+    ):
+        assert path in paths_to_bbs
+        bb_inst = paths_to_bbs[path]
+        assert bb_inst is get_black_box(pe, path)
+        assert isinstance(bb_inst, BlackBox)
+
+def test_fp_pe_smt():
+    pe = fp.PE_fc.SMT()
+    AInst = SMTFamily().get_adt_t(fp.Inst)
+    inst = AInst.from_fields(
+        op=AInst.op(
+            fpu=AInst.op.fpu(fp.FPU_op.FPAdd)
+        ),
+        imm=SBV[16](10),
+        use_imm=SBit(name='ui')
+    )
+    paths_to_bbs = get_black_boxes(pe)
+    for bb in paths_to_bbs.values():
+        bb._set_outputs(SBV[16]())
+    val = pe(inst, SBV[16](name='a'), SBV[16](2))
+    for bb in paths_to_bbs.values():
+        bb_inputs = bb._get_inputs()
 
 
 
