@@ -1,7 +1,7 @@
 import itertools
 import typing as tp
 from functools import lru_cache
-
+from collections import defaultdict
 from peak import family_closure, Const, Peak
 from hwtypes.adt import Product, Tuple
 from hwtypes import Bit, BitVector
@@ -581,19 +581,24 @@ class IRMapper(SMTMapper):
             preconditions.append(Or(form_conditions))
 
             #Alternate formula construction
-            #indexed by (fi, bi)
-            forall_vars_dict = {}
-            exists_vars_dict = {}
+
+            #name -> list((fi,bi))
+            forall_to_fbs = defaultdict(list)
+            exists_to_fbs = defaultdict(list)
+
+            #name -> var
+            name_to_var = {}
+
             fb_conditions = {} #form/binding conditions in a list
             for fi, ibindings in enumerate(input_bindings):
                 fi_conditions = [form_var==2**fi]
                 for bi, ibinding in enumerate(ibindings):
-                    forall_vars = {}
-                    exists_vars = {}
                     conditions = fi_conditions + [(ib_var == 2 ** bi)]
+                    fb = (fi, bi)
                     for ir_path, arch_path in ibinding:
                         arch_name = ".".join(["A"] + [str(p) for p in arch_path])
                         arch_var = archmapper.input_varmap[arch_path]
+                        name_to_var[arch_name] = arch_var
                         is_unbound = ir_path is Unbound
                         is_constrained = arch_path in self.archmapper.path_constraints
                         is_const = issubclass(arch_input_path_to_adt[arch_path], Const)
@@ -601,28 +606,40 @@ class IRMapper(SMTMapper):
                             if not is_unbound:
                                 raise NotImplementedError()
                         if is_unbound and not is_const:
-                            forall_vars[arch_name] = arch_var
+                            forall_to_fbs[arch_name].append(fb)
                         elif is_unbound and is_const:
-                            exists_vars[arch_name] = arch_var
+                            exists_to_fbs[arch_name].append(fb)
                         elif not is_unbound:
                             assert not is_unbound
                             ir_name = ".".join(["I"] + [str(p) for p in ir_path])
                             ir_var = self.input_varmap[ir_path]
-                            forall_vars[arch_name] = arch_var
-                            forall_vars[ir_name] = ir_var
+                            name_to_var[ir_name] = ir_var
+                            forall_to_fbs[arch_name].append(fb)
+                            forall_to_fbs[ir_name].append(fb)
                             conditions.append(arch_var==ir_var)
-                    forall_vars_dict[(fi, bi)] = forall_vars
-                    exists_vars_dict[(fi, bi)] = exists_vars
                     fb_conditions[(fi, bi)] = conditions
 
-            # Check if there is any overlap between forall_vars and exist vars
-            foralls = set([name for vars in forall_vars_dict.values() for name in vars])
-            exists = set([name for vars in exists_vars_dict.values() for name in vars])
-            if len(foralls.intersection(exists)) > 0:
-                raise NotImplementedError()
-                #Will need to do an input transformation
 
-            pysmt_forall_vars = list(set([var.value for forall_vars in forall_vars_dict.values() for var in forall_vars.values()]))
+            pysmt_forall_vars = set(name_to_var[name].value for name in forall_to_fbs)
+
+            # Check if there is any overlap between forall_vars and exist vars
+            overlap = forall_to_fbs.keys() & exists_to_fbs.keys()
+            overlap_subs = []
+            for name in overlap:
+                var = name_to_var[name]
+                forall_fbs = forall_to_fbs[name]
+                exists_fbs = exists_to_fbs[name]
+                assert len(exists_fbs) > 0
+                assert len(forall_fbs) > 0
+                var_a = type(var)(prefix=str(var)+"_FORALL")
+                var_e = type(var)(prefix=str(var)+"_EXISTS")
+                e_conds = Or([((form_var==2**fi) & (ib_var==2**bi)) for fi,bi in exists_fbs]).to_hwtypes()
+                sub_var = e_conds.ite(var_e, var_a)
+                overlap_subs.append((var, sub_var))
+                pysmt_forall_vars.remove(var.value)
+                pysmt_forall_vars.add(var_a.value)
+                #Will need to do an input transformation
+            pysmt_forall_vars = list(pysmt_forall_vars)
 
             #Create F
             def run_peak(mapper, input_value):
@@ -693,6 +710,9 @@ class IRMapper(SMTMapper):
                     (temp_ir_in._value_, self.input_value._value_)
                 ]
                 formula = formula.substitute(*input_subs)
+
+            if len(overlap_subs) > 0:
+                formula = formula.substitute(*overlap_subs)
 
             pysmt_forall_vars += bb_forall
             self.formula = smt.ForAll(pysmt_forall_vars, formula.value)

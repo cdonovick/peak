@@ -19,7 +19,8 @@ class RIInst(Product):
         add = 4
     rs = Ridx
     rd = Ridx
-    imm = Word
+    imm0 = Word
+    imm1 = Word
 
 class Inst(TaggedUnion):
     RR=RRInst
@@ -38,7 +39,7 @@ def arch_fc(family):
                     return r0 + r1, r0
             else: #inst.RI.match
                 ri_inst = inst.RI.value
-                imm = ri_inst.imm
+                imm = ri_inst.imm1
                 if ri_inst.OP == RIInst.OP.ld_imm:
                     return imm, r0
                 else:
@@ -70,13 +71,18 @@ def ir_const_fc(family):
             return c
     return IR
 
-def test_basic():
+import pytest
+@pytest.mark.parametrize("ir_fc, name", [
+    #(ir_add_fc, "Reg-Reg Addition"),
+    #(ir_inc_fc, "Reg Increment"),
+    (ir_const_fc, "Load Immediate"),
+])
+def test_basic(ir_fc, name):
     arch_mapper = ArchMapper(arch_fc)
-    for ir_fc, name in (
-        (ir_add_fc, "Reg-Reg Addition"),
-        (ir_inc_fc, "Reg Increment"),
-        (ir_const_fc, "Load Immediate"),
-    ):
-        ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
-        rewrite_rule = ir_mapper.solve('z3', external_loop=True)
-        assert rewrite_rule is not None
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    assert rewrite_rule is not None
+    counter_example = rewrite_rule.verify()
+    assert counter_example is None
+
+
