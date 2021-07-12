@@ -2,13 +2,14 @@ import itertools
 import typing as tp
 from functools import lru_cache
 from collections import defaultdict
-from peak import family_closure, Const, Peak
+from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
 from hwtypes import Bit, BitVector
-from hwtypes import AbstractBit, AbstractBitVector
+from hwtypes import AbstractBit, AbstractBitVector, TypeFamily
 from hwtypes.adt import is_adt_type
 from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
 from peak.assembler import Assembler, AssembledADT
+from .index_var import IndexVar, OneHot
 from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
 from .utils import create_bindings, pretty_print_binding
@@ -19,7 +20,7 @@ from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
 from peak import Peak
 from peak import family as peak_family
-from peak.black_box import get_black_boxes, get_black_box
+from peak.black_box import get_black_boxes
 from hwtypes.adt_util import rebind_type
 
 import logging
@@ -93,8 +94,9 @@ def get_bb_inputs(peak_obj):
     return bb_inputs
 
 
+
 class SMTMapper:
-    def __init__(self, peak_fc : tp.Callable, family=peak_family):
+    def __init__(self, peak_fc: tp.Callable, family: TypeFamily=peak_family, IVar: IndexVar=OneHot):
         self.family = family
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
@@ -145,9 +147,8 @@ class SMTMapper:
         #verify same number of output forms
         assert all(num_output_forms == len(forms) for forms in output_forms)
         self.peak_fc = peak_fc
-        SBV = family.SMTFamily().BitVector
-        self.input_form_var = SBV[num_input_forms](prefix=f"fi")
-        self.output_form_var = SBV[num_output_forms](prefix=f"fo")
+        self.input_form_var = IVar(num_input_forms, name=f"fi", family=family)
+        self.output_form_var = IVar(num_output_forms, name=f"fo", family=family)
 
         self.input_forms = input_forms
         self.output_forms = output_forms
@@ -165,8 +166,8 @@ class SMTMapper:
         return _create_path_to_adt(adt)
 
 class ArchMapper(SMTMapper):
-    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family):
-        super().__init__(arch_fc, family=family)
+    def __init__(self, arch_fc, *, path_constraints= {}, family=peak_family, IVar: IndexVar=OneHot):
+        super().__init__(arch_fc, family=family, IVar=IVar)
         if self.num_output_forms > 1:
             raise NotImplementedError("Multiple ir output forms")
 
@@ -187,9 +188,10 @@ class ArchMapper(SMTMapper):
             path_constraints[path] =constraints
 
         self.path_constraints = path_constraints
+        self.IVar = IVar
 
     def process_ir_instruction(self, ir_fc, simple_formula=False):
-        return IRMapper(self, ir_fc, simple_formula)
+        return IRMapper(self, ir_fc, simple_formula, self.IVar)
 
 def is_valid(aadt_value: tp.Union[AssembledADT, AbstractBit, AbstractBitVector]):
     if isinstance(aadt_value, (AbstractBitVector, AbstractBit)):
@@ -449,7 +451,7 @@ def update_with_bb(
 
 
 class IRMapper(SMTMapper):
-    def __init__(self, archmapper, ir_fc, simple_formula=True):
+    def __init__(self, archmapper, ir_fc, simple_formula=True, IVar: IndexVar=OneHot):
         super().__init__(ir_fc)
         #For now assume that ir input forms and ir output forms is just 1
         if self.num_input_forms > 1:
@@ -461,11 +463,7 @@ class IRMapper(SMTMapper):
             if not simple_formula:
                 raise ValueError("Simple Formula required for black boxes")
 
-        ir_input_form = self.input_forms[0]
-        ir_output_form = self.output_forms[0][0]
-
         self.archmapper = archmapper
-        arch_output_form = archmapper.output_forms[0]
 
         # Create input bindings
         # binding = [input_form_idx][bidx]
@@ -521,7 +519,7 @@ class IRMapper(SMTMapper):
             # form_condition represents the & of all the appropriate matches
             #   and that the const adt types are valid
             assert len(archmapper.const_valid_conditions[fi]) > 0
-            conditions = [form_var == 2**fi] + archmapper.const_valid_conditions[fi]
+            conditions = [form_var.match_index(fi)] + archmapper.const_valid_conditions[fi]
             for path, choice in form.path_dict.items():
                 match_path = path + (Match,)
                 assert match_path in archmapper.input_varmap
@@ -531,9 +529,9 @@ class IRMapper(SMTMapper):
 
         max_input_bindings = max(len(bindings) for bindings in input_bindings)
         SBV = self.family.SMTFamily().BitVector
-        ib_var = SBV[max_input_bindings](prefix="bi")
+        ib_var = IVar(max_input_bindings, name="bi", family=self.family)
         max_output_bindings = len(output_bindings)
-        ob_var = SBV[max_output_bindings](prefix="bo")
+        ob_var = IVar(max_output_bindings, name="bo", family=self.family)
 
         self.ib_var = ib_var
         self.ob_var = ob_var
@@ -572,7 +570,7 @@ class IRMapper(SMTMapper):
             # [input_form_idx]
             form_conditions = []
             for fi, form in enumerate(archmapper.input_forms):
-                conditions = [form_var == 2**fi]
+                conditions = [form_var.match_index(fi)]
                 for path, choice in form.path_dict.items():
                     match_path = path + (Match,)
                     assert match_path in archmapper.input_varmap
@@ -591,9 +589,9 @@ class IRMapper(SMTMapper):
 
             fb_conditions = {} #form/binding conditions in a list
             for fi, ibindings in enumerate(input_bindings):
-                fi_conditions = [form_var==2**fi]
+                fi_conditions = [form_var.match_index(fi)]
                 for bi, ibinding in enumerate(ibindings):
-                    conditions = fi_conditions + [(ib_var == 2 ** bi)]
+                    conditions = fi_conditions + [ib_var.match_index(bi)]
                     fb = (fi, bi)
                     for ir_path, arch_path in ibinding:
                         arch_name = ".".join(["A"] + [str(p) for p in arch_path])
@@ -633,7 +631,7 @@ class IRMapper(SMTMapper):
                 assert len(forall_fbs) > 0
                 var_a = type(var)(prefix=str(var)+"_FORALL")
                 var_e = type(var)(prefix=str(var)+"_EXISTS")
-                e_conds = Or([((form_var==2**fi) & (ib_var==2**bi)) for fi,bi in exists_fbs]).to_hwtypes()
+                e_conds = Or([(form_var.match_index(fi) & ib_var.match_index(bi)) for fi,bi in exists_fbs]).to_hwtypes()
                 sub_var = e_conds.ite(var_e, var_a)
                 overlap_subs.append((var, sub_var))
                 pysmt_forall_vars.remove(var.value)
@@ -656,7 +654,7 @@ class IRMapper(SMTMapper):
             F_conds = []
             o_preconditions = []
             for bo, obinding in enumerate(output_bindings):
-                ob_cond = (ob_var == 2**bo)
+                ob_cond = ob_var.match_index(bo)
                 o_conds = []
                 o_preconditions.append(ob_cond)
                 for ir_path, arch_path in obinding:
@@ -673,7 +671,7 @@ class IRMapper(SMTMapper):
             fb_conds = []
 
             for (f,b), conds in fb_conditions.items():
-                fb_conds.append((form_var == 2**f) & (ib_var == 2**b))
+                fb_conds.append(form_var.match_index(f) & ib_var.match_index(b))
                 fb_cond = And(conds)
                 impl_conds.append(fb_cond)
 
@@ -725,7 +723,7 @@ class IRMapper(SMTMapper):
             for fi, ibindings in enumerate(input_bindings):
                 conditions = list(form_conditions[fi])
                 for bi, ibinding in enumerate(ibindings):
-                    bi_match = (ib_var == 2**bi)
+                    bi_match = ib_var.match_index(bi)
                     #Build substitution map
                     submap = []
                     for ir_path, arch_path in ibinding:
@@ -747,7 +745,7 @@ class IRMapper(SMTMapper):
                             forall_vars.add(ir_var.value)
 
                     for bo, obinding in enumerate(output_bindings):
-                        bo_match = (ob_var == 2**bo)
+                        bo_match = ob_var.match_index(bo)
                         conditions = list(form_conditions[fi]) + [bi_match, bo_match]
                         for ir_path, arch_path in obinding:
                             if ir_path is Unbound:
@@ -827,9 +825,9 @@ def _input_aadt_t(fc, family):
 def rr_from_solver(solver, irmapper):
     im = irmapper
     am = irmapper.archmapper
-    arch_input_form_val = log2(int(solved_to_bv(am.input_form_var, solver)))
-    ib_val = log2(int(solved_to_bv(im.ib_var, solver)))
-    ob_val = log2(int(solved_to_bv(im.ob_var, solver)))
+    arch_input_form_val = am.input_form_var.decode(int(solved_to_bv(am.input_form_var.var, solver)))
+    ib_val = im.ib_var.decode(int(solved_to_bv(im.ib_var.var, solver)))
+    ob_val = im.ob_var.decode(int(solved_to_bv(im.ob_var.var, solver)))
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
 

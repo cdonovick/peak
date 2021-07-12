@@ -8,6 +8,7 @@ from peak import family
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import AssembledADT
 from peak.mapper import ArchMapper, RewriteRule
+from peak.mapper.index_var import OneHot, Binary
 
 from examples.reg_file import sim as regsim
 from examples.smallir import gen_SmallIR
@@ -62,13 +63,14 @@ def test_simple(simple_formula):
     assert counter_example is None
 
 
+@pytest.mark.parametrize('IVar', [OneHot, Binary])
 @pytest.mark.parametrize('simple_formula', [True, False])
 @pytest.mark.parametrize('external_loop', [True, False])
 @pytest.mark.parametrize('arch_fc', [PE_fc_s, PE_fc_t])
-def test_automapper(simple_formula, external_loop, arch_fc):
+def test_automapper(IVar, simple_formula, external_loop, arch_fc):
     IR = gen_SmallIR(8)
     arch_bv = arch_fc(family.PyFamily())
-    arch_mapper = ArchMapper(arch_fc)
+    arch_mapper = ArchMapper(arch_fc, IVar=IVar)
     expect_found = ('Add', 'Sub', 'And', 'Nand', 'Or', 'Nor')
     expect_not_found = ('Mul', 'Shftr', 'Shftl', 'Not', 'Neg')
     for ir_name, ir_fc in IR.instructions.items():
