@@ -73,8 +73,8 @@ def ir_const_fc(family):
 
 import pytest
 @pytest.mark.parametrize("ir_fc, name", [
-    #(ir_add_fc, "Reg-Reg Addition"),
-    #(ir_inc_fc, "Reg Increment"),
+    (ir_add_fc, "Reg-Reg Addition"),
+    (ir_inc_fc, "Reg Increment"),
     (ir_const_fc, "Load Immediate"),
 ])
 def test_basic(ir_fc, name):
