@@ -198,7 +198,7 @@ class _BBFamily(AbstractFamily):
         return _compose(deco, s_deco)
 
 
-class PyFamily(_BBFamily, _RegFamily):
+class PyFamily(_RegFamily):
     '''
     Pure python family
     Doesn't perform any transformation or do anything special
@@ -225,6 +225,8 @@ class PyFamily(_BBFamily, _RegFamily):
     def get_constructor(self, adt_t):
         return adt_t
 
+    def assemble(self, locals, globals, **kwargs):
+        return super().assemble(locals, globals, **kwargs)
 
 
 # Strategically put _AsmFamily first so eq dispatches to it
