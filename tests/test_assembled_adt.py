@@ -247,6 +247,11 @@ def test_from_fields_tagged(T, kwargs):
     assembled_ = AT(assembled)
     from_fields = AT.from_fields(**kwargs)
 
+    assert lit == assembled_
+    assert assembled == assembled_
+    assert assembled_ == from_fields
+    assert from_fields == lit
+
     for k, v in kwargs.items():
         assert getattr(lit, k).match
         assert getattr(assembled, k).match
