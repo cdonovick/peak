@@ -1,6 +1,6 @@
 from hwtypes import BitVector, Bit
 from hwtypes import make_modifier
-from hwtypes.adt import Product, Tuple, Sum, Enum
+from hwtypes.adt import TaggedUnion, Product, Tuple, Sum, Enum
 from hwtypes.bit_vector_util import BitVectorProtocol
 
 import pytest
@@ -71,6 +71,7 @@ def test_assembled_adt(isa, bv_type):
 
     _check_recursive(isa, bv_type)
 
+
 def test_match():
     class I0(Enum):
         a = 0
@@ -107,96 +108,170 @@ def test_match():
     assert s[I1].value != I1.c
     assert s[I1].value != I1.d
 
-def test_from_subfields():
-    BV = BitVector[3]
-    class E(Enum):
-        a=1
-        b=4
 
-    e = E.b
+BV = BitVector[3]
 
-    class A(Product):
-        a = Bit
-        b = BV
-        e = E
+class E(Enum):
+    a=1
+    b=4
 
-    a = A(
-        a=Bit(0),
-        b=BV(3),
-        e=e
-    )
+T = Tuple[BV, Bit]
 
-    class B(Product):
-        a = A
-        b = Bit
+class P(Product):
+    a = Bit
+    b = BV
 
-    b = B(
-        a=a,
-        b=Bit(1)
-    )
+S = Sum[BV, Bit]
 
-    T = Tuple[A, E]
-    t = T(a, e)
+class TU(TaggedUnion):
+    a = Bit
+    b = BV
 
-    S = Sum[B, T]
-    s_b = S(b)
-    s_t = S(t)
 
-    AA = AssembledADT[A, Assembler, BitVector]
-    assert hasattr(AA, "from_fields")
-    AB = AssembledADT[B, Assembler, BitVector]
-    assert hasattr(AB, "from_fields")
+@pytest.mark.parametrize("T, args",
+        [
+            (E, (E.a,)),
+            (E, (E.b,)),
+        ]
+)
+def test_from_fields_enum(T, args):
     AT = AssembledADT[T, Assembler, BitVector]
     assert hasattr(AT, "from_fields")
-    AS = AssembledADT[S, Assembler, BitVector]
-    assert hasattr(AS, "from_fields")
 
-    #This is really what I want to do.
-    kwargs = dict(
-        a=Bit(0),
-        b=BV(3),
-        e=E.b
-    )
+    lit = T(*args)
+    assembled = AT(lit)
+    assembled_ = AT(assembled)
+    from_fields = AT.from_fields(*args)
 
-    aa = AA.from_fields(**kwargs)
+    assert lit == assembled_
+    assert assembled == assembled_
+    assert assembled_ == from_fields
+    assert from_fields == lit
 
-    assert aa == AA(a)
-    assert aa.a == Bit(0)
-    assert aa.b == BV(3)
-    assert aa.e == E.b
-    assert aa == AA(**kwargs)
 
-    kwargs = dict(
-        a=aa,
-        b=Bit(1)
-    )
+@pytest.mark.parametrize("T, args",
+        [
+            (T, (BV(7), Bit(1))),
+        ]
+)
+def test_from_fields_tuple(T, args):
+    AT = AssembledADT[T, Assembler, BitVector]
+    assert hasattr(AT, "from_fields")
 
-    ab = AB.from_fields(**kwargs)
-    assert ab == AB(b)
-    assert ab.a == aa
-    assert ab.b == Bit(1)
-    assert ab == AB(**kwargs)
+    lit = T(*args)
+    assembled = AT(lit)
+    assembled_ = AT(assembled)
+    from_fields = AT.from_fields(*args)
 
-    args = (aa, e)
-    at = AT.from_fields(*args)
-    assert at == AT(t)
-    assert at[0] == aa
-    assert at[1] == e
-    assert at == AT(*args)
+    assert lit == assembled_
+    assert assembled == assembled_
+    assert assembled_ == from_fields
+    assert from_fields == lit
 
-    args_b = (B, ab)
-    args_t = (T, t)
-    as_b = AS.from_fields(*args_b)
-    as_t = AS.from_fields(*args_t)
-    assert as_b == AS(s_b)
-    assert as_b == AS(*args_b)
-    assert as_t == AS(s_t)
-    assert as_t == AS(*args_t)
+    for i, v in enumerate(args):
+        assert lit[i] == v
+        assert assembled[i] == v
+        assert assembled_[i] == v
+        assert from_fields[i] == v
 
-    assert as_b[B].match
-    assert not as_b[T].match
-    assert as_b[B].value == ab
-    assert as_t[T].match
-    assert not as_t[B].match
-    assert as_t[T].value == at
 
+@pytest.mark.parametrize("T, args",
+        [
+            (S, (Bit, Bit(0))),
+            (S, (BV, BV(4))),
+        ]
+)
+def test_from_fields_sum(T, args):
+    AT = AssembledADT[T, Assembler, BitVector]
+    assert hasattr(AT, "from_fields")
+
+    lit = T(args[1])
+    assembled = AT(lit)
+    assembled_ = AT(assembled)
+    from_fields = AT.from_fields(*args)
+
+    assert lit == assembled_
+    assert assembled == assembled_
+    assert assembled_ == from_fields
+    assert from_fields == lit
+
+    assert lit[args[0]].match
+    assert assembled[args[0]].match
+    assert assembled_[args[0]].match
+    assert from_fields[args[0]].match
+
+    assert lit[args[0]].value == args[1]
+    assert assembled[args[0]].value == args[1]
+    assert assembled_[args[0]].value == args[1]
+    assert from_fields[args[0]].value == args[1]
+
+
+@pytest.mark.parametrize("T, kwargs",
+        [
+            (P, dict(a=Bit(1), b=BV(6))),
+        ]
+)
+def test_from_fields_product(T, kwargs):
+    AT = AssembledADT[T, Assembler, BitVector]
+    assert hasattr(AT, "from_fields")
+
+    lit = T(**kwargs)
+    assembled = AT(lit)
+    assembled_ = AT(assembled)
+    from_fields = AT.from_fields(**kwargs)
+
+    assert lit == assembled_
+    assert assembled == assembled_
+    assert assembled_ == from_fields
+    assert from_fields == lit
+
+    for k, v in kwargs.items():
+        assert getattr(lit, k) == v
+        assert getattr(assembled, k) == v
+        assert getattr(assembled_, k) == v
+        assert getattr(from_fields, k) == v
+
+
+@pytest.mark.parametrize("T, kwargs",
+        [
+            (TU, dict(a=Bit(0))),
+            (TU, dict(b=BV(11))),
+        ]
+)
+def test_from_fields_tagged(T, kwargs):
+    AT = AssembledADT[T, Assembler, BitVector]
+    assert hasattr(AT, "from_fields")
+
+    lit = T(**kwargs)
+    assembled = AT(lit)
+    assembled_ = AT(assembled)
+    from_fields = AT.from_fields(**kwargs)
+
+    assert lit == assembled_
+    assert assembled == assembled_
+    assert assembled_ == from_fields
+    assert from_fields == lit
+
+    for k, v in kwargs.items():
+        assert getattr(lit, k).match
+        assert getattr(assembled, k).match
+        assert getattr(assembled_, k).match
+        assert getattr(from_fields, k).match
+
+        assert getattr(lit, k).value == v
+        assert getattr(assembled, k).value == v
+        assert getattr(assembled_, k).value == v
+        assert getattr(from_fields, k).value == v
+
+
+def test_enum_error():
+    AE = AssembledADT[E, Assembler, BitVector]
+
+    with pytest.raises(TypeError):
+        E(1)
+
+    with pytest.raises(TypeError):
+        AE(1)
+
+    with pytest.raises(TypeError):
+        AE.from_fields(1)

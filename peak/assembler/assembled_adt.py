@@ -129,7 +129,6 @@ def _tuple_from_fields(cls, *args, default_bv=0):
 def _enum_from_fields(cls, value, *, default_bv=0):
     return cls(value)
 
-
 class AssembledADTMeta(BoundMeta):
     def __init__(cls, name, bases, namespace, **kwargs):
         if not cls.is_bound:
@@ -153,10 +152,15 @@ class AssembledADTMeta(BoundMeta):
     def __call__(cls, *args, **kwargs):
         # Dirty hack to make it seem like init can be called like from_fields
         # In the face ambiguity it will use old constructor
-        try:
+        if issubclass(cls.adt_t, Enum):
+            # Avoid infinite recusion in enums on error cases
+            # as from_fields just calls __call__
             return super().__call__(*args, **kwargs)
-        except TypeError:
-            return cls.from_fields(*args, **kwargs)
+        else:
+            try:
+                return super().__call__(*args, **kwargs)
+            except TypeError:
+                return cls.from_fields(*args, **kwargs)
 
     def _name_from_idx(cls, idx):
         return f'{cls.__name__}[{", ".join(map(repr, idx))}]'
