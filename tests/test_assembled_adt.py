@@ -257,3 +257,16 @@ def test_from_fields_tagged(T, kwargs):
         assert getattr(assembled, k).value == v
         assert getattr(assembled_, k).value == v
         assert getattr(from_fields, k).value == v
+
+
+def test_enum_error():
+    AE = AssembledADT[E, Assembler, BitVector]
+
+    with pytest.raises(TypeError):
+        E(1)
+
+    with pytest.raises(TypeError):
+        AE(1)
+
+    with pytest.raises(TypeError):
+        AE.from_fields(1)
