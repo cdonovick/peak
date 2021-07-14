@@ -308,14 +308,27 @@ class MagmaFamily(_AsmFamily):
                 name_map=m.generator.ParamDict(CE='en', I='value'))
 
     def assemble(self, locals, globals, set_port_names: bool = False, **kwargs):
-        def adtify(t_):
+        def magmafy(t_):
             if isinstance(t_, tuple):
-                return tuple(adtify(t__) for t__ in t_)
+                return tuple(magmafy(t__) for t__ in t_)
             t_ = strip_modifiers(t_)
             if hwtypes.is_adt_type(t_):
                 return self.get_adt_t(t_)
+            elif issubclass(t_, hwtypes.AbstractBitVector):
+                t_fam  = t_.get_family()
+                size = t_.size
+                # There should really be a better way to check this
+                if issubclass(t_, t_fam.Signed):
+                    return self.Signed[size]
+                elif issubclass(t_, t_fam.Unsigned):
+                    return self.Unsigned[size]
+                else:
+                    return self.BitVector[size]
+            elif issubclass(t_, hwtypes.AbstractBit):
+                return self.Bit
             else:
                 return t_
+
         env = SymbolTable(locals, globals)
 
         s_deco = super().assemble(locals, globals, **kwargs)
@@ -329,7 +342,7 @@ class MagmaFamily(_AsmFamily):
 
             annotations = {}
             for arg, t_ in call.__annotations__.items():
-                annotations[arg] = adtify(t_)
+                annotations[arg] = magmafy(t_)
             cls = m.sequential2(env=env,
                     annotations=annotations,
                     reset_type=m.AsyncReset,
