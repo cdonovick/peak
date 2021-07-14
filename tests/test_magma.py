@@ -19,7 +19,6 @@ import itertools
 def test_basic(named_outputs, set_port_names):
     @family_closure
     def PE_fc(family):
-        Bit = family.Bit
         if named_outputs:
             @family.assemble(locals(), globals(), set_port_names=set_port_names)
             class PENamed(Peak, typecheck=True):
@@ -77,8 +76,6 @@ def test_enum():
 
     @family_closure
     def PE_fc(family):
-
-        Bit = family.Bit
         @family.assemble(locals(), globals())
         class PE_Enum(Peak):
             def __call__(self, op: Const(Op), in0: Bit, in1: Bit) -> Bit:
@@ -173,14 +170,13 @@ def test_composition():
 def test_register():
     @family_closure
     def PE_fc(family):
-        T = family.BitVector[8]
-        Reg = family.gen_register(T, 0)
+        Reg = family.gen_register(family.BitVector[8], 0)
         @family.assemble(locals(), globals())
         class CounterPe(Peak):
             def __init__(self):
                 self.register: Reg = Reg()
 
-            def __call__(self, en: family.Bit) -> T:
+            def __call__(self, en: Bit) -> BitVector[8]:
                 val = self.register.prev()
                 self.register(val+1, en)
                 return val
