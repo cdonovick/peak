@@ -13,7 +13,6 @@ import pysmt.shortcuts as smt
 from peak.assembler import Assembler
 from peak.assembler import AssembledADT
 from peak.assembler import AssembledADTRecursor
-from peak.assembler import _TAG
 from peak import family
 
 class Match: pass
@@ -64,34 +63,26 @@ class SMTForms(AssembledADTRecursor):
     def sum(self, aadt_t, path, value):
         adt_t, assembler_t, bv_t = aadt_t.fields
         assembler = aadt_t._assembler_
-        #Create _TAG
-        if value is None:
-            tag = SMTBitVector[assembler.tag_width]()
-        else:
-            tag = value[_TAG]
 
         field_dict = {}
         forms = []
         varmap = {}
-        varmap[path + (_TAG,)] = tag
         varmap[path + (Match,)] = {}
         fields = list(adt_t.fields)
         for field in fields:
-            #field_tag_value = assembler.assemble_tag(field, bv_t)
-            #tag_match = (tag==field_tag_value)
             sub_aadt_t = aadt_t[field]
             if value is None:
                 sub_value = None
             else:
                 sub_value = value[field].value
             sub_forms, sub_varmap, _sub_value = self(sub_aadt_t, path=path + (field,), value=sub_value)
-            _value = aadt_t.from_fields(field, _sub_value, tag_bv=tag)
+            _value = aadt_t.from_fields(field, _sub_value)
             #update sub_forms with current match path
             for sub_form in sub_forms:
                 assert path not in sub_form.path_dict
                 path_dict = {path:field, **sub_form.path_dict}
                 if value is None:
-                    form_value = aadt_t.from_fields(field, sub_form.value, tag_bv=tag)
+                    form_value = aadt_t.from_fields(field, sub_form.value)
                 else:
                     form_value = value
                 forms.append(Form(value=form_value, path_dict=path_dict, varmap=sub_form.varmap))
@@ -111,21 +102,12 @@ class SMTForms(AssembledADTRecursor):
     def tagged_union(self, aadt_t, path, value):
         adt_t, assembler_t, bv_t = aadt_t.fields
         assembler = aadt_t._assembler_
-        #Create _TAG
-        if value is None:
-            tag_prefix = ".".join([str(p) for p in path] + ["TAG"])
-            tag = SMTBitVector[assembler.tag_width](prefix=tag_prefix)
-        else:
-            tag = value[_TAG]
 
         field_dict = {}
         forms = []
         varmap = {}
-        varmap[path + (_TAG,)] = tag
         varmap[path + (Match,)] = {}
         for field_name, field in adt_t.field_dict.items():
-            #field_tag_value = assembler.assemble_tag(field, bv_t)
-            #tag_match = (tag==field_tag_value)
             sub_aadt_t = getattr(aadt_t, field_name)
             if value is None:
                 sub_value = None
@@ -133,13 +115,13 @@ class SMTForms(AssembledADTRecursor):
                 sub_value = value[field].value
 
             sub_forms, sub_varmap, _sub_value = self(sub_aadt_t, path=path + (field_name,), value=sub_value)
-            _value = aadt_t.from_fields(tag_bv=tag, **{field_name: _sub_value})
+            _value = aadt_t.from_fields(**{field_name: _sub_value})
             #update sub_forms with current match path
             for sub_form in sub_forms:
                 assert path not in sub_form.path_dict
                 path_dict = {path:field_name, **sub_form.path_dict}
                 if value is None:
-                    form_value = aadt_t.from_fields(tag_bv=tag, **{field_name: sub_form.value})
+                    form_value = aadt_t.from_fields(**{field_name: sub_form.value})
                 else:
                     form_value = value
                 forms.append(Form(value=form_value, path_dict=path_dict, varmap=sub_form.varmap))
