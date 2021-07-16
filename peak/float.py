@@ -321,6 +321,7 @@ def float_lib_gen(exp_bits: int, frac_bits: int):
         return Eq
 
 
+    #Used to create floating point ops with a constant rounding mode
     @lru_cache(None)
     def const_rm(rm: RoundingMode):
         assert isinstance(rm, RoundingMode)
@@ -410,8 +411,12 @@ def float_lib_gen(exp_bits: int, frac_bits: int):
 
         return SimpleNamespace(
             Add_fc=_Add_fc,
+            Sub_fc=_Sub_fc,
             Mul_fc=_Mul_fc,
+            Div_fc=_Div_fc,
             Sqrt_fc=_Sqrt_fc,
+            Fma_fc=_Fma_fc,
+            RoundToIntegral_fc=_RoundToIntegral_fc,
         )
 
 
