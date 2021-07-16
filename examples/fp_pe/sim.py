@@ -2,7 +2,7 @@ from peak import Peak, family_closure, family, Const
 from hwtypes import TypeFamily
 from hwtypes.adt import TaggedUnion, Product, Enum
 from hwtypes import BitVector, Bit
-from peak.float import Float
+from peak.float import float_lib_gen, RoudningMode_utils, RoundingMode
 
 
 Data = BitVector[16]
@@ -12,13 +12,16 @@ class FPU_op(Enum):
     FPMul = 2
     FPSqrt = 3
 
-BFloat16 = Float(7, 8)
+BFloat16 = float_lib_gen(7, 8)
 
 @family_closure
 def FPU_fc(family: TypeFamily):
-    Add = BFloat16.add_fc(family)
-    Mul = BFloat16.mul_fc(family)
-    Sqrt = BFloat16.sqrt_fc(family)
+    Add = BFloat16.Add_fc(family)
+    Mul = BFloat16.Mul_fc(family)
+    Sqrt = BFloat16.Sqrt_fc(family)
+
+    rm_utils = RoudningMode_utils(family)
+
     @family.assemble(locals(), globals())
     class FPU(Peak):
         def __init__(self):
@@ -27,9 +30,10 @@ def FPU_fc(family: TypeFamily):
             self.sqrt: Sqrt = Sqrt()
 
         def __call__(self, op: FPU_op, a: Data, b: Data) -> Data:
-            add_out = self.add(a, b)
-            mul_out = self.mul(a, b)
-            sqrt_out = self.sqrt(a)
+            rm = rm_utils.to_rm(family.BitVector[3](2))
+            add_out = self.add(rm, a, b)
+            mul_out = self.mul(rm, a, b)
+            sqrt_out = self.sqrt(rm, a)
             if op == FPU_op.FPAdd:
                 return add_out
             elif op == FPU_op.FPMul:

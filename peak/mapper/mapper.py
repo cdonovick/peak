@@ -800,7 +800,7 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 10,
+        itr_limit = 20,
         logic = BV
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
@@ -846,7 +846,7 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
-def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4", irmapper = None):
+def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None):
 
     y = set(y)
     x = phi.get_free_variables() - y
@@ -854,7 +854,6 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
     with smt.Solver(logic=logic, name=solver_name) as solver:
         solver.add_assertion(smt.Bool(True))
         loops = 0
-
         while maxloops is None or loops <= maxloops:
             loops += 1
             eres = solver.solve()
@@ -872,7 +871,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops = 10, solver_name = "cvc4",
                     sigma = {v: model.get_value(v) for v in y}
                     sub_phi = phi.substitute(sigma).simplify()
                     solver.add_assertion(sub_phi)
-        ValueError("Unknown result in efsmt")
+        raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
 
 
 def strip_aadt(binding):
