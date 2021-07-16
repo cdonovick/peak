@@ -1,7 +1,7 @@
 from hwtypes import Bit, BitVector
 from peak import Const, family_closure, Peak
 from peak.family import PyFamily
-from peak.float import Float
+from peak.float import float_lib_gen
 import examples.fp_pe as fp
 from hwtypes import SMTBitVector as SBV, SMTBit as SBit
 from peak.family import SMTFamily
@@ -98,8 +98,8 @@ def test_black_box_smt():
 
 #Test the floating point libs
 def test_float():
-    fplib = Float(3, 4)
-    add_obj = fplib.add_fc.Py()
+    fplib = float_lib_gen(3, 4)
+    add_obj = fplib.Add_fc.Py()
     paths_to_bbs = get_black_boxes(add_obj)
     assert paths_to_bbs == {():add_obj}
 
