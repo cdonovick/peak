@@ -37,3 +37,34 @@ def gen_register2(family, T, init=0):
     if family.Bit is m.Bit:
         Register = m.circuit.sequential(Register)
     return Register
+
+def gen_Register3(width, init=None):
+
+    if init is None:
+        init = 0
+
+    @family_closure
+    def Register3_fc(family):
+        T = family.BitVector[width]
+
+        class Register3(Peak):
+            def __init__(self):
+                self.value: T = T(init)
+                self.next_value: T = None
+
+            #equivelent to evaluating 'posedge clk'
+            def update_state(self) -> None:
+                self.value = self.next_value
+                self.next_value = None
+
+            def __call__(self, i: T) -> T:
+                self.next_value = i
+                return self.value
+
+            def get(self) -> T:
+                return self.value
+
+            def set(self, v: T) -> None:
+                self.value = v
+        return Register3
+    return Register3_fc
