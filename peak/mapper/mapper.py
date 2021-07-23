@@ -32,6 +32,15 @@ from pysmt.logics import BV
 from .formula_constructor import And, Or, Implies, or_reduce, and_reduce
 
 
+from enum import Enum
+class FormulaKind(Enum):
+    A=0 #Old formula
+    B=1 #New, but obindings embedded in Q of implications
+    C=2 #New, but obindings embedded in P of implication
+    D=3 #Super simplified Formula
+
+
+
 #Helper function to search for the one peak class
 def _get_peak_cls(fc_out):
     clss = []
@@ -190,8 +199,8 @@ class ArchMapper(SMTMapper):
         self.path_constraints = path_constraints
         self.IVar = IVar
 
-    def process_ir_instruction(self, ir_fc, simple_formula=False):
-        return IRMapper(self, ir_fc, simple_formula, self.IVar)
+    def process_ir_instruction(self, ir_fc, formula_kind=FormulaKind.A):
+        return IRMapper(self, ir_fc, formula_kind, self.IVar)
 
 def is_valid(aadt_value: tp.Union[AssembledADT, AbstractBit, AbstractBitVector]):
     if isinstance(aadt_value, (AbstractBitVector, AbstractBit)):
@@ -451,7 +460,7 @@ def update_with_bb(
 
 
 class IRMapper(SMTMapper):
-    def __init__(self, archmapper, ir_fc, simple_formula=True, IVar: IndexVar=OneHot):
+    def __init__(self, archmapper, ir_fc, formula_kind=FormulaKind.A, IVar: IndexVar=OneHot):
         super().__init__(ir_fc)
         #For now assume that ir input forms and ir output forms is just 1
         if self.num_input_forms > 1:
@@ -460,7 +469,7 @@ class IRMapper(SMTMapper):
             raise NotImplementedError("Multiple ir output forms")
 
         if len(self.bb_outputs) > 0 or len(archmapper.bb_outputs) > 0:
-            if not simple_formula:
+            if not formula_kind:
                 raise ValueError("Simple Formula required for black boxes")
 
         self.archmapper = archmapper
@@ -542,7 +551,7 @@ class IRMapper(SMTMapper):
 
         use_input_sub = True
         #--------------------------------------------
-        if simple_formula:
+        if formula_kind in (FormulaKind.B, FormulaKind.C):
             def create_temp(aadt, name):
                 i_width = aadt._assembler_.width
                 bv = self.family.SMTFamily().BitVector[i_width](prefix=f"{name}")
@@ -639,6 +648,21 @@ class IRMapper(SMTMapper):
                 #Will need to do an input transformation
             pysmt_forall_vars = list(pysmt_forall_vars)
 
+            #Will be anded together
+            impl_conds = []
+
+            #-------- Input Binding Conditions --------
+            bi_conds = []
+            fb_conds = []
+            for (f,b), conds in fb_conditions.items():
+                fb_conds.append(form_var.match_index(f) & ib_var.match_index(b))
+                fb_cond = And(conds)
+                bi_conds.append(fb_cond)
+            impl_conds.append(Or(bi_conds))
+            preconditions.append(Or(fb_conds))
+
+
+
             #Create F
             def run_peak(mapper, input_value):
                 obj = mapper.peak_obj
@@ -649,32 +673,58 @@ class IRMapper(SMTMapper):
                 bb_inputs = get_bb_inputs(obj)
                 return output_dict, bb_inputs
 
+            #Output binding Conditions
             arch_output_dict, arch_bb_inputs = run_peak(archmapper, arch_in)
             ir_output_dict, ir_bb_inputs = run_peak(self, ir_in)
-            F_conds = []
-            o_preconditions = []
-            for bo, obinding in enumerate(output_bindings):
-                ob_cond = ob_var.match_index(bo)
-                o_conds = []
-                o_preconditions.append(ob_cond)
-                for ir_path, arch_path in obinding:
-                    if ir_path is Unbound:
-                        continue
-                    ir_out = ir_output_dict[ir_path]
-                    arch_out = arch_output_dict[arch_path]
-                    o_conds.append(ir_out == arch_out)
-                F_conds.append(Implies(ob_cond, And(o_conds)))
-            assert len(F_conds) > 0
-            preconditions.append(Or(o_preconditions))
-            F = And(F_conds)
-            impl_conds = []
-            fb_conds = []
 
-            for (f,b), conds in fb_conditions.items():
-                fb_conds.append(form_var.match_index(f) & ib_var.match_index(b))
-                fb_cond = And(conds)
-                impl_conds.append(fb_cond)
+            if formula_kind is FormulaKind.B:
+                F_conds = []
+                o_preconditions = []
+                for bo, obinding in enumerate(output_bindings):
+                    ob_cond = ob_var.match_index(bo)
+                    o_conds = []
+                    o_preconditions.append(ob_cond)
+                    for ir_path, arch_path in obinding:
+                        if ir_path is Unbound:
+                            continue
+                        ir_out = ir_output_dict[ir_path]
+                        arch_out = arch_output_dict[arch_path]
+                        o_conds.append(ir_out == arch_out)
+                    F_conds.append(Implies(ob_cond, And(o_conds)))
+                assert len(F_conds) > 0
+                preconditions.append(Or(o_preconditions))
+                F = And(F_conds)
+            elif formula_kind is FormulaKind.C:
+                #Need to create a new variable for the output of everything
+                arch_out = create_temp(archmapper.output_aadt_t, "ArchOut")
+                bind_out = create_temp(self.output_aadt_t, "BindOut")
+                pysmt_forall_vars += [arch_out._value_.value, bind_out._value_.value]
+                arch_out_vars = {(k,): v for k, v in aadt_product_to_dict(arch_out).items()}
+                bind_out_vars = {(k,): v for k, v in aadt_product_to_dict(bind_out).items()}
+                F = And([bind_out_vars[k] == ir_output_dict[k] for k in ir_output_dict.keys()])
+                impl_conds += [arch_out_vars[k] == arch_output_dict[k] for k in arch_output_dict.keys()]
 
+                #Create output binding conditions
+
+                #will be ored
+                bo_conds = []
+                o_preconditions = []
+                for bo, obinding in enumerate(output_bindings):
+                    ob_cond = ob_var.match_index(bo)
+                    o_preconditions.append(ob_cond)
+                    conds = []
+                    for ir_path, arch_path in obinding:
+                        if ir_path is Unbound:
+                            continue
+                        ir_out = bind_out_vars[ir_path]
+                        arch_out = arch_out_vars[arch_path]
+                        conds.append(ir_out == arch_out)
+                    bo_conds.append(Implies(ob_cond, And(conds)))
+                impl_conds.append(Or(bo_conds))
+            else:
+                assert 0
+
+            #------ Add in the user constraints -----
             exist_constraints = []
             forall_constraints = []
             for path, constraints in archmapper.path_constraints.items():
@@ -685,10 +735,14 @@ class IRMapper(SMTMapper):
                 else:
                     forall_constraints.append(Or(arch_var == c for c in constraints))
             preconditions += exist_constraints
-            preconditions.append(Or(fb_conds))
-            F_cond = And(forall_constraints + [Or(impl_conds)])
+            impl_conds += forall_constraints
+            #--------------------------------------------
+
+
+            impl_cond = And(impl_conds)
+
             valid_conditions = And(preconditions)
-            formula = And([valid_conditions, Implies(F_cond, F)])
+            formula = And([valid_conditions, Implies(impl_cond, F)])
 
             formula, bb_forall = update_with_bb(
                 formula,
@@ -716,7 +770,7 @@ class IRMapper(SMTMapper):
             self.formula = smt.ForAll(pysmt_forall_vars, formula.value)
             self.forall_vars = pysmt_forall_vars
             self.formula_wo_forall = formula.value
-        else:
+        elif formula_kind is FormulaKind.A:
             constraints = []
             #Build the constraint
             forall_vars = set()
@@ -795,7 +849,8 @@ class IRMapper(SMTMapper):
             logger.debug("Universally Quantified Vars")
             for var in forall_vars:
                 logger.debug(f"  {var}")
-
+        else:
+            raise NotImplementedError()
 
     def solve(self,
         solver_name : str = 'z3',
@@ -846,6 +901,10 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
+
+def pdict(d):
+    for k, v in d.items():
+        print(f"    {k}: {v}")
 def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None):
 
     y = set(y)
@@ -855,6 +914,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
         solver.add_assertion(smt.Bool(True))
         loops = 0
         while maxloops is None or loops <= maxloops:
+            print(loops)
             loops += 1
             eres = solver.solve()
 
@@ -862,6 +922,8 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                 return None
             else:
                 tau = {v: solver.get_value(v) for v in x}
+                print("  Exists")
+                pdict(tau)
                 sub_phi = phi.substitute(tau).simplify()
                 model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
 
@@ -869,6 +931,8 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                     return rr_from_solver(solver, irmapper)
                 else :
                     sigma = {v: model.get_value(v) for v in y}
+                    print("  Forall")
+                    pdict(sigma)
                     sub_phi = phi.substitute(sigma).simplify()
                     solver.add_assertion(sub_phi)
         raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
