@@ -1,6 +1,6 @@
 import operator
 from functools import partial, reduce, lru_cache
-
+from hwtypes import AbstractBit
 or_reduce = partial(reduce, operator.or_)
 and_reduce = partial(reduce, operator.and_)
 
@@ -26,10 +26,15 @@ def _op_to_str(vs, opname, ts, indent):
         f"{ts})"
     ])
 
+def _check_values(vs):
+    assert len(vs) > 0
+    assert all(isinstance(v, (FormulaConstructor, AbstractBit)) for v in vs)
+
+
 class And(FormulaConstructor):
     def __init__(self, values: list):
         self.values = list(values)
-        assert len(self.values) > 0
+        _check_values(self.values)
 
     def serialize(self, ts="", indent="|   "):
         return _op_to_str(self.values, "And", ts, indent)
@@ -40,7 +45,7 @@ class And(FormulaConstructor):
 class Or(FormulaConstructor):
     def __init__(self, values: list):
         self.values = list(values)
-        assert len(self.values) > 0
+        _check_values(self.values)
 
     def serialize(self, ts="", indent="|   "):
         return _op_to_str(self.values, "Or", ts, indent)
@@ -52,6 +57,7 @@ class Implies(FormulaConstructor):
     def __init__(self, p, q):
         self.p = p
         self.q = q
+        _check_values([p, q])
 
     def serialize(self, ts="", indent="|   "):
         return _op_to_str((self.p, self.q), "Implies", ts, indent)

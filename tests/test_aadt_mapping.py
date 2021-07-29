@@ -23,11 +23,9 @@ num_test_vectors = 16
 
 fa, fb, fc, fd = FormulaKind.A, FormulaKind.B, FormulaKind.C, FormulaKind.D
 
-formula_kinds = [fa, fb, fc]
-formula_kinds = [fc]
+formula_kinds = [fa, fb]
 
 
-#@pytest.mark.parametrize('formula_kind', [fa, fb, fc])
 @pytest.mark.parametrize('formula_kind', formula_kinds)
 def test_simple(formula_kind):
     print()
@@ -81,7 +79,7 @@ def test_automapper(IVar, formula_kind, external_loop, arch_fc):
     expect_not_found = ('Mul', 'Shftr', 'Shftl', 'Not', 'Neg')
     for ir_name, ir_fc in IR.instructions.items():
         ir_mapper = arch_mapper.process_ir_instruction(ir_fc, formula_kind)
-        rewrite_rule = ir_mapper.solve('z3', external_loop=external_loop, itr_limit=100)
+        rewrite_rule = ir_mapper.solve('z3', external_loop=external_loop)
         if rewrite_rule is None:
             assert ir_name in expect_not_found
             continue
@@ -474,19 +472,31 @@ def test_non_const_constraint(formula_kind, arch_fc, ISA_fc, is_sum):
             }
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved, formula_kind=formula_kind)
 
-@pytest.mark.parametrize('formula_kind', formula_kinds)
-def test_riscv_rr(formula_kind):
-    @family_closure
-    def ir_fc(family):
-        Data = family.BitVector[32]
-        @family.assemble(locals(), globals())
-        class i32_add(Peak):
-            def __call__(self, in0: BitVector[32], in1: BitVector[32]) -> BitVector[32]:
-                return in0 + in1
-        return i32_add
 
+@family_closure
+def ir_add_fc(family):
+    Data = family.BitVector[32]
+    @family.assemble(locals(), globals())
+    class i32_add(Peak):
+        def __call__(self, in0: BitVector[32], in1: BitVector[32]) -> BitVector[32]:
+            return in0 | in1
+    return i32_add
+
+@family_closure
+def ir_c_fc(family):
+    Data = family.BitVector[32]
+    @family.assemble(locals(), globals())
+    class i32_c(Peak):
+        def __call__(self, c: Const(BitVector[12])) -> BitVector[32]:
+            return c.sext(20)
+    return i32_c
+
+@pytest.mark.parametrize('ir_fc', (ir_add_fc, ir_c_fc))
+@pytest.mark.parametrize('formula_kind', formula_kinds)
+def test_riscv_rr(ir_fc, formula_kind):
     arch_fc = riscv_sim.R32I_mappable_fc
     arch_mapper = ArchMapper(arch_fc, family=riscv_family)
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc, formula_kind=formula_kind)
-    rewrite_rule = ir_mapper.solve('z3', external_loop=True, itr_limit=10)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True, itr_limit=200)
     assert rewrite_rule is not None
+    rewrite_rule.verify()

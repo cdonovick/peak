@@ -2,6 +2,15 @@ from peak import family_closure, family, Peak, Const
 from hwtypes.adt import Enum, TaggedUnion, Product
 from hwtypes import Bit, BitVector
 from peak.mapper import ArchMapper
+from peak.mapper import FormulaKind
+
+fa, fb, fc, fd = FormulaKind.A, FormulaKind.B, FormulaKind.C, FormulaKind.D
+
+formula_kinds = [
+    fa,
+    fb,
+]
+
 
 Ridx = BitVector[2]
 Word = BitVector[8]
@@ -72,17 +81,17 @@ def ir_const_fc(family):
     return IR
 
 import pytest
+@pytest.mark.parametrize('formula_kind', formula_kinds)
 @pytest.mark.parametrize("ir_fc, name", [
     (ir_add_fc, "Reg-Reg Addition"),
     (ir_inc_fc, "Reg Increment"),
     (ir_const_fc, "Load Immediate"),
 ])
-def test_basic(ir_fc, name):
+def test_basic(formula_kind, ir_fc, name):
     arch_mapper = ArchMapper(arch_fc)
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
-    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, formula_kind=formula_kind)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True, itr_limit=100)
     assert rewrite_rule is not None
     counter_example = rewrite_rule.verify()
     assert counter_example is None
-
 

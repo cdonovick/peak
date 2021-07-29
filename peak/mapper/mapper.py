@@ -14,7 +14,7 @@ from .utils import SMTForms, SimplifyBinding
 from .utils import Unbound, Match
 from .utils import create_bindings, pretty_print_binding
 from .utils import aadt_product_to_dict
-from .utils import solved_to_bv, log2
+from .utils import solved_to_bv
 from .utils import rebind_binding
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax, EnumMeta
 import inspect
@@ -548,17 +548,122 @@ class IRMapper(SMTMapper):
         self.output_bindings = output_bindings
 
 
+        def run_peak(mapper, input_value):
+            obj = mapper.peak_obj
+            input_dict = aadt_product_to_dict(input_value)
+            outputs = obj(**input_dict)
+            output = wrap_outputs(outputs, mapper.output_aadt_t)
+            output_dict = {(k,): v for k, v in aadt_product_to_dict(output).items()}
+            bb_inputs = get_bb_inputs(obj)
+            return output_dict, bb_inputs
 
+        def var_from_aadt(aadt, name):
+            i_width = aadt._assembler_.width
+            bv = self.family.SMTFamily().BitVector[i_width](prefix=f"{name}")
+            value = aadt(bv)
+            return value
+
+        if formula_kind is FormulaKind.D:
+            ir_in = var_from_aadt(self.input_aadt_t, "ir_in")
+            arch_in_a = var_from_aadt(archmapper.input_aadt_t, "arch_in_a")
+            arch_in_e = var_from_aadt(archmapper.input_aadt_t, "arch_in_e")
+            ir_forms, ir_in_varmap, _ = SMTForms()(self.input_aadt_t, value=ir_in)
+            arch_forms_a, arch_in_varmap_a, _ = SMTForms()(archmapper.input_aadt_t, value=arch_in_a)
+            arch_forms_e, arch_in_varmap_e, _ = SMTForms()(archmapper.input_aadt_t, value=arch_in_e)
+
+            archmapper.input_varmap = arch_in_varmap_e
+            arch_const_fields = [field for field, T in archmapper.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
+            ir_const_fields = [field for field, T in self.peak_fc.Py.input_t.field_dict.items() if issubclass(T, Const)]
+            assert len(arch_const_fields) > 0
+            #instr_var = var_from_aadt(archmapper.input_aadt_t[const_field], "instr")
+
+            ir_out_dict, ir_bb_inputs = run_peak(self, ir_in)
+            arch_out_dict, arch_bb_inputs = run_peak(archmapper, arch_in_a)
+            if len(ir_bb_inputs) > 0:
+                raise NotImplementedError()
+            if len(arch_bb_inputs) > 0:
+                raise NotImplementedError()
+
+            valid_conds = [is_valid(arch_in_e)]
+
+            match_options = []
+            for fi, ibindings in enumerate(input_bindings):
+                fi_cond = form_var.match_index(fi)
+                conds = [fi_cond]
+                for path, choice in arch_forms_e[fi].path_dict.items():
+                    match_path = path + (Match,)
+                    assert match_path in arch_in_varmap_e
+                    conds.append(arch_in_varmap_e[match_path][choice])
+                match_options.append(And(conds))
+            valid_conds.append(Or(match_options))
+
+            #Will be Ored
+            impl_conds = []
+            fb_valid = []
+            for fi, ibindings in enumerate(input_bindings):
+                fi_cond = form_var.match_index(fi)
+                for bi, ibinding in enumerate(ibindings):
+                    #print(fi, bi)
+                    #pretty_print_binding(ibinding)
+                    bi_cond = ib_var.match_index(bi)
+                    fb_valid.append(And([fi_cond, bi_cond]))
+
+                    #TO be anded
+                    fb_conds = [fi_cond, bi_cond, match_options[fi]]
+                    for ir_path, arch_path in ibinding:
+                        arch_val = arch_in_varmap_a[arch_path]
+                        is_unbound = ir_path is Unbound
+                        if is_unbound:
+                            if arch_path[0] in arch_const_fields:
+                                arch_e_val = arch_in_varmap_e[arch_path]
+                                fb_conds.append(arch_val == arch_e_val)
+                            else:
+                                continue
+                        else:
+                            ir_val = ir_in_varmap[ir_path]
+                            fb_conds.append(arch_val == ir_val)
+                    impl_conds.append(And(fb_conds))
+            valid_conds.append(Or(fb_valid))
+
+            pysmt_forall_vars = [ir_in._value_.value, arch_in_a._value_.value]
+
+            #Create F (with Output Bindings)
+            F_conds = []
+            o_preconditions = []
+            for bo, obinding in enumerate(output_bindings):
+                ob_cond = ob_var.match_index(bo)
+                o_conds = []
+                o_preconditions.append(ob_cond)
+                for ir_path, arch_path in obinding:
+                    if ir_path is Unbound:
+                        continue
+                    ir_out = ir_out_dict[ir_path]
+                    arch_out = arch_out_dict[arch_path]
+                    o_conds.append(ir_out == arch_out)
+                F_conds.append(Implies(ob_cond, And(o_conds)))
+            assert len(F_conds) > 0
+            F = And(F_conds)
+            valid_conds.append(Or(o_preconditions))
+            impl_cond = And([Or(impl_conds), is_valid(arch_in_a)])
+            formula = And([And(valid_conds), Implies(impl_cond, F)])
+            #print(formula.serialize(), flush=True)
+            formula = formula.to_hwtypes()
+
+            #If there is no const on the IR I can replace the All the exist parts of arch with exists
+            if len(ir_const_fields) == 0:
+                input_subs = [(arch_in_a[field]._value_, arch_in_e[field]._value_) for field in arch_const_fields]
+                formula = formula.substitute(*input_subs)
+
+            self.formula = smt.ForAll(pysmt_forall_vars, formula.value)
+            self.forall_vars = pysmt_forall_vars
+            self.formula_wo_forall = formula.value
+            return
         use_input_sub = True
         #--------------------------------------------
         if formula_kind in (FormulaKind.B, FormulaKind.C):
-            def create_temp(aadt, name):
-                i_width = aadt._assembler_.width
-                bv = self.family.SMTFamily().BitVector[i_width](prefix=f"{name}")
-                value = aadt(bv)
-                return value
-            temp_arch_in = create_temp(archmapper.input_aadt_t, "Arch_in")
-            temp_ir_in = create_temp(self.input_aadt_t, "IR_in")
+
+            temp_arch_in = var_from_aadt(archmapper.input_aadt_t, "Arch_in")
+            temp_ir_in = var_from_aadt(self.input_aadt_t, "IR_in")
             if use_input_sub:
                 arch_in = temp_arch_in
                 ir_in = temp_ir_in
@@ -664,14 +769,7 @@ class IRMapper(SMTMapper):
 
 
             #Create F
-            def run_peak(mapper, input_value):
-                obj = mapper.peak_obj
-                input_dict = aadt_product_to_dict(input_value)
-                outputs = obj(**input_dict)
-                output = wrap_outputs(outputs, mapper.output_aadt_t)
-                output_dict = {(k,): v for k, v in aadt_product_to_dict(output).items()}
-                bb_inputs = get_bb_inputs(obj)
-                return output_dict, bb_inputs
+
 
             #Output binding Conditions
             arch_output_dict, arch_bb_inputs = run_peak(archmapper, arch_in)
@@ -696,9 +794,12 @@ class IRMapper(SMTMapper):
                 F = And(F_conds)
             elif formula_kind is FormulaKind.C:
                 #Need to create a new variable for the output of everything
-                arch_out = create_temp(archmapper.output_aadt_t, "ArchOut")
-                bind_out = create_temp(self.output_aadt_t, "BindOut")
-                pysmt_forall_vars += [arch_out._value_.value, bind_out._value_.value]
+                arch_out = var_from_aadt(archmapper.output_aadt_t, "ArchOut")
+                bind_out = var_from_aadt(self.output_aadt_t, "BindOut")
+                pysmt_forall_vars += [
+                    arch_out._value_.value,
+                    bind_out._value_.value,
+                ]
                 arch_out_vars = {(k,): v for k, v in aadt_product_to_dict(arch_out).items()}
                 bind_out_vars = {(k,): v for k, v in aadt_product_to_dict(bind_out).items()}
                 F = And([bind_out_vars[k] == ir_output_dict[k] for k in ir_output_dict.keys()])
@@ -706,7 +807,6 @@ class IRMapper(SMTMapper):
 
                 #Create output binding conditions
 
-                #will be ored
                 bo_conds = []
                 o_preconditions = []
                 for bo, obinding in enumerate(output_bindings):
@@ -717,10 +817,11 @@ class IRMapper(SMTMapper):
                         if ir_path is Unbound:
                             continue
                         ir_out = bind_out_vars[ir_path]
+                        #arch_out = arch_output_dict[arch_path]
                         arch_out = arch_out_vars[arch_path]
                         conds.append(ir_out == arch_out)
                     bo_conds.append(Implies(ob_cond, And(conds)))
-                impl_conds.append(Or(bo_conds))
+                impl_conds.append(And(bo_conds))
             else:
                 assert 0
 
@@ -855,7 +956,7 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 20,
+        itr_limit = 3000,
         logic = BV
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
@@ -886,6 +987,8 @@ def rr_from_solver(solver, irmapper):
     ibinding = im.input_bindings[arch_input_form_val][ib_val]
     obinding = im.output_bindings[ob_val]
 
+    #print(f"(f, bi, bo) = {arch_input_form_val}, {ib_val}, {ob_val}", flush=True)
+
     #extract, simplify, and convert constants to BV in the input binding
     bv_ibinding = []
     for ir_path, arch_path in ibinding:
@@ -899,12 +1002,10 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = rebind_binding(bv_ibinding, fam)
 
     bv_ibinding = strip_aadt(bv_ibinding)
+    #pretty_print_binding(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
 
-def pdict(d):
-    for k, v in d.items():
-        print(f"    {k}: {v}")
 def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None):
 
     y = set(y)
@@ -913,8 +1014,11 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
     with smt.Solver(logic=logic, name=solver_name) as solver:
         solver.add_assertion(smt.Bool(True))
         loops = 0
+        #print("\nsolving")
         while maxloops is None or loops <= maxloops:
-            print(loops)
+            #print(loops, end=".", flush=True)
+            #if loops %50==49:
+            #    print()
             loops += 1
             eres = solver.solve()
 
@@ -922,8 +1026,6 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                 return None
             else:
                 tau = {v: solver.get_value(v) for v in x}
-                print("  Exists")
-                pdict(tau)
                 sub_phi = phi.substitute(tau).simplify()
                 model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
 
@@ -931,8 +1033,6 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                     return rr_from_solver(solver, irmapper)
                 else :
                     sigma = {v: model.get_value(v) for v in y}
-                    print("  Forall")
-                    pdict(sigma)
                     sub_phi = phi.substitute(sigma).simplify()
                     solver.add_assertion(sub_phi)
         raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")

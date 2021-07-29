@@ -77,8 +77,6 @@ class SMTForms(AssembledADTRecursor):
         varmap[path + (Match,)] = {}
         fields = list(adt_t.fields)
         for field in fields:
-            #field_tag_value = assembler.assemble_tag(field, bv_t)
-            #tag_match = (tag==field_tag_value)
             sub_aadt_t = aadt_t[field]
             if value is None:
                 sub_value = None
@@ -124,13 +122,11 @@ class SMTForms(AssembledADTRecursor):
         varmap[path + (_TAG,)] = tag
         varmap[path + (Match,)] = {}
         for field_name, field in adt_t.field_dict.items():
-            #field_tag_value = assembler.assemble_tag(field, bv_t)
-            #tag_match = (tag==field_tag_value)
             sub_aadt_t = getattr(aadt_t, field_name)
             if value is None:
                 sub_value = None
             else:
-                sub_value = value[field].value
+                sub_value = getattr(value, field_name).value
 
             sub_forms, sub_varmap, _sub_value = self(sub_aadt_t, path=path + (field_name,), value=sub_value)
             _value = aadt_t.from_fields(tag_bv=tag, **{field_name: _sub_value})
@@ -322,11 +318,6 @@ class SimplifyBinding(AssembledADTRecursor):
     @check_leaf(required=False)
     def tuple(self, aadt_t, binding):
         return self.product_or_tuple(aadt_t, binding, is_product=False)
-
-def log2(x):
-    #verify it is a power of 2
-    assert x !=0 and (x & (x-1) == 0)
-    return x.bit_length() - 1
 
 def solved_to_bv(var, solver):
     smt_var = solver.get_value(var.value)

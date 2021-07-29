@@ -15,7 +15,7 @@ class IndexVar:
         for i in range(self.num_entries):
             if v == self.translate_index(self.num_entries, i):
                 return i
-        raise ValueError("Invalid Decode")
+        raise ValueError(f"Invalid Decode: {v}")
 
     @staticmethod
     @abc.abstractmethod

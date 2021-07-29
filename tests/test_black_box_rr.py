@@ -3,16 +3,14 @@ import pytest
 import examples.fp_pe as fp
 
 from examples.smallir import gen_SmallIR
-from peak.mapper import ArchMapper, RewriteRule
+from peak.mapper import ArchMapper, FormulaKind
 from peak.float import float_lib_gen, RoudningMode_utils, RoundingMode
-from peak import Peak, family, family_closure, Const
+from peak import Peak, family_closure, Const
 from hwtypes import BitVector
 from hwtypes.adt import Product, Enum
 
 
-
 def test_simple():
-    print()
 
     @family_closure
     def ir_add_fc(family):
@@ -60,7 +58,7 @@ def test_simple():
         (fplib.const_rm(RoundingMode.RNE).Add_fc, True),
         (fplib.const_rm(RoundingMode.RNE).Mul_fc, False),
     ):
-        ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
+        ir_mapper = arch_mapper.process_ir_instruction(ir_fc, formula_kind=FormulaKind.B)
         rewrite_rule = ir_mapper.solve('z3', external_loop=True)
         if found:
             assert rewrite_rule is not None
@@ -71,6 +69,8 @@ def test_simple():
 
 ir = gen_SmallIR(16)
 fplib = float_lib_gen(7, 8).const_rm(RoundingMode.RDN)
+
+
 
 @pytest.mark.parametrize('ir_fc, found', [
     (ir.instructions["Add"], True),
@@ -84,7 +84,7 @@ def test_rr(ir_fc, found):
     arch_fc = fp.PE_fc
     arch_mapper = ArchMapper(arch_fc)
 
-    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
+    ir_mapper = arch_mapper.process_ir_instruction(ir_fc, formula_kind=FormulaKind.B)
     rewrite_rule = ir_mapper.solve('z3', external_loop=True)
     if not found:
         assert rewrite_rule is None
