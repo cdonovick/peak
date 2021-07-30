@@ -1,9 +1,12 @@
+import inspect
+
 from functools import lru_cache
 from types import SimpleNamespace
 
 from peak import family_closure, Peak
 from peak.family import SMTFamily, MagmaFamily
 from hwtypes import SMTFPVector, FPVector, RoundingMode as RM, TypeFamily
+from hwtypes.fp_vector_abc import AbstractFPVector
 from peak.black_box import BlackBox
 from hwtypes import BitVector, Bit
 from hwtypes.adt import Enum
@@ -52,373 +55,222 @@ def RoudningMode_utils(family):
 
     return SimpleNamespace(**locals())
 
+
+def _format_name(name: str) -> str:
+    assert name[:3] == 'fp_', name
+    return name[3:].capitalize() + '_fc'
+
 @lru_cache(None)
-def float_lib_gen(exp_bits: int, frac_bits: int):
+def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
 
     width = 1 + exp_bits + frac_bits
     Data = BitVector[width]
 
-    #Returns a hwtypes float type
-    @family_closure
-    def Float_fc(family):
+    def _cast_magma(rm, x):
+        Float = magma.BFloat[width]
+        Float.reinterpret_from_bv = lambda bv: Float(bv)
+        Float.reinterpret_as_bv = lambda f: magma.Bits[width](f)
+        return Float.reinterpret_from_bv(x)
+
+    def _cast_smt(rm, x):
+        return SMTFPVector[exp_bits, frac_bits, rm, ieee_compliance].reinterpret_from_bv(x)
+
+    def _cast_py(rm, x):
+        return FPVector[exp_bits, frac_bits, rm, ieee_compliance].reinterpret_from_bv(x)
+
+    def _get_cast(family):
         if isinstance(family, MagmaFamily):
-            Float = magma.BFloat[width]
-            Float.reinterpret_from_bv = lambda bv: Float(bv)
-            Float.reinterpret_as_bv = lambda f: magma.Bits[width](f)
-            return Float
+            return _cast_magma
         elif isinstance(family, SMTFamily):
-            return SMTFPVector[exp_bits, frac_bits, RM.RNE, False]
+            return _cast_smt
         else:
-            return FPVector[exp_bits, frac_bits, RM.RNE, False]
+            return _cast_py
+
+    @lru_cache(None)
+    def gen_binary(op_name):
+        @family_closure
+        def fc(family: TypeFamily):
+            cast = _get_cast
+            @family.assemble(locals(), globals())
+            class Op(Peak, BlackBox):
+                def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
+                    if rm == RoundingMode.RNE:
+                        in0_rne = cast(RM.RNE, in0)
+                        in1_rne = cast(RM.RNE, in1)
+                        out_rne = getattr(in0_rne, op_name)(in1_rne)
+                        out = out_rne.reinterpret_as_bv()
+                    elif rm == RoundingMode.RTZ:
+                        in0_rtz = cast(RM.RTZ, in0)
+                        in1_rtz = cast(RM.RTZ, in1)
+                        out_rtz = getattr(in0_rtz, op_name)(in1_rtz)
+                        out = out_rtz.reinterpret_as_bv()
+                    elif rm == RoundingMode.RDN:
+                        in0_rdn = cast(RM.RDN, in0)
+                        in1_rdn = cast(RM.RDN, in1)
+                        out_rdn = getattr(in0_rdn, op_name)(in1_rdn)
+                        out = out_rdn.reinterpret_as_bv()
+                    elif rm == RoundingMode.RUP:
+                        in0_rup = cast(RM.RUP, in0)
+                        in1_rup = cast(RM.RUP, in1)
+                        out_rup = getattr(in0_rup, op_name)(in1_rup)
+                        out = out_rup.reinterpret_as_bv()
+                    else:
+                        assert  rm == RoundingMode.RMM
+                        in0_rmm = cast(RM.RUP, in0)
+                        in1_rmm = cast(RM.RUP, in1)
+                        out_rmm = getattr(in0_rmm, op_name)(in1_rmm)
+                        out = out_rmm.reinterpret_as_bv()
+                    return out
+            return Op
+        return fc
+
+    @lru_cache(None)
+    def gen_unary(op_name):
+        @family_closure
+        def fc(family: TypeFamily):
+            cast = _get_cast
+            @family.assemble(locals(), globals())
+            class Op(Peak, BlackBox):
+                def __call__(self, rm: RoundingMode, in0: Data) -> Data:
+                    if rm == RoundingMode.RNE:
+                        in0_rne = cast(RM.RNE, in0)
+                        out_rne = getattr(in0_rne, op_name)()
+                        out = out_rne.reinterpret_as_bv()
+                    elif rm == RoundingMode.RTZ:
+                        in0_rtz = cast(RM.RTZ, in0)
+                        out_rtz = getattr(in0_rtz, op_name)()
+                        out = out_rtz.reinterpret_as_bv()
+                    elif rm == RoundingMode.RDN:
+                        in0_rdn = cast(RM.RDN, in0)
+                        out_rdn = getattr(in0_rdn, op_name)()
+                        out = out_rdn.reinterpret_as_bv()
+                    elif rm == RoundingMode.RUP:
+                        in0_rup = cast(RM.RUP, in0)
+                        out_rup = getattr(in0_rup, op_name)()
+                        out = out_rup.reinterpret_as_bv()
+                    else:
+                        assert  rm == RoundingMode.RMM
+                        in0_rmm = cast(RM.RUP, in0)
+                        out_rmm = getattr(in0_rmm, op_name)()
+                        out = out_rmm.reinterpret_as_bv()
+                    return out
+            return Op
+        return fc
+
+    def gen_const_rm_binary(op_name, rm, closures):
+        @family_closure
+        def fc(family):
+            rm_ = family.get_constructor(RoundingMode)(rm)
+            _Op = closures[_format_name(op_name)](family)
+            @family.assemble(locals(), globals())
+            class Op(Peak):
+                def __init__(self):
+                    self.op : _Op = _Op()
+
+                def __call__(self, in0: Data, in1: Data) -> Data:
+                    return self.op(rm_, in0, in1)
+
+            return Op
+        return fc
+
+    def gen_const_rm_unary(op_name, rm, closures):
+        @family_closure
+        def fc(family):
+            rm_ = family.get_constructor(RoundingMode)(rm)
+            _Op = closures[_format_name(op_name)](family)
+            @family.assemble(locals(), globals())
+            class Op(Peak):
+                def __init__(self):
+                    self.op : _Op = _Op()
+
+                def __call__(self, in0: Data) -> Data:
+                    return self.op(rm_, in0)
+
+            return Op
+        return fc
+
+
+
+    closures = {}
+    for k, f in AbstractFPVector.__dict__.items():
+        if k.startswith('fp_'):
+            if len(inspect.signature(f).parameters) == 1:
+                closures[_format_name(k)] = gen_unary(k)
+            elif len(inspect.signature(f).parameters) == 2:
+                closures[_format_name(k)] = gen_binary(k)
 
     @family_closure
-    def Abs_fc(family: TypeFamily):
-        Float = Float_fc(family)
-
+    def fp_fma(family):
+        cast = _get_cast
         @family.assemble(locals(), globals())
-        class Abs(Peak, BlackBox):
-            def __call__(self, in_: Data) -> Data:
-                ...
-        return Abs
-
-    @family_closure
-    def Neg_fc(family: TypeFamily):
-        Float = Float_fc(family)
-
-        @family.assemble(locals(), globals())
-        class Neg(Peak, BlackBox):
-            def __call__(self, in_: Data) -> Data:
-                ...
-        return Neg
-
-    @family_closure
-    def Add_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Add(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f + in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Add
-
-    @family_closure
-    def Sub_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Sub(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f - in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Sub
-
-    @family_closure
-    def Mul_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Mul(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f * in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Mul
-
-    @family_closure
-    def Div_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Div(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f / in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Div
-
-    @family_closure
-    def Fma_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Fma(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data, in2: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                in2_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f * in1_f + in2_f
-                return Float.reinterpret_as_bv(res_f)
-        return Fma
-
-    @family_closure
-    def Sqrt_fc(family: TypeFamily):
-        Float = Float_fc(family)
-
-        @family.assemble(locals(), globals())
-        class Sqrt(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in_: Data) -> Data:
-                ...
-        return Sqrt
+        class FMA(Peak, BlackBox):
+            def __call__(self, rm: RoundingMode, in0: Data, in1: Data, in3: Data) -> Data:
+                if rm == RoundingMode.RNE:
+                    in0_rne = cast(RM.RNE, in0)
+                    in1_rne = cast(RM.RNE, in1)
+                    in2_rne = cast(RM.RNE, in2)
+                    out_rne = in0_rne.fp_fma(in1_rne, in2_rne)
+                    out = out_rne.reinterpret_as_bv()
+                elif rm == RoundingMode.RTZ:
+                    in0_rtz = cast(RM.RTZ, in0)
+                    in1_rtz = cast(RM.RTZ, in1)
+                    in2_rtz = cast(RM.RTZ, in2)
+                    out_rtz = in0_rtz.fp_fma(in1_rtz, in2_rtz)
+                    out = out_rtz.reinterpret_as_bv()
+                elif rm == RoundingMode.RDN:
+                    in0_rdn = cast(RM.RDN, in0)
+                    in1_rdn = cast(RM.RDN, in1)
+                    in2_rdn = cast(RM.RDN, in2)
+                    out_rdn = in0_rdn.fp_fma(in1_rdn, in2_rdn)
+                    out = out_rdn.reinterpret_as_bv()
+                elif rm == RoundingMode.RUP:
+                    in0_rup = cast(RM.RUP, in0)
+                    in1_rup = cast(RM.RUP, in1)
+                    in2_rup = cast(RM.RUP, in2)
+                    out_rup = in0_rup.fp_fma(in1_rup, in2_rup)
+                    out = out_rup.reinterpret_as_bv()
+                else:
+                    assert  rm == RoundingMode.RMM
+                    in0_rmm = cast(RM.RUP, in0)
+                    in1_rmm = cast(RM.RUP, in1)
+                    in2_rmm = cast(RM.RUP, in2)
+                    out_rmm = in0_rmm.fp_fma(in1_rmm, in2_rmm)
+                    out = out_rmm.reinterpret_as_bv()
+                return out
+        return FMA
 
 
-    @family_closure
-    def RoundToIntegral_fc(family: TypeFamily):
-        Float = Float_fc(family)
-
-        @family.assemble(locals(), globals())
-        class RoundToIntegral(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in_: Data) -> Data:
-                ...
-        return RoundToIntegral
-
-    @family_closure
-    def Add_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Add(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f + in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Add
-
-    @family_closure
-    def Sub_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Sub(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f - in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Sub
-
-    @family_closure
-    def Mul_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Mul(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f * in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Mul
-
-    @family_closure
-    def Div_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Div(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f / in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Div
-
-    @family_closure
-    def Fma_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Fma(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data, in2: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                in2_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f * in1_f + in2_f
-                return Float.reinterpret_as_bv(res_f)
-        return Fma
-
-    @family_closure
-    def Sqrt_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Sqrt(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in_: Data) -> Data:
-                ...
-        return Sqrt
-
-
-    @family_closure
-    def RoundToIntegral_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class RoundToIntegral(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in_: Data) -> Data:
-                ...
-        return RoundToIntegral
-
-    @family_closure
-    def Rem_fc(family: TypeFamily):
-        Float = Float_fc(family)
-        @family.assemble(locals(), globals())
-        class Rem(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                in0_f = Float.reinterpret_from_bv(in0)
-                in1_f = Float.reinterpret_from_bv(in1)
-                res_f = in0_f % in1_f
-                return Float.reinterpret_as_bv(res_f)
-        return Rem
-
-
-    @family_closure
-    def Min_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Min(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Min
-
-    @family_closure
-    def Max_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Max(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Max
-
-    @family_closure
-    def Lte_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Lte(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Lte
-
-    @family_closure
-    def Lt_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Lt(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Lt
-
-    @family_closure
-    def Gte_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Gte(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Gte
-
-    @family_closure
-    def Gt_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Gt(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Gt
-
-    @family_closure
-    def Eq_fc(family: TypeFamily):
-        @family.assemble(locals(), globals())
-        class Eq(Peak, BlackBox):
-            def __call__(self, in0: Data, in1: Data) -> Data:
-                ...
-        return Eq
+    closures[_format_name('fp_fma')] = fp_fma
 
 
     #Used to create floating point ops with a constant rounding mode
     @lru_cache(None)
     def const_rm(rm: RoundingMode):
         assert isinstance(rm, RoundingMode)
-        @family_closure
-        def _Add_fc(family):
-            rm_ = family.get_constructor(RoundingMode)(rm)
-            Add = Add_fc(family)
-            @family.assemble(locals(), globals())
-            class _Add(Peak):
-                def __init__(self):
-                    self.add: Add = Add()
-                def __call__(self, in0: Data, in1: Data) -> Data:
-                    return self.add(rm_, in0, in1)
-            return _Add
+        closures_ = {}
+        for k, f in AbstractFPVector.__dict__.items():
+            if k.startswith('fp_'):
+                if len(inspect.signature(f).parameters) == 1:
+                    closures_[_format_name(k)] = gen_const_rm_unary(k, rm, closures)
+                elif len(inspect.signature(f).parameters) == 2:
+                    closures_[_format_name(k)] = gen_const_rm_binary(k, rm, closures)
 
         @family_closure
-        def _Sub_fc(family):
+        def _fp_fma(family):
             rm_ = family.get_constructor(RoundingMode)(rm)
-            Sub = Sub_fc(family)
+            FMA = fp_fma_fc(family)
             @family.assemble(locals(), globals())
-            class _Sub(Peak):
+            class _FMA(Peak):
                 def __init__(self):
-                    self.sub: Sub = Sub()
-                def __call__(self, in0: Data, in1: Data) -> Data:
-                    return self.sub(rm_, in0, in1)
-            return _Sub
+                    self.fma : FMA = FMA()
 
-        @family_closure
-        def _Mul_fc(family):
-            rm_ = family.get_constructor(RoundingMode)(rm)
-            Mul = Mul_fc(family)
-            @family.assemble(locals(), globals())
-            class _Mul(Peak):
-                def __init__(self):
-                    self.mul: Mul = Mul()
-                def __call__(self, in0: Data, in1: Data) -> Data:
-                    return self.mul(rm_, in0, in1)
-            return _Mul
-
-        @family_closure
-        def _Div_fc(family):
-            rm_ = family.get_constructor(RoundingMode)(rm)
-            Div = Div_fc(family)
-            @family.assemble(locals(), globals())
-            class _Div(Peak):
-                def __init__(self):
-                    self.div: Div = Div()
-                def __call__(self, in0: Data, in1: Data) -> Data:
-                    return self.div(rm_, in0, in1)
-            return _Div
-
-        @family_closure
-        def _Fma_fc(family):
-            rm_ = family.get_constructor(RoundingMode)(rm)
-            Fma = Fma_fc(family)
-            @family.assemble(locals(), globals())
-            class _Fma(Peak):
-                def __init__(self):
-                    self.fma: Fma = Fma()
                 def __call__(self, in0: Data, in1: Data, in2: Data) -> Data:
                     return self.fma(rm_, in0, in1, in2)
-            return _Fma
+            return _FMA
 
-        @family_closure
-        def _Sqrt_fc(family):
-            rm_ = family.get_constructor(RoundingMode)(rm)
-            Sqrt = Sqrt_fc(family)
-            @family.assemble(locals(), globals())
-            class _Sqrt(Peak):
-                def __init__(self):
-                    self.sqrt: Sqrt = Sqrt()
-                def __call__(self, in_: Data) -> Data:
-                    return self.sqrt(rm_, in_)
-            return _Sqrt
-
-        @family_closure
-        def _RoundToIntegral_fc(family):
-            rm_ = family.get_constructor(RoundingMode)(rm)
-            RoundToIntegral = RoundToIntegral_fc(family)
-            @family.assemble(locals(), globals())
-            class _RoundToIntegral(Peak):
-                def __init__(self):
-                    self.r2i: RoundToIntegral = RoundToIntegral()
-                def __call__(self, in_: Data) -> Data:
-                    return self.r2i(rm_, in_)
-            return _RoundToIntegral
-
-        return SimpleNamespace(
-            Add_fc=_Add_fc,
-            Sub_fc=_Sub_fc,
-            Mul_fc=_Mul_fc,
-            Div_fc=_Div_fc,
-            Sqrt_fc=_Sqrt_fc,
-            Fma_fc=_Fma_fc,
-            RoundToIntegral_fc=_RoundToIntegral_fc,
-        )
+        closures_[_format_name('fp_fma')] = _fp_fma
+        return SimpleNamespace(**closures_)
 
 
-
-    return SimpleNamespace(**locals())
+    closures['const_rm'] = const_rm
+    return SimpleNamespace(**closures)
