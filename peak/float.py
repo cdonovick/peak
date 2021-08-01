@@ -90,7 +90,7 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
     def gen_binary(op_name):
         @family_closure
         def fc(family: TypeFamily):
-            cast = _get_cast
+            cast = _get_cast(family)
             @family.assemble(locals(), globals())
             class Op(Peak, BlackBox):
                 def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Data:
@@ -128,7 +128,7 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
     def gen_binary_bit(op_name):
         @family_closure
         def fc(family: TypeFamily):
-            cast = _get_cast
+            cast = _get_cast(family)
             @family.assemble(locals(), globals())
             class Op(Peak, BlackBox):
                 def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Bit:
@@ -166,7 +166,7 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
     def gen_unary(op_name):
         @family_closure
         def fc(family: TypeFamily):
-            cast = _get_cast
+            cast = _get_cast(family)
             @family.assemble(locals(), globals())
             class Op(Peak, BlackBox):
                 def __call__(self, rm: RoundingMode, in0: Data) -> Data:
@@ -241,7 +241,7 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
 
     @family_closure
     def fp_fma(family):
-        cast = _get_cast
+        cast = _get_cast(family)
         @family.assemble(locals(), globals())
         class FMA(Peak, BlackBox):
             def __call__(self, rm: RoundingMode, in0: Data, in1: Data, in2: Data) -> Data:
