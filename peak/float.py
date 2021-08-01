@@ -125,6 +125,44 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
         return fc
 
     @lru_cache(None)
+    def gen_binary_bit(op_name):
+        @family_closure
+        def fc(family: TypeFamily):
+            cast = _get_cast
+            @family.assemble(locals(), globals())
+            class Op(Peak, BlackBox):
+                def __call__(self, rm: RoundingMode, in0: Data, in1: Data) -> Bit:
+                    if rm == RoundingMode.RNE:
+                        in0_rne = cast(RM.RNE, in0)
+                        in1_rne = cast(RM.RNE, in1)
+                        out_rne = getattr(in0_rne, op_name)(in1_rne)
+                        out = out_rne
+                    elif rm == RoundingMode.RTZ:
+                        in0_rtz = cast(RM.RTZ, in0)
+                        in1_rtz = cast(RM.RTZ, in1)
+                        out_rtz = getattr(in0_rtz, op_name)(in1_rtz)
+                        out = out_rtz
+                    elif rm == RoundingMode.RDN:
+                        in0_rdn = cast(RM.RDN, in0)
+                        in1_rdn = cast(RM.RDN, in1)
+                        out_rdn = getattr(in0_rdn, op_name)(in1_rdn)
+                        out = out_rdn
+                    elif rm == RoundingMode.RUP:
+                        in0_rup = cast(RM.RUP, in0)
+                        in1_rup = cast(RM.RUP, in1)
+                        out_rup = getattr(in0_rup, op_name)(in1_rup)
+                        out = out_rup
+                    else:
+                        assert  rm == RoundingMode.RMM
+                        in0_rmm = cast(RM.RUP, in0)
+                        in1_rmm = cast(RM.RUP, in1)
+                        out_rmm = getattr(in0_rmm, op_name)(in1_rmm)
+                        out = out_rmm
+                    return out
+            return Op
+        return fc
+
+    @lru_cache(None)
     def gen_unary(op_name):
         @family_closure
         def fc(family: TypeFamily):
@@ -196,6 +234,8 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
         if k.startswith('fp_'):
             if len(inspect.signature(f).parameters) == 1:
                 closures[_format_name(k)] = gen_unary(k)
+            elif k in ("fp_leq", "fp_lt", "fp_geq", "fp_gt", "fp_eq"):
+                closures[_format_name(k)] = gen_binary_bit(k)
             elif len(inspect.signature(f).parameters) == 2:
                 closures[_format_name(k)] = gen_binary(k)
 
@@ -204,7 +244,7 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
         cast = _get_cast
         @family.assemble(locals(), globals())
         class FMA(Peak, BlackBox):
-            def __call__(self, rm: RoundingMode, in0: Data, in1: Data, in3: Data) -> Data:
+            def __call__(self, rm: RoundingMode, in0: Data, in1: Data, in2: Data) -> Data:
                 if rm == RoundingMode.RNE:
                     in0_rne = cast(RM.RNE, in0)
                     in1_rne = cast(RM.RNE, in1)
