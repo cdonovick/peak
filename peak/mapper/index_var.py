@@ -20,7 +20,9 @@ class IndexVar:
                 return i
         raise ValueError("Invalid Decode")
 
-    def valid(self):
+    @abc.abstractmethod
+    def is_valid(self):
+        raise NotImplementedError()
         return Or([self.match_index(i) for i in range(self.num_entries)]).to_hwtypes()
 
 
@@ -46,17 +48,21 @@ class OneHot(IndexVar):
     def translate_index(num_entries: int, i: int):
         return 2**i
 
+    def is_valid(self):
+        return Or([self.match_index(i) for i in range(self.num_entries)]).to_hwtypes()
+
+
 class Binary(IndexVar):
     @staticmethod
     def var_len(num_entries: int):
-        return len(bin(num_entries))-2
+        return len(bin(num_entries-1))-2
 
     @staticmethod
     def translate_index(num_entries: int, i: int):
         return i
 
-    def valid(self):
-        if self.num_entries == self.var_len(self.num_entries)**2:
+    def is_valid(self):
+        if self.num_entries == 2**self.var_len(self.num_entries):
             return self.SMT.Bit(True)
         else:
             return self.var < self.num_entries

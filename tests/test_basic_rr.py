@@ -60,7 +60,8 @@ def ir_inc_fc(family):
     @family.assemble(locals(), globals())
     class IR(Peak):
         def __call__(self, a: Word) -> Word:
-            return a + 1
+            #return a + 1
+            return a*59
     return IR
 
 @family_closure
@@ -92,9 +93,12 @@ def ir_add3_fc(family):
     @family.assemble(locals(), globals())
     class IR(Peak):
         def __call__(self, a: Word, b: Word, c: Word) -> Word:
-            return a + b + c
+            return (a + b) * c
     return IR
 
 def test_multi():
+    #ir_fc = ir_add_fc
+    #ir_fc = ir_inc_fc
     ir_fc = ir_add3_fc
-    Multi(arch_fc, ir_fc, 4)
+    rr = Multi(arch_fc, ir_fc, 2, max_loops=500)
+    assert rr is not None

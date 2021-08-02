@@ -1,3 +1,5 @@
+from hwtypes import modifiers
+
 from peak import Peak, name_outputs, family_closure, Const
 
 
@@ -214,6 +216,8 @@ def R32I_fc(family):
     return R32I
 
 
+PC = modifiers.make_modifier('PC_type', cache=True)
+
 @family_closure(family)
 def R32I_mappable_fc(family):
     R32I = R32I_fc(family)
@@ -226,14 +230,14 @@ def R32I_mappable_fc(family):
         def __init__(self):
             self.riscv = R32I()
 
-        @name_outputs(pc_next=isa.Word, rd=isa.Word)
+        @name_outputs(pc_next=PC(isa.Word), rd=isa.Word)
         def __call__(self,
                      inst: Const(isa.Inst),
-                     pc: isa.Word,
+                     pc: PC(isa.Word),
                      rs1: isa.Word,
                      rs2: isa.Word,
                      rd: Initial(isa.Word),
-                     ) -> (isa.Word, isa.Word):
+                     ) -> (PC(isa.Word), isa.Word):
 
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)

@@ -856,15 +856,16 @@ def rr_from_solver(solver, irmapper):
 
 def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None):
 
-    y = set(y)
-    x = phi.get_free_variables() - y
+    y = set(y) #forall_vars
+    x = phi.get_free_variables() - y #exist vars
 
     with smt.Solver(logic=logic, name=solver_name) as solver:
         solver.add_assertion(smt.Bool(True))
         loops = 0
-        print("Solving")
+        #print("Solving")
         while maxloops is None or loops <= maxloops:
-            print(f"{loops}.", end="", flush=True)
+            if loops %100==0:
+                print(f"{loops}.", end="", flush=True)
             loops += 1
             eres = solver.solve()
 
@@ -876,7 +877,8 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                 model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
 
                 if model is None:
-                    return rr_from_solver(solver, irmapper)
+                    return loops
+                    #return rr_from_solver(solver, irmapper)
                 else :
                     sigma = {v: model.get_value(v) for v in y}
                     sub_phi = phi.substitute(sigma).simplify()
