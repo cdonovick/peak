@@ -509,5 +509,6 @@ def ir_add_fc(family):
 def test_multi():
     arch_fc = riscv_sim.R32I_mappable_fc
     ir_fc = ir_add3_fc
+    #ir_fc = ir_add_fc
     rr = Multi(arch_fc, ir_fc, N=2, family=riscv_family, max_loops=2000)
     assert rr is not None

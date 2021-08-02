@@ -100,5 +100,5 @@ def test_multi():
     #ir_fc = ir_add_fc
     #ir_fc = ir_inc_fc
     ir_fc = ir_add3_fc
-    rr = Multi(arch_fc, ir_fc, 2, max_loops=500)
+    rr = Multi(arch_fc, ir_fc, 3, max_loops=500)
     assert rr is not None

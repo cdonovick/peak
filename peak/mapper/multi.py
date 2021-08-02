@@ -138,15 +138,6 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
         for field in arch_info.const_dict:
             valid_conds.append(is_valid(arch_inputs[field]))
 
-        block_info.append(SimpleNamespace(
-            arch_inputs=arch_inputs,
-            free_arch_outputs=free_arch_outputs,
-            real_arch_outputs=real_arch_outputs,
-            obj=arch_obj,
-            bb_outputs=bb_outputs,
-            bb_inputs=bb_inputs,
-        ))
-
         #Creating i'th binding
         #Consisting of the ir_inputs, arch_inputs, Arch_output[N-1 ... 1])
         inputs = {
@@ -159,21 +150,24 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
                 **{("Arch_out", j, field):T for field, T in arch_info.output_t.field_dict.items()},
             }
         outputs = {(f"Arch_in", i, field):T for field, T in arch_info.non_const_dict.items()}
-        bindings, bind_var, impl_conds = do_bindings(inputs, outputs, f"bind{i}")
-        #Hack
-        block_info[-1].bindings = bindings
-        block_info[-1].bind_var = bind_var
-        block_info[-1].impl_conds = impl_conds
+        bindings = create_bindings(inputs, outputs)
+        block_info.append(SimpleNamespace(
+            arch_inputs=arch_inputs,
+            free_arch_outputs=free_arch_outputs,
+            real_arch_outputs=real_arch_outputs,
+            obj=arch_obj,
+            bb_outputs=bb_outputs,
+            bb_inputs=bb_inputs,
+            bindings=bindings
+        ))
 
+    #Out of the cross product of the bindings, filter out everything that does not use all the ir inputs
     ir_paths = [("IR_in", field) for field in ir_info.input_t.field_dict]
-    b_map = [block.bindings for block in block_info]
-    b_len = [len(b) for b in b_map]
-    print(b_len)
-    tot = reduce(lambda x,y: x*y, b_len, 1)
-    print("TOT", tot)
+    all_bindings = [block.bindings for block in block_info]
 
+    orig_bindings = reduce(lambda x, y: x*y, [len(b) for b in all_bindings])
     def filt(x):
-        bind = [b[x[j]] for j, b in enumerate(b_map)]
+        bind = [b[x[j]] for j, b in enumerate(all_bindings)]
         found = [0 for _ in ir_paths]
         for j, p in enumerate(ir_paths):
             for binding in bind:
@@ -181,16 +175,26 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
                     if input == p:
                         found[j] += 1
         return all(f==1 for f in found)
-    b_prod = list(filter(filt, itertools.product(*[range(l) for l in b_len])))
-    print(len(b_prod))
-    #for j, bs in enumerate(b_prod):
-    #    print(f"Binding(s) {j}", "{")
-    #    for k, b in enumerate(bs):
-    #        print(k)
-    #        pretty_print_binding(b_map[k][b])
-    #    print("}")
-    assert 0
+    valid_bindings = list(filter(filt, itertools.product(*[range(len(bindings)) for bindings in all_bindings])))
+    bind_var = IVar(len(valid_bindings), "bind_in")
+    valid_conds.append(bind_var.is_valid())
+    print(f"{bind_var.var}: {orig_bindings} -> {len(valid_bindings)}")
 
+    # Will be Ored
+    impl_conds = []
+    for b, bind_indices in enumerate(valid_bindings):
+        assert len(bind_indices) == N
+        b_match = bind_var.match_index(b)
+
+        # TO be anded
+        bind_conds = [b_match]
+        for bind_index, block in zip(bind_indices, block_info):
+            binding = block.bindings[bind_index]
+            for ipath, opath in binding:
+                ival = translate(ipath)
+                oval = translate(opath)
+                bind_conds.append(ival == oval)
+        impl_conds.append(And(bind_conds))
 
 
 
@@ -209,7 +213,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
         impl_conds=out_conds
     ))
     valid_cond = And(valid_conds)
-    impl_cond = And([b.impl_conds for b in block_info[:-1]])
+    impl_cond = Or(impl_conds)
     F = out_conds
     formula = And([valid_cond, Implies(impl_cond, F)])
     print(formula.serialize(), flush=True)
@@ -222,7 +226,9 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
     info = SimpleNamespace(
         N=N,
         block_info=block_info,
-        arch_info=arch_info
+        arch_info=arch_info,
+        bind_var=bind_var,
+        valid_bindings=valid_bindings,
     )
     return external_loop_solve(forall_vars, formula_wo_forall, info, logic=BV, maxloops=max_loops, solver_name="z3")
 
@@ -232,19 +238,18 @@ def RR(info, solver):
     N = info.N
     block_info = info.block_info
     arch_info = info.arch_info
-    for i in range(N+1):
+    bind_var = info.bind_var
+    bind_val = bind_var.decode(int(solved_to_bv(bind_var.var, solver)))
+    print(bind_var.var.value, bind_val)
+    binding_indices = info.valid_bindings[bind_val]
+    for i in range(N):
         print("*"*100)
         print(f"Instruction {i}")
-        bindings = block_info[i].bindings
-        bind_var = block_info[i].bind_var
-        bind_val = bind_var.decode(int(solved_to_bv(bind_var.var, solver)))
-        binding = bindings[bind_val]
-        print(bind_var.var.value)
+        binding = block_info[i].bindings[binding_indices[i]]
         pretty_print_binding(binding)
-        if i !=N:
-            instrs = [block_info[i].arch_inputs[field] for field in arch_info.const_dict]
-            ivals = [solved_to_bv(instr._value_,solver) for instr in instrs]
-            print(ivals)
+        instrs = [block_info[i].arch_inputs[field] for field in arch_info.const_dict]
+        ivals = [solved_to_bv(instr._value_,solver) for instr in instrs]
+        print(ivals)
     return info
 
 def external_loop_solve(y, phi, rr_info, logic = BV, maxloops=10, solver_name = "cvc4"):
