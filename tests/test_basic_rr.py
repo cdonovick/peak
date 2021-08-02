@@ -86,3 +86,15 @@ def test_basic(ir_fc, name):
     assert counter_example is None
 
 
+from peak.mapper.multi import Multi
+@family_closure
+def ir_add3_fc(family):
+    @family.assemble(locals(), globals())
+    class IR(Peak):
+        def __call__(self, a: Word, b: Word, c: Word) -> Word:
+            return a + b + c
+    return IR
+
+def test_multi():
+    ir_fc = ir_add3_fc
+    Multi(arch_fc, ir_fc, 4)

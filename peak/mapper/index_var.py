@@ -1,10 +1,13 @@
 import abc
 from hwtypes import TypeFamily
+from .formula_constructor import And, Or
+from peak.family import SMTFamily
 
 class IndexVar:
-    def __init__(self, num_entries: int, name: str, family: TypeFamily):
+    def __init__(self, num_entries: int, name: str, SMT=SMTFamily()):
         self.num_entries = num_entries
-        self.var = family.SMTFamily().BitVector[self.var_len(num_entries)](prefix=name)
+        self.var = SMT.BitVector[self.var_len(num_entries)](prefix=name)
+        self.SMT = SMT
 
     def match_index(self, i: int):
         if i not in range(self.num_entries):
@@ -16,6 +19,10 @@ class IndexVar:
             if v == self.translate_index(self.num_entries, i):
                 return i
         raise ValueError("Invalid Decode")
+
+    def valid(self):
+        return Or([self.match_index(i) for i in range(self.num_entries)]).to_hwtypes()
+
 
     @staticmethod
     @abc.abstractmethod
@@ -47,4 +54,10 @@ class Binary(IndexVar):
     @staticmethod
     def translate_index(num_entries: int, i: int):
         return i
+
+    def valid(self):
+        if self.num_entries == self.var_len(self.num_entries)**2:
+            return self.SMT.Bit(True)
+        else:
+            return self.var < self.num_entries
 

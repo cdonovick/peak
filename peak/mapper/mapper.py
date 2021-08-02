@@ -32,6 +32,18 @@ from pysmt.logics import BV
 from .formula_constructor import And, Or, Implies, or_reduce, and_reduce
 
 
+def _create_free_var(aadt, name, SMT=peak_family.SMTFamily()):
+    if issubclass(aadt, AbstractBit):
+        return SMT.Bit(prefix=name)
+    elif issubclass(aadt, AbstractBitVector):
+        width = aadt.size
+    else:
+        width = aadt._assembler_.width
+    bv = SMT.BitVector[width](prefix=f"{name}")
+    value = aadt(bv)
+    return value
+
+
 #Helper function to search for the one peak class
 def _get_peak_cls(fc_out):
     clss = []
@@ -147,8 +159,8 @@ class SMTMapper:
         #verify same number of output forms
         assert all(num_output_forms == len(forms) for forms in output_forms)
         self.peak_fc = peak_fc
-        self.input_form_var = IVar(num_input_forms, name=f"fi", family=family)
-        self.output_form_var = IVar(num_output_forms, name=f"fo", family=family)
+        self.input_form_var = IVar(num_input_forms, name=f"fi", SMT=family.SMTFamily())
+        self.output_form_var = IVar(num_output_forms, name=f"fo", SMT=family.SMTFamily())
 
         self.input_forms = input_forms
         self.output_forms = output_forms
@@ -529,9 +541,9 @@ class IRMapper(SMTMapper):
 
         max_input_bindings = max(len(bindings) for bindings in input_bindings)
         SBV = self.family.SMTFamily().BitVector
-        ib_var = IVar(max_input_bindings, name="bi", family=self.family)
+        ib_var = IVar(max_input_bindings, name="bi", SMT=self.family.SMTFamily())
         max_output_bindings = len(output_bindings)
-        ob_var = IVar(max_output_bindings, name="bo", family=self.family)
+        ob_var = IVar(max_output_bindings, name="bo", SMT=self.family.SMTFamily())
 
         self.ib_var = ib_var
         self.ob_var = ob_var
@@ -543,13 +555,9 @@ class IRMapper(SMTMapper):
         use_input_sub = True
         #--------------------------------------------
         if simple_formula:
-            def create_temp(aadt, name):
-                i_width = aadt._assembler_.width
-                bv = self.family.SMTFamily().BitVector[i_width](prefix=f"{name}")
-                value = aadt(bv)
-                return value
-            temp_arch_in = create_temp(archmapper.input_aadt_t, "Arch_in")
-            temp_ir_in = create_temp(self.input_aadt_t, "IR_in")
+
+            temp_arch_in = _create_free_var(archmapper.input_aadt_t, "Arch_in")
+            temp_ir_in = _create_free_var(self.input_aadt_t, "IR_in")
             if use_input_sub:
                 arch_in = temp_arch_in
                 ir_in = temp_ir_in
@@ -800,7 +808,7 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 20,
+        itr_limit = 100,
         logic = BV
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
@@ -854,7 +862,9 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
     with smt.Solver(logic=logic, name=solver_name) as solver:
         solver.add_assertion(smt.Bool(True))
         loops = 0
+        print("Solving")
         while maxloops is None or loops <= maxloops:
+            print(f"{loops}.", end="", flush=True)
             loops += 1
             eres = solver.solve()
 
