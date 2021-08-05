@@ -49,8 +49,7 @@ class OneHot(IndexVar):
         return 2**i
 
     def is_valid(self):
-        return Or([self.match_index(i) for i in range(self.num_entries)]).to_hwtypes()
-
+        return ((self.var & (self.var-1))==0) & (self.var!=0)
 
 class Binary(IndexVar):
     @staticmethod

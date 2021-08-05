@@ -877,8 +877,8 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                 model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
 
                 if model is None:
-                    return loops
-                    #return rr_from_solver(solver, irmapper)
+                    #return loops
+                    return rr_from_solver(solver, irmapper)
                 else :
                     sigma = {v: model.get_value(v) for v in y}
                     sub_phi = phi.substitute(sigma).simplify()

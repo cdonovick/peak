@@ -238,7 +238,8 @@ def R32I_mappable_fc(family):
                      rs2: isa.Word,
                      rd: Initial(isa.Word),
                      ) -> (PC(isa.Word), isa.Word):
-
+            #pc = Word(0)
+            #rd = Word(0)
             self._set_rs1_(rs1)
             self._set_rs2_(rs2)
             self._set_rd_(rd)

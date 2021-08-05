@@ -52,7 +52,7 @@ def ir_add_fc(family):
     @family.assemble(locals(), globals())
     class IR(Peak):
         def __call__(self, a: Word, b: Word) -> Word:
-            return a + b
+            return a & b
     return IR
 
 @family_closure
@@ -87,7 +87,7 @@ def test_basic(ir_fc, name):
     assert counter_example is None
 
 
-from peak.mapper.multi import Multi
+from peak.mapper.multi import Multi, Binary, OneHot
 @family_closure
 def ir_add3_fc(family):
     @family.assemble(locals(), globals())
@@ -100,5 +100,5 @@ def test_multi():
     #ir_fc = ir_add_fc
     #ir_fc = ir_inc_fc
     ir_fc = ir_add3_fc
-    rr = Multi(arch_fc, ir_fc, 3, max_loops=500)
+    rr = Multi(arch_fc, ir_fc, 3, max_loops=500, IVar=Binary)
     assert rr is not None

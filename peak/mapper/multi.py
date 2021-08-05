@@ -6,30 +6,36 @@ from peak import family as peak_family, family_closure, Peak, Const
 from .mapper import aadt_product_to_dict
 from .index_var import IndexVar, OneHot, Binary
 from .mapper import _get_peak_cls, _create_free_var, create_and_set_bb_outputs, wrap_outputs, is_valid, get_bb_inputs
-from .utils import _sort_by_t, pretty_print_binding, solved_to_bv
+from .utils import _sort_by_t, pretty_print_binding, solved_to_bv, Unbound
 from .formula_constructor import And, Or, Implies
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
 
-#This will Solve a multi-rewrite rule N instructions
-def create_bindings(inputs, outputs):
-#def create_bindings(needed_inputs, aux_inputs, outputs):
-    #assert needed_inputs.keys() & aux_inputs.keys() == set()
-    #inputs = {**needed_inputs, **aux_inputs}
+def create_bindings(inputs, outputs, use_unbound=True):
     inputs_by_t = _sort_by_t(inputs)
     outputs_by_t = _sort_by_t(outputs)
     #check early out
-    if not all((o_t in inputs_by_t) for o_t in outputs_by_t):
+    if (not use_unbound) and (not all((o_t in inputs_by_t) for o_t in outputs_by_t)):
         raise ValueError("No matching Bindings")
 
     #inputs = ir, outputs = arch
-    possible_matching = {o_path:inputs_by_t[o_T] for o_path, o_T in outputs.items()}
+
+    possible_matching = []
+    for o_path, o_T in outputs.items():
+        poss = []
+        if use_unbound:
+            poss.append(Unbound)
+        if o_T in inputs_by_t:
+            poss += inputs_by_t[o_T]
+        possible_matching.append(poss)
+    assert all(len(p)>0 for p in possible_matching)
     bindings = []
-    for l in itertools.product(*possible_matching.values()):
+    for l in itertools.product(*possible_matching):
         binding = list(zip(l, outputs.keys()))
         bindings.append(binding)
     return bindings
 
+#This will Solve a multi-rewrite rule N instructions
 def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, max_loops=50):
     #Does things
     def parse_peak_fc(peak_fc):
@@ -85,7 +91,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
     valid_conds = []
 
 
-    def translate(path):
+    def translate(path, use_real=True):
         if path[0] == "IR_in":
             assert len(path) == 2
             val = ir_inputs[path[1]]
@@ -99,12 +105,17 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
             assert len(path) == 3
             j = path[1]
             assert len(block_info) > j
-            val = block_info[j].real_arch_outputs[path[2]]
+            if use_real:
+                val = block_info[j].real_arch_outputs[path[2]]
+            else:
+                val = block_info[j].free_arch_outputs[path[2]]
         else:
             assert 0
         return val
+
+    #only output
     def do_bindings(inputs, outputs, name):
-        bindings = create_bindings(inputs, outputs)
+        bindings = create_bindings(inputs, outputs, use_unbound=False)
         bind_var = IVar(len(bindings), name=name)
         valid_conds.append(bind_var.is_valid())
         print(bind_var.var, len(bindings))
@@ -116,8 +127,8 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
             # TO be anded
             bind_conds = [b_match]
             for ipath, opath in binding:
-                ival = translate(ipath)
-                oval = translate(opath)
+                ival = translate(ipath, use_real=True)
+                oval = translate(opath, use_real=True)
                 bind_conds.append(ival == oval)
             impl_conds.append(And(bind_conds))
         return bindings, bind_var, Or(impl_conds)
@@ -134,15 +145,12 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
         pysmt_forall_vars += [v.value for field, v in arch_inputs.items() if field in arch_info.non_const_dict]
         pysmt_forall_vars += [v.value for v in bb_outputs.values()]
 
-        #Make sure instruction is valid
-        for field in arch_info.const_dict:
-            valid_conds.append(is_valid(arch_inputs[field]))
 
         #Creating i'th binding
         #Consisting of the ir_inputs, arch_inputs, Arch_output[N-1 ... 1])
         inputs = {
             **{("IR_in", field):T for field, T in ir_info.input_t.field_dict.items()},
-            **{(f"Arch_in", i, field):T for field, T in arch_info.non_const_dict.items()},
+            #**{(f"Arch_in", i, field):T for field, T in arch_info.non_const_dict.items()},
         }
         for j in range(i):
             inputs = {
@@ -150,7 +158,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
                 **{("Arch_out", j, field):T for field, T in arch_info.output_t.field_dict.items()},
             }
         outputs = {(f"Arch_in", i, field):T for field, T in arch_info.non_const_dict.items()}
-        bindings = create_bindings(inputs, outputs)
+        bindings = create_bindings(inputs, outputs, use_unbound=True)
         block_info.append(SimpleNamespace(
             arch_inputs=arch_inputs,
             free_arch_outputs=free_arch_outputs,
@@ -174,12 +182,16 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
                 for input, _ in binding:
                     if input == p:
                         found[j] += 1
-        return all(f==1 for f in found)
+        return all(f in (1,) for f in found)
     valid_bindings = list(filter(filt, itertools.product(*[range(len(bindings)) for bindings in all_bindings])))
+    if len(valid_bindings) == 0:
+        raise ValueError("There are no valid Bindings")
     bind_var = IVar(len(valid_bindings), "bind_in")
     valid_conds.append(bind_var.is_valid())
     print(f"{bind_var.var}: {orig_bindings} -> {len(valid_bindings)}")
 
+    use_real = True
+    #use_real = False
     # Will be Ored
     impl_conds = []
     for b, bind_indices in enumerate(valid_bindings):
@@ -191,10 +203,27 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
         for bind_index, block in zip(bind_indices, block_info):
             binding = block.bindings[bind_index]
             for ipath, opath in binding:
-                ival = translate(ipath)
-                oval = translate(opath)
+                if ipath is Unbound:
+                    ipath = opath
+                ival = translate(ipath, use_real=use_real)
+                oval = translate(opath, use_real=use_real)
                 bind_conds.append(ival == oval)
         impl_conds.append(And(bind_conds))
+
+    #set fake to real except for the last one
+
+    if not use_real:
+        if N==1:
+            free_repl = family.SMTFamily().Bit(True)
+        else:
+            free_repl = []
+            for i in range(N-1):
+                real = block_info[i].real_arch_outputs
+                fake = block_info[i].free_arch_outputs
+                for vr, vf in zip(real.values(), fake.values()):
+                    pysmt_forall_vars.append(vf.value)
+                    free_repl.append(vf==vr)
+            free_repl = And(free_repl)
 
 
 
@@ -212,8 +241,24 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
         bind_var=bind_out_var,
         impl_conds=out_conds
     ))
+
+
+    use_split_instr = False
+    if use_split_instr:
+        #This will use an SMT Form instruction instead of a raw instruction. Might be faster
+        pass
+    else:
+        for i in range(N):
+            arch_inputs = block_info[i].arch_inputs
+            # Make sure instruction is valid
+            for field in arch_info.const_dict:
+                valid_conds.append(is_valid(arch_inputs[field]))
+
     valid_cond = And(valid_conds)
-    impl_cond = Or(impl_conds)
+    if use_real:
+        impl_cond = Or(impl_conds)
+    else:
+        impl_cond = And([free_repl, Or(impl_conds)])
     F = out_conds
     formula = And([valid_cond, Implies(impl_cond, F)])
     print(formula.serialize(), flush=True)
