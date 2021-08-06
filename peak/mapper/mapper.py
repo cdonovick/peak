@@ -451,7 +451,6 @@ def update_with_bb(
         return Implies(bb_cond, f), bb_forall
     return f, bb_forall
 
-_INITIAL_VECTORS = 8
 class IRMapper(SMTMapper):
     def __init__(self, archmapper, ir_fc, simple_formula=True, IVar: IndexVar=OneHot):
         super().__init__(ir_fc)
@@ -466,7 +465,6 @@ class IRMapper(SMTMapper):
                 raise ValueError("Simple Formula required for black boxes")
 
         # should be a param to __init__ but this works for now
-        self.num_initial_vectors = _INITIAL_VECTORS
         self.archmapper = archmapper
 
         # Create input bindings
@@ -805,13 +803,14 @@ class IRMapper(SMTMapper):
         solver_name : str = 'z3',
         external_loop : bool = False,
         itr_limit = 20,
+        num_init = -1,
         logic = BV
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
 
         if external_loop:
-            return external_loop_solve(self.forall_vars, self.formula_wo_forall, logic, itr_limit, solver_name, self, self.num_initial_vectors)
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, logic, itr_limit, solver_name, self, num_init)
 
         with smt.Solver(solver_name, logic=logic) as solver:
             solver.add_assertion(self.formula)
@@ -867,6 +866,8 @@ def _gen_random(sort: smt_typing.PySMTType):
     return _int_to_pysmt(val, sort)
 
 def _gen_initial(y, num_initial_vectors):
+    if num_initial_vectors < 0:
+        return []
     # always add the 0,1,-1 vectors
     initial_vectors = [
         {v: _int_to_pysmt(0, v.get_type()) for v in y},

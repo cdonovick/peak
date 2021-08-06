@@ -468,7 +468,8 @@ def test_non_const_constraint(simple_formula, arch_fc, ISA_fc, is_sum):
             }
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved, simple_formula=simple_formula)
 
-@pytest.mark.parametrize('simple_formula', [True, False])
+#@pytest.mark.parametrize('simple_formula', [True, False])
+@pytest.mark.parametrize('simple_formula', [True])
 def test_riscv_rr(simple_formula):
     @family_closure
     def ir_fc(family):
@@ -482,5 +483,7 @@ def test_riscv_rr(simple_formula):
     arch_fc = riscv_sim.R32I_mappable_fc
     arch_mapper = ArchMapper(arch_fc, family=riscv_family)
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=simple_formula)
-    rewrite_rule = ir_mapper.solve('z3', external_loop=True)
+    rewrite_rule = ir_mapper.solve('z3', external_loop=True, num_init=2)
     assert rewrite_rule is not None
+    ce = rewrite_rule.verify()
+    assert ce is None
