@@ -880,6 +880,10 @@ def _gen_initial(y, num_initial_vectors):
 
     return initial_vectors
 
+
+class LoopException(Exception):
+    pass
+
 def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None, num_initial_vectors: int = 0):
 
     y = set(y)
@@ -910,7 +914,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                     sigma = {v: model.get_value(v) for v in y}
                     sub_phi = phi.substitute(sigma).simplify()
                     solver.add_assertion(sub_phi)
-        raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
+        raise LoopException(f"Unknown result in efsmt in {maxloops} number of iterations")
 
 
 def strip_aadt(binding):

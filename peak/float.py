@@ -211,6 +211,22 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
             return Op
         return fc
 
+    def gen_const_rm_binary_bit(op_name, rm, closures):
+        @family_closure
+        def fc(family):
+            rm_ = family.get_constructor(RoundingMode)(rm)
+            _Op = closures[_format_name(op_name)](family)
+            @family.assemble(locals(), globals())
+            class Op(Peak):
+                def __init__(self):
+                    self.op : _Op = _Op()
+
+                def __call__(self, in0: Data, in1: Data) -> Bit:
+                    return self.op(rm_, in0, in1)
+
+            return Op
+        return fc
+
     def gen_const_rm_unary(op_name, rm, closures):
         @family_closure
         def fc(family):
@@ -292,6 +308,8 @@ def float_lib_gen(exp_bits: int, frac_bits: int, ieee_compliance: bool = False):
             if k.startswith('fp_'):
                 if len(inspect.signature(f).parameters) == 1:
                     closures_[_format_name(k)] = gen_const_rm_unary(k, rm, closures)
+                elif k in ("fp_leq", "fp_lt", "fp_geq", "fp_gt", "fp_eq"):
+                    closures_[_format_name(k)] = gen_const_rm_binary_bit(k, rm, closures)
                 elif len(inspect.signature(f).parameters) == 2:
                     closures_[_format_name(k)] = gen_const_rm_binary(k, rm, closures)
 
