@@ -3,7 +3,7 @@ from functools import reduce
 from types import SimpleNamespace
 from hwtypes import strip_modifiers
 from peak import family as peak_family, family_closure, Peak, Const
-from .mapper import aadt_product_to_dict
+from .mapper import aadt_product_to_dict, external_loop_solve
 from .index_var import IndexVar, OneHot, Binary
 from .mapper import _get_peak_cls, _create_free_var, create_and_set_bb_outputs, wrap_outputs, is_valid, get_bb_inputs
 from .utils import _sort_by_t, pretty_print_binding, solved_to_bv, Unbound
@@ -36,7 +36,7 @@ def create_bindings(inputs, outputs, use_unbound=True):
     return bindings
 
 #This will Solve a multi-rewrite rule N instructions
-def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, max_loops=50):
+def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
     #Does things
     def parse_peak_fc(peak_fc):
         if not isinstance(peak_fc, family_closure):
@@ -275,9 +275,11 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, m
         bind_var=bind_var,
         valid_bindings=valid_bindings,
     )
-    return external_loop_solve(forall_vars, formula_wo_forall, info, logic=BV, maxloops=max_loops, solver_name="z3")
+    def solve(maxloops=20, logic=BV, solver_name="z3"):
+        return external_loop_solve(forall_vars, formula_wo_forall, logic=logic, maxloops=maxloops, solver_name=solver_name, rr_from_solver=RR, irmapper=info)
+    return solve
 
-def RR(info, solver):
+def RR(solver, info):
     if solver is None:
         return None
     N = info.N
@@ -297,33 +299,33 @@ def RR(info, solver):
         print(ivals)
     return info
 
-def external_loop_solve(y, phi, rr_info, logic = BV, maxloops=10, solver_name = "cvc4"):
-
-    y = set(y) #forall_vars
-    x = phi.get_free_variables() - y #exist vars
-
-    with smt.Solver(logic=logic, name=solver_name) as solver:
-        solver.add_assertion(smt.Bool(True))
-        loops = 0
-        #print("Solving")
-        while maxloops is None or loops <= maxloops:
-            if loops %10==0:
-                print(f"{loops}.", end="", flush=True)
-            loops += 1
-            eres = solver.solve()
-
-            if not eres:
-                return None
-            else:
-                tau = {v: solver.get_value(v) for v in x}
-                sub_phi = phi.substitute(tau).simplify()
-                model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
-
-                if model is None:
-                    return RR(rr_info, solver)
-                else :
-                    sigma = {v: model.get_value(v) for v in y}
-                    sub_phi = phi.substitute(sigma).simplify()
-                    solver.add_assertion(sub_phi)
-        raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
+#def external_loop_solve(y, phi, rr_info, logic = BV, maxloops=10, solver_name = "cvc4"):
+#
+#    y = set(y) #forall_vars
+#    x = phi.get_free_variables() - y #exist vars
+#
+#    with smt.Solver(logic=logic, name=solver_name) as solver:
+#        solver.add_assertion(smt.Bool(True))
+#        loops = 0
+#        #print("Solving")
+#        while maxloops is None or loops <= maxloops:
+#            if loops %10==0:
+#                print(f"{loops}.", end="", flush=True)
+#            loops += 1
+#            eres = solver.solve()
+#
+#            if not eres:
+#                return None
+#            else:
+#                tau = {v: solver.get_value(v) for v in x}
+#                sub_phi = phi.substitute(tau).simplify()
+#                model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
+#
+#                if model is None:
+#                    return RR(rr_info, solver)
+#                else :
+#                    sigma = {v: model.get_value(v) for v in y}
+#                    sub_phi = phi.substitute(sigma).simplify()
+#                    solver.add_assertion(sub_phi)
+#        raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
 

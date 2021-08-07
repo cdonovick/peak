@@ -25,11 +25,15 @@ def _op_to_str(vs, opname, ts, indent):
         ",\n".join([_value_to_str(v, new_ts, indent) for v in vs]),
         f"{ts})"
     ])
-
+from hwtypes import SMTBit
+def _check(vs):
+    assert len(vs) > 0
+    for v in vs:
+        assert isinstance(v, FormulaConstructor) or isinstance(v, SMTBit)
 class And(FormulaConstructor):
     def __init__(self, values: list):
         self.values = list(values)
-        assert len(self.values) > 0
+        _check(self.values)
 
     def serialize(self, ts="", indent="|   "):
         return _op_to_str(self.values, "And", ts, indent)
@@ -40,7 +44,7 @@ class And(FormulaConstructor):
 class Or(FormulaConstructor):
     def __init__(self, values: list):
         self.values = list(values)
-        assert len(self.values) > 0
+        _check(self.values)
 
     def serialize(self, ts="", indent="|   "):
         return _op_to_str(self.values, "Or", ts, indent)
@@ -52,6 +56,7 @@ class Implies(FormulaConstructor):
     def __init__(self, p, q):
         self.p = p
         self.q = q
+        _check([p, q])
 
     def serialize(self, ts="", indent="|   "):
         return _op_to_str((self.p, self.q), "Implies", ts, indent)

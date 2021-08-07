@@ -484,43 +484,5 @@ def test_riscv_rr(simple_formula):
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=simple_formula)
     rewrite_rule = ir_mapper.solve('z3', external_loop=True)
     assert rewrite_rule is not None
-
-
-
-from peak.mapper.multi import Multi
-@family_closure
-def ir_add4_fc(family):
-    Word = BitVector[32]
-    @family.assemble(locals(), globals())
-    class IR(Peak):
-        def __call__(self, a: Word, b: Word, c: Word, d: Word) -> Word:
-            return (a - (b | c)) & d
-    return IR
-
-@family_closure
-def ir_add3_fc(family):
-    Word = BitVector[32]
-    @family.assemble(locals(), globals())
-    class IR(Peak):
-        def __call__(self, a: Word, b: Word, c: Word) -> Word:
-            return (a + b) & c
-    return IR
-
-
-@family_closure
-def ir_add_fc(family):
-    Word = BitVector[32]
-    @family.assemble(locals(), globals())
-    class IR(Peak):
-        def __call__(self, a: Word, b: Word) -> Word:
-            return (a * b)
-    return IR
-
-from peak.mapper.multi import OneHot, Binary
-def test_multi():
-    arch_fc = riscv_sim.R32I_mappable_fc
-    #ir_fc = ir_add4_fc
-    ir_fc = ir_add3_fc
-    #ir_fc = ir_add_fc
-    rr = Multi(arch_fc, ir_fc, N=2, family=riscv_family, max_loops=2000, IVar=OneHot)
-    assert rr is not None
+    ce = rewrite_rule.verify()
+    assert ce is None

@@ -1,4 +1,5 @@
 import itertools
+import random
 import typing as tp
 from functools import lru_cache
 from collections import defaultdict
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
+from pysmt import typing as smt_typing
 
 from .formula_constructor import And, Or, Implies, or_reduce, and_reduce
 
@@ -461,7 +463,6 @@ def update_with_bb(
         return Implies(bb_cond, f), bb_forall
     return f, bb_forall
 
-
 class IRMapper(SMTMapper):
     def __init__(self, archmapper, ir_fc, simple_formula=True, IVar: IndexVar=OneHot):
         super().__init__(ir_fc)
@@ -475,6 +476,7 @@ class IRMapper(SMTMapper):
             if not simple_formula:
                 raise ValueError("Simple Formula required for black boxes")
 
+        # should be a param to __init__ but this works for now
         self.archmapper = archmapper
 
         # Create input bindings
@@ -808,14 +810,15 @@ class IRMapper(SMTMapper):
     def solve(self,
         solver_name : str = 'z3',
         external_loop : bool = False,
-        itr_limit = 100,
+        itr_limit = 20,
+        num_init = -1,
         logic = BV
     ) -> tp.Union[None, RewriteRule]:
         if not self.has_bindings:
             return None
 
         if external_loop:
-            return external_loop_solve(self.forall_vars, self.formula_wo_forall, logic, itr_limit, solver_name, self)
+            return external_loop_solve(self.forall_vars, self.formula_wo_forall, logic, itr_limit, solver_name, self, num_init)
 
         with smt.Solver(solver_name, logic=logic) as solver:
             solver.add_assertion(self.formula)
@@ -854,13 +857,53 @@ def rr_from_solver(solver, irmapper):
     bv_ibinding = strip_aadt(bv_ibinding)
     return RewriteRule(bv_ibinding, obinding, im.peak_fc, am.peak_fc)
 
-def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None):
+
+def _int_to_pysmt(x: int, sort: smt_typing.PySMTType):
+    if sort.is_bv_type():
+        return smt.BV(x % sort.width, sort.width)
+    else:
+        assert sort.is_bool_type()
+        return smt.Bool(bool(x))
+
+def _gen_random(sort: smt_typing.PySMTType):
+    if sort.is_bv_type():
+        val = random.randrange(1 << sort.width)
+    else:
+        assert sort.is_bool_type()
+        val = random.randrange(2)
+    return _int_to_pysmt(val, sort)
+
+def _gen_initial(y, num_initial_vectors):
+    if num_initial_vectors < 0:
+        return []
+    # always add the 0,1,-1 vectors
+    initial_vectors = [
+        {v: _int_to_pysmt(0, v.get_type()) for v in y},
+        {v: _int_to_pysmt(1, v.get_type()) for v in y},
+        {v: _int_to_pysmt(-1, v.get_type()) for v in y},
+    ]
+
+    for _ in range(num_initial_vectors):
+        initial_vectors.append({v: _gen_random(v.get_type()) for v in y})
+
+    return initial_vectors
+
+
+class LoopException(Exception):
+    pass
+
+def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", irmapper = None, num_initial_vectors: int = 0, rr_from_solver=rr_from_solver):
 
     y = set(y) #forall_vars
     x = phi.get_free_variables() - y #exist vars
+    initial_vectors =_gen_initial(y, num_initial_vectors)
 
     with smt.Solver(logic=logic, name=solver_name) as solver:
         solver.add_assertion(smt.Bool(True))
+        for sigma in initial_vectors:
+            sub_phi = phi.substitute(sigma).simplify()
+            solver.add_assertion(sub_phi)
+
         loops = 0
         #print("Solving")
         while maxloops is None or loops <= maxloops:
@@ -883,7 +926,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
                     sigma = {v: model.get_value(v) for v in y}
                     sub_phi = phi.substitute(sigma).simplify()
                     solver.add_assertion(sub_phi)
-        raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
+        raise LoopException(f"Unknown result in efsmt in {maxloops} number of iterations")
 
 
 def strip_aadt(binding):
