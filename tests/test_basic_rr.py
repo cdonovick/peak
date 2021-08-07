@@ -98,5 +98,5 @@ def ir_add3_fc(family):
 def test_multi():
     ir_fc = ir_add3_fc
     solve = Multi(arch_fc, ir_fc, 2, IVar=Binary)
-    rr = solve(maxloops=100, solver_name="z3")
+    rr = solve(maxloops=300, solver_name="z3")
     assert rr is not None

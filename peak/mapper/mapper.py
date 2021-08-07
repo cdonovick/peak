@@ -905,10 +905,7 @@ def external_loop_solve(y, phi, logic = BV, maxloops=10, solver_name = "cvc4", i
             solver.add_assertion(sub_phi)
 
         loops = 0
-        #print("Solving")
         while maxloops is None or loops <= maxloops:
-            if loops %100==0:
-                print(f"{loops}.", end="", flush=True)
             loops += 1
             eres = solver.solve()
 

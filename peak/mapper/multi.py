@@ -36,8 +36,7 @@ def create_bindings(inputs, outputs, use_unbound=True):
     return bindings
 
 #This will Solve a multi-rewrite rule N instructions
-def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
-    #Does things
+def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, use_real = True, use_split_instr = False):
     def parse_peak_fc(peak_fc):
         if not isinstance(peak_fc, family_closure):
             raise ValueError(f"family closure {peak_fc} needs to be decorated with @family_closure")
@@ -118,7 +117,6 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
         bindings = create_bindings(inputs, outputs, use_unbound=False)
         bind_var = IVar(len(bindings), name=name)
         valid_conds.append(bind_var.is_valid())
-        print(bind_var.var, len(bindings))
         impl_conds = []
         # Will be Ored
         for b, binding in enumerate(bindings):
@@ -188,10 +186,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
         raise ValueError("There are no valid Bindings")
     bind_var = IVar(len(valid_bindings), "bind_in")
     valid_conds.append(bind_var.is_valid())
-    print(f"{bind_var.var}: {orig_bindings} -> {len(valid_bindings)}")
 
-    use_real = True
-    #use_real = False
     # Will be Ored
     impl_conds = []
     for b, bind_indices in enumerate(valid_bindings):
@@ -211,7 +206,6 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
         impl_conds.append(And(bind_conds))
 
     #set fake to real except for the last one
-
     if not use_real:
         if N==1:
             free_repl = family.SMTFamily().Bit(True)
@@ -229,7 +223,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
 
     #Output bindings
     #This assumes that the output bindings will only be a function of the outputs of the last instruction
-    #Might not hold true if IR node is computing multiple things.
+    #Might not hold true if IR node is computing multiple things (ie i64.Add)
     inputs = {
         **{(f"Arch_out", N-1, field):T for field, T in arch_info.output_t.field_dict.items()},
     }
@@ -243,10 +237,9 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
     ))
 
 
-    use_split_instr = False
     if use_split_instr:
         #This will use an SMT Form instruction instead of a raw instruction. Might be faster
-        pass
+        raise NotImplementedError()
     else:
         for i in range(N):
             arch_inputs = block_info[i].arch_inputs
@@ -261,9 +254,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
         impl_cond = And([free_repl, Or(impl_conds)])
     F = out_conds
     formula = And([valid_cond, Implies(impl_cond, F)])
-    print(formula.serialize(), flush=True)
     formula = formula.to_hwtypes()
-    print("FA", pysmt_forall_vars, flush=True)
     forall_vars = pysmt_forall_vars
     formula_wo_forall = formula.value
     formula = smt.ForAll(pysmt_forall_vars, formula.value)
@@ -279,53 +270,26 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary):
         return external_loop_solve(forall_vars, formula_wo_forall, logic=logic, maxloops=maxloops, solver_name=solver_name, rr_from_solver=RR, irmapper=info)
     return solve
 
+#Definititely a bit hacked. Really should contain a verify function and better pretty printers
 def RR(solver, info):
     if solver is None:
         return None
-    N = info.N
-    block_info = info.block_info
-    arch_info = info.arch_info
-    bind_var = info.bind_var
-    bind_val = bind_var.decode(int(solved_to_bv(bind_var.var, solver)))
-    print(bind_var.var.value, bind_val)
-    binding_indices = info.valid_bindings[bind_val]
-    for i in range(N):
-        print("*"*100)
-        print(f"Instruction {i}")
-        binding = block_info[i].bindings[binding_indices[i]]
-        pretty_print_binding(binding)
-        instrs = [block_info[i].arch_inputs[field] for field in arch_info.const_dict]
-        ivals = [solved_to_bv(instr._value_,solver) for instr in instrs]
-        print(ivals)
-    return info
 
-#def external_loop_solve(y, phi, rr_info, logic = BV, maxloops=10, solver_name = "cvc4"):
-#
-#    y = set(y) #forall_vars
-#    x = phi.get_free_variables() - y #exist vars
-#
-#    with smt.Solver(logic=logic, name=solver_name) as solver:
-#        solver.add_assertion(smt.Bool(True))
-#        loops = 0
-#        #print("Solving")
-#        while maxloops is None or loops <= maxloops:
-#            if loops %10==0:
-#                print(f"{loops}.", end="", flush=True)
-#            loops += 1
-#            eres = solver.solve()
-#
-#            if not eres:
-#                return None
-#            else:
-#                tau = {v: solver.get_value(v) for v in x}
-#                sub_phi = phi.substitute(tau).simplify()
-#                model = smt.get_model(smt.Not(sub_phi), solver_name=solver_name, logic=logic)
-#
-#                if model is None:
-#                    return RR(rr_info, solver)
-#                else :
-#                    sigma = {v: model.get_value(v) for v in y}
-#                    sub_phi = phi.substitute(sigma).simplify()
-#                    solver.add_assertion(sub_phi)
-#        raise ValueError(f"Unknown result in efsmt in {maxloops} number of iterations")
-
+    def get_info():
+        N = info.N
+        block_info = info.block_info
+        arch_info = info.arch_info
+        bind_var = info.bind_var
+        bind_val = bind_var.decode(int(solved_to_bv(bind_var.var, solver)))
+        print(bind_var.var.value, bind_val)
+        binding_indices = info.valid_bindings[bind_val]
+        for i in range(N):
+            print("*"*100)
+            print(f"Instruction {i}")
+            binding = block_info[i].bindings[binding_indices[i]]
+            pretty_print_binding(binding)
+            instrs = [block_info[i].arch_inputs[field] for field in arch_info.const_dict]
+            ivals = [solved_to_bv(instr._value_,solver) for instr in instrs]
+            print(ivals)
+        return info
+    return get_info
