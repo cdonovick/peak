@@ -468,8 +468,7 @@ def test_non_const_constraint(simple_formula, arch_fc, ISA_fc, is_sum):
             }
         run_constraint_test(arch_fc, ir_fc, constraints=constraints, solved=solved, simple_formula=simple_formula)
 
-#@pytest.mark.parametrize('simple_formula', [True, False])
-@pytest.mark.parametrize('simple_formula', [True])
+@pytest.mark.parametrize('simple_formula', [True, False])
 def test_riscv_rr(simple_formula):
     @family_closure
     def ir_fc(family):
