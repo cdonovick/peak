@@ -1,7 +1,7 @@
 import itertools
 from functools import reduce
 from types import SimpleNamespace
-from hwtypes import strip_modifiers
+from hwtypes import strip_modifiers, modifiers
 from peak import family as peak_family, family_closure, Peak, Const
 from .mapper import aadt_product_to_dict, external_loop_solve
 from .index_var import IndexVar, OneHot, Binary
@@ -10,6 +10,8 @@ from .utils import _sort_by_t, pretty_print_binding, solved_to_bv, Unbound
 from .formula_constructor import And, Or, Implies
 import pysmt.shortcuts as smt
 from pysmt.logics import BV
+
+State = modifiers.make_modifier('State', cache=True)
 
 def create_bindings(inputs, outputs, use_unbound=True):
     inputs_by_t = _sort_by_t(inputs)
@@ -23,10 +25,17 @@ def create_bindings(inputs, outputs, use_unbound=True):
     possible_matching = []
     for o_path, o_T in outputs.items():
         poss = []
-        if use_unbound:
-            poss.append(Unbound)
+
         if o_T in inputs_by_t:
             poss += inputs_by_t[o_T]
+        if modifiers.is_modified(o_T) and modifiers.get_modifier(o_T) is State:
+            if len(poss) == 0:
+                poss.append(Unbound)
+            else:
+                assert len(poss) == 1
+        elif use_unbound:
+            poss.append(Unbound)
+
         possible_matching.append(poss)
     assert all(len(p)>0 for p in possible_matching)
     bindings = []
@@ -166,12 +175,10 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, u
             bb_inputs=bb_inputs,
             bindings=bindings
         ))
-
     #Out of the cross product of the bindings, filter out everything that does not use all the ir inputs
     ir_paths = [("IR_in", field) for field in ir_info.input_t.field_dict]
     all_bindings = [block.bindings for block in block_info]
 
-    orig_bindings = reduce(lambda x, y: x*y, [len(b) for b in all_bindings])
     def filt(x):
         bind = [b[x[j]] for j, b in enumerate(all_bindings)]
         found = [0 for _ in ir_paths]
@@ -186,7 +193,8 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, u
         raise ValueError("There are no valid Bindings")
     bind_var = IVar(len(valid_bindings), "bind_in")
     valid_conds.append(bind_var.is_valid())
-
+    num_orig_bindings = reduce(lambda x, y: x*y, [len(b) for b in all_bindings])
+    print(f"{num_orig_bindings} -> {len(valid_bindings)}", flush=True)
     # Will be Ored
     impl_conds = []
     for b, bind_indices in enumerate(valid_bindings):
@@ -204,7 +212,6 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, u
                 oval = translate(opath, use_real=use_real)
                 bind_conds.append(ival == oval)
         impl_conds.append(And(bind_conds))
-
     #set fake to real except for the last one
     if not use_real:
         if N==1:
@@ -254,6 +261,7 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, u
         impl_cond = And([free_repl, Or(impl_conds)])
     F = out_conds
     formula = And([valid_cond, Implies(impl_cond, F)])
+    #print(formula.serialize(), flush=True)
     formula = formula.to_hwtypes()
     forall_vars = pysmt_forall_vars
     formula_wo_forall = formula.value
@@ -271,11 +279,8 @@ def Multi(arch_fc, ir_fc, N: int, family=peak_family, IVar: IndexVar = Binary, u
     return solve
 
 #Definititely a bit hacked. Really should contain a verify function and better pretty printers
-def RR(solver, info):
-    if solver is None:
-        return None
-
-    def get_info():
+class RR:
+    def __init__(self, solver, info):
         N = info.N
         block_info = info.block_info
         arch_info = info.arch_info
@@ -291,5 +296,5 @@ def RR(solver, info):
             instrs = [block_info[i].arch_inputs[field] for field in arch_info.const_dict]
             ivals = [solved_to_bv(instr._value_,solver) for instr in instrs]
             print(ivals)
-        return info
-    return get_info
+        self.info = info
+        self.bind_val = bind_val
