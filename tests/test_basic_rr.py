@@ -86,3 +86,17 @@ def test_basic(ir_fc, name):
     assert counter_example is None
 
 
+from peak.mapper.multi import Multi, Binary, OneHot
+@family_closure
+def ir_add3_fc(family):
+    @family.assemble(locals(), globals())
+    class IR(Peak):
+        def __call__(self, a: Word, b: Word, c: Word) -> Word:
+            return (a + b) * c
+    return IR
+
+def test_multi():
+    ir_fc = ir_add3_fc
+    solve = Multi(arch_fc, ir_fc, 2, IVar=Binary)
+    rr = solve(maxloops=300, solver_name="z3")
+    assert rr is not None

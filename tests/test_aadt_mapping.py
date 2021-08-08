@@ -484,3 +484,5 @@ def test_riscv_rr(simple_formula):
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=simple_formula)
     rewrite_rule = ir_mapper.solve('z3', external_loop=True)
     assert rewrite_rule is not None
+    ce = rewrite_rule.verify()
+    assert ce is None
