@@ -8,6 +8,10 @@ import pytest
 from peak.assembler.assembler import Assembler
 from peak.assembler.assembled_adt import  AssembledADT
 from peak.assembler.assembler_util import _issubclass
+
+from peak.assembler2.assembler import Assembler as Assembler2
+from peak.assembler2.assembled_adt import AssembledADT as AssembledADT2
+
 from examples.demo_pes.pe5.isa import INST as pe5_isa
 from examples.arm.isa import Inst as arm_isa
 from examples.pico.isa import Inst as pico_isa
@@ -20,9 +24,12 @@ BarBV = make_modifier('Bar')(BitVector)
 
 _, _, min_isa = gen_min_isa(BitVector.get_family())
 
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
 @pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa, min_isa])
 @pytest.mark.parametrize("bv_type", [BarBV, FooBV])
-def test_assembled_adt(isa, bv_type):
+def test_assembled_adt(isa, bv_type, AssembledADT, Assembler):
     def _check_recursive(isa, bv_type):
         asm_adt = AssembledADT[isa, Assembler, bv_type]
         asm = Assembler(isa)
@@ -72,7 +79,10 @@ def test_assembled_adt(isa, bv_type):
     _check_recursive(isa, bv_type)
 
 
-def test_match():
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
+def test_match(AssembledADT, Assembler):
     class I0(Enum):
         a = 0
         b = 1
@@ -128,13 +138,16 @@ class TU(TaggedUnion):
     b = BV
 
 
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
 @pytest.mark.parametrize("T, args",
         [
             (E, (E.a,)),
             (E, (E.b,)),
         ]
 )
-def test_from_fields_enum(T, args):
+def test_from_fields_enum(T, args, AssembledADT, Assembler):
     AT = AssembledADT[T, Assembler, BitVector]
     assert hasattr(AT, "from_fields")
 
@@ -149,12 +162,15 @@ def test_from_fields_enum(T, args):
     assert from_fields == lit
 
 
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
 @pytest.mark.parametrize("T, args",
         [
             (T, (BV(7), Bit(1))),
         ]
 )
-def test_from_fields_tuple(T, args):
+def test_from_fields_tuple(T, args, AssembledADT, Assembler):
     AT = AssembledADT[T, Assembler, BitVector]
     assert hasattr(AT, "from_fields")
 
@@ -175,13 +191,16 @@ def test_from_fields_tuple(T, args):
         assert from_fields[i] == v
 
 
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
 @pytest.mark.parametrize("T, args",
         [
             (S, (Bit, Bit(0))),
             (S, (BV, BV(4))),
         ]
 )
-def test_from_fields_sum(T, args):
+def test_from_fields_sum(T, args, AssembledADT, Assembler):
     AT = AssembledADT[T, Assembler, BitVector]
     assert hasattr(AT, "from_fields")
 
@@ -190,7 +209,7 @@ def test_from_fields_sum(T, args):
     assembled_ = AT(assembled)
     from_fields = AT.from_fields(*args)
 
-    assert lit == assembled_
+    assert lit == assembled
     assert assembled == assembled_
     assert assembled_ == from_fields
     assert from_fields == lit
@@ -206,12 +225,15 @@ def test_from_fields_sum(T, args):
     assert from_fields[args[0]].value == args[1]
 
 
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
 @pytest.mark.parametrize("T, kwargs",
         [
             (P, dict(a=Bit(1), b=BV(6))),
         ]
 )
-def test_from_fields_product(T, kwargs):
+def test_from_fields_product(T, kwargs, AssembledADT, Assembler):
     AT = AssembledADT[T, Assembler, BitVector]
     assert hasattr(AT, "from_fields")
 
@@ -232,13 +254,16 @@ def test_from_fields_product(T, kwargs):
         assert getattr(from_fields, k) == v
 
 
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
 @pytest.mark.parametrize("T, kwargs",
         [
             (TU, dict(a=Bit(0))),
             (TU, dict(b=BV(11))),
         ]
 )
-def test_from_fields_tagged(T, kwargs):
+def test_from_fields_tagged(T, kwargs, AssembledADT, Assembler):
     AT = AssembledADT[T, Assembler, BitVector]
     assert hasattr(AT, "from_fields")
 
@@ -264,7 +289,10 @@ def test_from_fields_tagged(T, kwargs):
         assert getattr(from_fields, k).value == v
 
 
-def test_enum_error():
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
+def test_enum_error(Assembler, AssembledADT):
     AE = AssembledADT[E, Assembler, BitVector]
 
     with pytest.raises(TypeError):
