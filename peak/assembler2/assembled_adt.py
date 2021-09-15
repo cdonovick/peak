@@ -20,7 +20,6 @@ from .assembler_abc import AssemblerMeta
 from .assembler_util import _issubclass
 
 class _MISSING: pass
-class _TAG: pass
 
 RESERVED_NAMES = frozenset({
     'adt_t',
