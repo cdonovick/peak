@@ -45,7 +45,7 @@ class Assembler(AbstractAssembler):
     def width(self) -> int:
         return self._width
 
-    def assemble(self, inst: 'isa', bv_type: tp.Type[AbstractBitVector]) -> AbstractBitVector:
+    def assemble(self, inst: 'isa', bv_type: tp.Type[AbstractBitVector] = BitVector) -> AbstractBitVector:
         return self._asm(inst, bv_type)
 
     def disassemble(self, bv: BitVector) -> 'isa':
@@ -186,7 +186,6 @@ def _tuple(isa: tp.Type[Tuple]):
 
     if issubclass(isa, Product):
         def from_fields(*args, **kwargs):
-            print(args, kwargs)
             sig = inspect.signature(isa.__init__)
             # ... for self
             bound = sig.bind(..., *args, **kwargs)
@@ -204,10 +203,6 @@ def _tuple(isa: tp.Type[Tuple]):
             if len(args) != len(isa.fields):
                 raise  TypeError('Incorrect number of positional arguments')
             fields = dict(enumerate(args))
-            # assert we are either using the int or string key for each range
-            for name, k in n2i.items():
-                assert name in fields or k in fields
-
             # layout has both int and string keys, filter to used ones
             layout_ = {k: v for k, v in layout.items() if k in fields}
             bv_value = _create_from_layout(width, layout_, fields)
