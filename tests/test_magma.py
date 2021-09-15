@@ -1,17 +1,21 @@
 import pytest
-from peak import Peak, family_closure, Const
-from peak.assembler import Assembler, AssembledADT
-from peak.rtl_utils import wrap_with_disassembler
-from peak import family
-from peak import name_outputs
 
 from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
-from examples.demo_pes.pe6 import PE_fc
-from examples.demo_pes.pe6.sim import Inst
 
 import fault
 import magma
 import itertools
+
+from peak import Peak, family_closure, Const
+from peak.assembler import Assembler, AssembledADT
+from peak.assembler2.assembler import Assembler as Assembler2
+from peak.assembler2.assembled_adt import AssembledADT as AssembledADT2
+from peak.rtl_utils import wrap_with_disassembler
+from peak import family
+from peak import name_outputs
+
+from examples.demo_pes.pe6 import PE_fc
+from examples.demo_pes.pe6.sim import Inst
 
 
 @pytest.mark.parametrize('named_outputs', [True, False])
@@ -68,8 +72,10 @@ def test_basic(named_outputs, set_port_names):
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
 
-def test_enum():
-
+@pytest.mark.parametrize("AssembledADT, Assembler", [
+        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+    ])
+def test_enum(AssembledADT, Assembler):
     class Op(Enum):
         And=1
         Or=2
@@ -140,13 +146,14 @@ def test_wrap_with_disassembler():
 
 
 
-def test_composition():
+@pytest.mark.parametrize("asm_t", [Assembler, Assembler2])
+def test_composition(asm_t):
     PE_magma = PE_fc(family.MagmaFamily())
     PE_py = PE_fc(family.PyFamily())()
     tester = fault.Tester(PE_magma)
     Op = Inst.op0
     assert Op is Inst.op1
-    asm = Assembler(Inst)
+    asm = asm_t(Inst)
     for op0, op1, choice, in0, in1 in itertools.product(
             Inst.op0.enumerate(),
             Inst.op1.enumerate(),
