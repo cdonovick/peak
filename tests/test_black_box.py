@@ -118,6 +118,7 @@ def test_fp_pe_bb():
         assert isinstance(bb_inst, BlackBox)
 
 def test_fp_pe_smt():
+#    pe = fp.PE_fc.Magma()
     pe = fp.PE_fc.SMT()
     AInst = SMTFamily().get_adt_t(fp.Inst)
     inst = AInst.from_fields(

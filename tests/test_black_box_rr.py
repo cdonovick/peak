@@ -82,6 +82,7 @@ fplib = float_lib_gen(7, 8).const_rm(RoundingMode.RDN)
 ])
 def test_rr(ir_fc, found):
     arch_fc = fp.PE_fc
+    arch_fc.Magma
     arch_mapper = ArchMapper(arch_fc)
 
     ir_mapper = arch_mapper.process_ir_instruction(ir_fc, simple_formula=True)
