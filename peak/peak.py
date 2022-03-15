@@ -28,7 +28,28 @@ class PeakMeta(type):
 
         return cls
 
-class Peak(metaclass=PeakMeta): pass
+
+# a sentinel
+_null = object()
+
+class Peak(metaclass=PeakMeta):
+    # enable the descriptor like protocol on instance attributes
+    def __getattribute__(self, attr):
+        val = super().__getattribute__(attr)
+        try:
+            getter = val._peak_
+        except AttributeError:
+            return val
+
+        return getter()
+
+    def __setattr__(self, attr, value):
+        current = getattr(self, attr, _null)
+        set_method = getattr(current, '_poke_', _null)
+        if set_method is _null:
+            return super().__setattr__(attr, value)
+        else:
+            return set_method(value)
 
 class PeakNotImplementedError(NotImplementedError):
     pass

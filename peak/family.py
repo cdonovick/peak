@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import functools as ft
 import logging
+import inspect
 
 from ast_tools.passes import apply_passes
 from ast_tools.passes import ssa, bool_to_bit, if_to_phi
@@ -153,7 +154,9 @@ class _RewriterFamily(AbstractFamily):
     __ne__ = AbstractFamily.__ne__
 
 
+
 _REG_CACHE = {}
+_ATTR_REG_CACHE = {}
 class _RegFamily(AbstractFamily):
     def gen_register(self, T, init):
         key = (type(self), T, init)
@@ -161,11 +164,11 @@ class _RegFamily(AbstractFamily):
             return _REG_CACHE[key]
         except KeyError:
             pass
-
         family = self
 
         # avoids circular import
         from peak import Peak
+
 
         @family.assemble(locals(), globals())
         class Register(Peak):
@@ -187,6 +190,29 @@ class _RegFamily(AbstractFamily):
 
         return _REG_CACHE.setdefault(key, Register)
 
+
+    def gen_attr_register(self, T, init):
+        key = (type(self), T, init)
+        try:
+            return _REG_CACHE[key]
+        except KeyError:
+            pass
+        family = self
+
+        # avoids circular import
+        from peak import Peak
+
+        class Register(Peak):
+            def __init__(self):
+                self.value: T = T(init)
+
+            def _poke_(self, value):
+                self.value = value
+
+            def _peak_(self):
+                return self.value
+
+        return _ATTR_REG_CACHE.setdefault(key, Register)
 
 class _BBFamily(AbstractFamily):
     def assemble(self, locals, globals, **kwargs):
@@ -227,6 +253,32 @@ class PyFamily(_RegFamily):
 
     def assemble(self, locals, globals, **kwargs):
         return super().assemble(locals, globals, **kwargs)
+
+
+class PyXFamily(_AsmFamily, _RewriterFamily, PyFamily):
+    def __init__(self, assembler=None, **kwargs):
+        if assembler is None:
+            assembler=Assembler
+
+        assert "assembler" not in kwargs
+
+        passes = (ssa(), bool_to_bit(), if_to_phi(self.Bit.ite))
+        super().__init__(assembler, AssembledADT, passes=passes, **kwargs)
+
+    def assemble(self, locals, globals, **kwargs):
+        s_deco = super().assemble(locals, globals, **kwargs)
+        def deco(cls):
+            input_t = cls.__call__._input_t
+            output_t = cls.__call__._output_t
+
+            cls = s_deco(cls)
+
+            cls.__call__._input_t = input_t
+            cls.__call__._output_t = output_t
+            return cls
+
+        return deco
+
 
 
 # Strategically put _AsmFamily first so eq dispatches to it
@@ -308,6 +360,11 @@ class MagmaFamily(_AsmFamily):
                 has_enable=True,
                 reset_type=m.AsyncReset,
                 name_map=m.generator.ParamDict(CE='en', I='value'))
+
+    def gen_attr_register(self, T, init):
+        return m.Register(T, init,
+                has_enable=False,
+                reset_type=m.AsyncReset,)
 
     def assemble(self, locals, globals, set_port_names: bool = False, **kwargs):
         def magmafy(t_):
