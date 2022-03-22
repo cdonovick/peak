@@ -35,10 +35,7 @@ def test_simple():
                 add = 1
                 fpadd = 2
 
-        Add = fplib.Add_fc(family)
-
-
-        rm_utils = RoudningMode_utils(family)
+        Add = fplib.const_rm(RoundingMode.RNE).Add_fc(family)
 
         @family.assemble(locals(), globals())
         class Arch(Peak):
@@ -46,8 +43,7 @@ def test_simple():
                 self.fpadd: Add = Add()
 
             def __call__(self, inst: Const(Inst), a: Data, b: Data) -> Data:
-                rm = rm_utils.RM_c(RoundingMode.RNE)
-                fpadd = self.fpadd(rm, a, b)
+                fpadd = self.fpadd(a, b)
                 if inst.Op == Inst.Op.add:
                     return a + b
                 else: #inst == Inst.OP.fpadd_
