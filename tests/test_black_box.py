@@ -1,7 +1,7 @@
-from hwtypes import Bit, BitVector
+from hwtypes import Bit, BitVector, Product, Enum
 from peak import Const, family_closure, Peak
 from peak.family import PyFamily
-from peak.float import float_lib_gen
+from peak.float import float_lib_gen, RoudningMode_utils, RoundingMode
 import examples.fp_pe as fp
 from hwtypes import SMTBitVector as SBV, SMTBit as SBit
 from peak.family import SMTFamily
@@ -38,7 +38,7 @@ def PE_fc(family):
             if instr == 0:
                 return in_ + 5
             elif instr == 1:
-                return b1;
+                return b1
             elif instr == 2:
                 return b2
             else:
@@ -94,6 +94,35 @@ def test_black_box_smt():
         check(v==out)
         check_BB_inputs()
 
+
+def test_float_const_rm_magma():
+    fplib = float_lib_gen(7, 8)
+    @family_closure
+    def arch_fc(family):
+        Data = BitVector[16]
+        class Inst(Product):
+            class Op(Enum):
+                add = 1
+                fpadd = 2
+                fpmul = 2
+
+        Add = fplib.const_rm(RoundingMode.RNE).Add_fc(family)
+        Mul = fplib.const_rm(RoundingMode.RNE).Mul_fc(family)
+
+        @family.assemble(locals(), globals())
+        class Arch(Peak):
+            def __init__(self):
+                self.fpadd: Add = Add()
+                self.fpmul: Mul = Mul()
+
+            def __call__(self, inst: Const(Inst), a: Data, b: Data) -> Data:
+                fpadd = self.fpadd(a, b)
+                if inst.Op == Inst.Op.add:
+                    return a + b
+                else: #inst == Inst.OP.fpadd_
+                    return fpadd
+        return Arch
+    m = arch_fc.Magma
 
 
 #Test the floating point libs
