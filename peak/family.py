@@ -229,10 +229,11 @@ class PyFamily(_RegFamily):
         return super().assemble(locals, globals, **kwargs)
 
 
+
 # Strategically put _AsmFamily first so eq dispatches to it
-# Put _BBFamily second it switch out the __call__ after its been ssa'd
-class SMTFamily(_AsmFamily, _BBFamily, _RewriterFamily, _RegFamily):
+class _StdMix(_AsmFamily, _RewriterFamily):
     '''
+    Mixin which defines an init and assemble with the usual arguments
     Rewrites __call__ to ssa
     Also assembles adts
     '''
@@ -245,6 +246,25 @@ class SMTFamily(_AsmFamily, _BBFamily, _RewriterFamily, _RegFamily):
         passes = (ssa(), bool_to_bit(), if_to_phi(self.Bit.ite))
         super().__init__(assembler, AssembledADT, passes=passes, **kwargs)
 
+    def assemble(self, locals, globals, **kwargs):
+        s_deco = super().assemble(locals, globals, **kwargs)
+        def deco(cls):
+            input_t = cls.__call__._input_t
+            output_t = cls.__call__._output_t
+
+            cls = s_deco(cls)
+
+            cls.__call__._input_t = input_t
+            cls.__call__._output_t = output_t
+            return cls
+
+        return deco
+
+class PyXFamily(_StdMix, PyFamily): pass
+
+
+# Put _BBFamily first so it switchs out the __call__ after its been ssa'd
+class SMTFamily(_BBFamily, _StdMix, _RegFamily):
     @property
     def Bit(self):
         return hwtypes.SMTBit
