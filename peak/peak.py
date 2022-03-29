@@ -28,7 +28,46 @@ class PeakMeta(type):
 
         return cls
 
-class Peak(metaclass=PeakMeta): pass
+
+def _is_dunder(name: str) -> bool:
+    return (len(name) > 4
+            and name[:2] == name[-2:] == '__'
+            and name[2] != '_' and name[-3] != '_')
+
+# a sentinel
+_null = object()
+
+class Peak(metaclass=PeakMeta):
+    # enable a descriptor like protocol on instance attributes
+    def __getattribute__(self, attr):
+        val = super().__getattribute__(attr)
+
+        if _is_dunder(attr):
+            return val
+
+        try:
+            getter = val._peak_
+        except AttributeError:
+            return val
+
+        return getter()
+
+    def __setattr__(self, attr, value):
+        if _is_dunder(attr):
+            return super().__setattr__(attr, value)
+
+        try:
+            current = super().__getattribute__(attr)
+        except AttributeError:
+            return super().__setattr__(attr, value)
+
+        setter = getattr(current, '_poke_', _null)
+
+        if setter is _null:
+            return super().__setattr__(attr, value)
+        else:
+            return setter(value)
+
 
 class PeakNotImplementedError(NotImplementedError):
     pass
