@@ -1,7 +1,9 @@
 import random
 
+import hwtypes as hw
 import fault
 import magma as m
+import pytest
 
 from peak.family import MagmaFamily, PyFamily, PyXFamily
 from peak import Peak, name_outputs, family_closure
@@ -59,7 +61,7 @@ def test_attr_register():
     assert not isinstance(reg, Data)
     gold_val = Data(0)
 
-    for _ in range(2):
+    for _ in range(32):
         en = Bit(random.randint(0, 1))
         rst = Bit(random.randint(0, 1))
         val = ctr(en, rst)
@@ -108,3 +110,60 @@ def test_attr_register():
         tester.circuit.O.expect(gold)
         tester.step(2)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
+
+
+def test_adt_reg():
+    class State(hw.Enum):
+        init  = 0
+        busy  = 1
+        ready = 2
+
+    @family_closure
+    def state_fc(family):
+        Bit = family.Bit
+        Data = family.BitVector[16]
+        State_ = family.get_adt_t(State)
+        Reg = family.gen_attr_register(State_, State.init)
+
+        @family.assemble(locals(), globals())
+        class StateMachine(Peak):
+            def __init__(self):
+                self.reg = Reg()
+
+            @name_outputs(out=Data)
+            def __call__(self, step: Bit) -> State:
+                current = self.reg
+                if current == State.init:
+                    self.reg = State_(State.ready)
+                elif step:
+                    if current == State.busy:
+                        self.reg = State_(State.ready)
+                    else:
+                        self.reg = State_(State.busy)
+                return current
+        return StateMachine
+
+    Bit = PyFamily().Bit
+    state_machine = state_fc.Py()
+    state_machine_x = state_fc.PyX()
+    gold = State.init
+
+    for _ in range(32):
+        step = Bit(random.randint(0, 1))
+        val = state_machine(step)
+        val_x = state_machine_x(step)
+
+        assert gold == val
+        assert val == val_x
+
+        if gold == State.init:
+            gold = State.ready
+        elif step:
+            if gold == State.busy:
+                gold = State.ready
+            else:
+                gold = State.busy
+
+    # Magma only supports bv registers
+    with pytest.raises(TypeError):
+        state_fc.Magma
