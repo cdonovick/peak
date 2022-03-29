@@ -54,9 +54,12 @@ def test_attr_register():
 
     CtrPy = counter_fc.Py
     ctr = CtrPy()
+    reg = ctr.__dict__['reg']
+    assert isinstance(ctr.reg, Data)
+    assert not isinstance(reg, Data)
     gold_val = Data(0)
 
-    for _ in range(32):
+    for _ in range(2):
         en = Bit(random.randint(0, 1))
         rst = Bit(random.randint(0, 1))
         val = ctr(en, rst)
@@ -67,10 +70,18 @@ def test_attr_register():
         elif en:
             gold_val = val + 1
 
+    assert isinstance(ctr.reg, Data)
+    assert reg is ctr.__dict__['reg']
 
     ctr = CtrPy()
+    reg = ctr.__dict__['reg']
     CtrPyX = counter_fc.PyX
     ctrx = CtrPyX()
+    regx = ctrx.__dict__['reg']
+    assert isinstance(ctr.reg, Data)
+    assert isinstance(ctrx.reg, Data)
+    assert not isinstance(reg, Data)
+    assert not isinstance(regx, Data)
 
     for _ in range(32):
         en = Bit(random.randint(0, 1))
@@ -79,6 +90,10 @@ def test_attr_register():
         val = ctrx(en, rst)
         assert val == gold_val
 
+    assert isinstance(ctr.reg, Data)
+    assert isinstance(ctrx.reg, Data)
+    assert reg is ctr.__dict__['reg']
+    assert regx is ctrx.__dict__['reg']
 
     CtrM = counter_fc(MagmaFamily())
 
