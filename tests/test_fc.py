@@ -7,6 +7,7 @@ class ExtendFamily:
     class MagmaFamily(family.MagmaFamily): pass
     class PyFamily(family.PyFamily): pass
     class SMTFamily(family.SMTFamily): pass
+    class PyXFamily(family.PyXFamily): pass
 
 @family_closure
 def foo_fc(family): return family
@@ -27,3 +28,4 @@ def test_autocall(fc):
     assert isinstance(fc.Magma, fc.family.MagmaFamily)
     assert isinstance(fc.Py, fc.family.PyFamily)
     assert isinstance(fc.SMT, fc.family.SMTFamily)
+    assert isinstance(fc.PyX, fc.family.PyXFamily)

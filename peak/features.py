@@ -126,6 +126,11 @@ class family_closure:
     def Py(self):
         return self(self.family.PyFamily())
 
+    @property
+    def PyX(self):
+        return self(self.family.PyXFamily())
+
+
     def __call__(self, *args, **kwargs):
         if not self.is_bound:
             self._bind(*args, **kwargs)

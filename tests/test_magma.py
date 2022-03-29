@@ -17,7 +17,6 @@ from peak import name_outputs
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
 
-
 @pytest.mark.parametrize('named_outputs', [True, False])
 @pytest.mark.parametrize('set_port_names', [True, False])
 def test_basic(named_outputs, set_port_names):
@@ -42,6 +41,11 @@ def test_basic(named_outputs, set_port_names):
     vals = [Bit(0), Bit(1)]
     for i0, i1 in itertools.product(vals, vals):
         assert PE_bv()(i0, i1) == i0 & i1
+
+    #verify rewriting doesn't change bv behavior
+    PE_bvx = PE_fc(family.PyXFamily())
+    for i0, i1 in itertools.product(vals, vals):
+        assert PE_bv()(i0, i1) == PE_bvx()(i0, i1)
 
     #verify SMT works
     PE_smt = PE_fc(family.SMTFamily())
@@ -101,6 +105,16 @@ def test_enum(AssembledADT, Assembler):
             gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
             assert res == gold
 
+    #verify rewriting doesn't change bv behavior
+    PE_bvx = PE_fc(family.PyXFamily())
+    Op_aadt = AssembledADT[Op, Assembler, BitVector]
+    for op in Op.enumerate():
+        asm_op = Op_aadt(op)
+        for i0, i1 in itertools.product(vals, vals):
+            res = PE_bvx()(asm_op, i0, i1)
+            gold = PE_bv()(op, i0, i1)
+            assert res == gold
+
     # verify BV works
     PE_smt  = PE_fc(family.SMTFamily())
     Op_aadt = AssembledADT[Op, Assembler, SMTBitVector]
@@ -126,6 +140,7 @@ def test_enum(AssembledADT, Assembler):
             tester.eval()
             tester.circuit.O.expect(gold)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
+
 
 def test_wrap_with_disassembler():
     class HashableDict(dict):
