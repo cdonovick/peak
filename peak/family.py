@@ -154,6 +154,7 @@ class _RewriterFamily(AbstractFamily):
 
 
 _REG_CACHE = {}
+_ATTR_REG_CACHE = {}
 class _RegFamily(AbstractFamily):
     def gen_register(self, T, init):
         key = (type(self), T, init)
@@ -186,6 +187,29 @@ class _RegFamily(AbstractFamily):
                 return self.value
 
         return _REG_CACHE.setdefault(key, Register)
+
+    def gen_attr_register(self, T, init):
+        key = (type(self), T, init)
+        try:
+            return _ATTR_REG_CACHE[key]
+        except KeyError:
+            pass
+        family = self
+
+        # avoids circular import
+        from peak import Peak
+
+        class Register(Peak):
+            def __init__(self):
+                self.value: T = T(init)
+
+            def _poke_(self, value):
+                self.value = value
+
+            def _peak_(self):
+                return self.value
+
+        return _ATTR_REG_CACHE.setdefault(key, Register)
 
 
 class _BBFamily(AbstractFamily):
@@ -325,9 +349,17 @@ class MagmaFamily(_AsmFamily):
 
     def gen_register(self, T, init):
         return m.Register(T, init,
-                has_enable=True,
-                reset_type=m.AsyncReset,
-                name_map=m.generator.ParamDict(CE='en', I='value'))
+            has_enable=True,
+            reset_type=m.AsyncReset,
+            name_map=m.generator.ParamDict(CE='en', I='value'),
+        )
+
+    def gen_attr_register(self, T, init):
+        return m.Register(T, init,
+            has_enable=False,
+            reset_type=m.AsyncReset,
+        )
+
 
     def assemble(self, locals, globals, set_port_names: bool = False, **kwargs):
         def magmafy(t_):
