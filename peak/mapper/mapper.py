@@ -151,12 +151,6 @@ class SMTMapper:
             output_value = wrap_outputs(outputs, output_aadt_t)
 
             forms, output_varmap, _ = SMTForms()(output_aadt_t, value=output_value)
-            #Check consistency of SMTForms
-            for f in forms:
-                bool_check = (f.value == output_value)
-                if isinstance(bool_check, SMTBit):
-                    bool_check = bool_check.value
-                assert bool_check
 
             output_forms.append(forms)
         num_input_forms = len(output_forms)
