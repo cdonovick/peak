@@ -5,7 +5,7 @@ from functools import lru_cache
 from collections import defaultdict
 from peak import family_closure, Const
 from hwtypes.adt import Product, Tuple
-from hwtypes import Bit, BitVector
+from hwtypes import Bit, BitVector, SMTBit
 from hwtypes import AbstractBit, AbstractBitVector, TypeFamily
 from hwtypes.adt import is_adt_type
 from hwtypes.modifiers import strip_modifiers, wrap_modifier, unwrap_modifier
@@ -151,9 +151,7 @@ class SMTMapper:
             output_value = wrap_outputs(outputs, output_aadt_t)
 
             forms, output_varmap, _ = SMTForms()(output_aadt_t, value=output_value)
-            #Check consistency of SMTForms
-            for f in forms:
-                assert f.value == output_value
+
             output_forms.append(forms)
         num_input_forms = len(output_forms)
         num_output_forms = len(output_forms[0])
