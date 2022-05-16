@@ -77,6 +77,10 @@ class AbstractFamily(metaclass=ABCMeta):
         def deco(cls): return cls
         return deco
 
+    # an alias for assemble
+    def compile(self, locals, globals, **kwargs):
+        return self.assemble(locals, globals, **kwargs)
+
     @abstractmethod
     def get_adt_t(self, adt_t): pass
 
