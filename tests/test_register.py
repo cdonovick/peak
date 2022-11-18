@@ -5,7 +5,7 @@ import fault
 import magma as m
 import pytest
 
-from peak.family import MagmaFamily, PyFamily, PyXFamily
+from peak.family import MagmaFamily, PyFamily, PyXFamily, SMTFamily
 from peak import Peak, name_outputs, family_closure
 
 def test_register():
@@ -167,3 +167,57 @@ def test_adt_reg():
     # Magma only supports bv registers
     with pytest.raises(TypeError):
         state_fc.Magma
+
+@pytest.mark.parametrize("family", [PyFamily(), SMTFamily()])
+def test_reg_base(family):
+    @family_closure
+    def pipe_fc(family):
+        Data = family.BitVector[16]
+        Reg = family.gen_register(Data, 0)
+
+        @family.assemble(locals(), globals())
+        class Pipe(Peak):
+            def __init__(self):
+                self.reg_0 = Reg()
+                self.reg_1 = Reg()
+
+            @name_outputs(out=Data)
+            def __call__(self, i: Data) -> Data:
+                return self.reg_1(self.reg_0(i))
+
+        return Pipe
+
+    Pipe = pipe_fc(family)
+    pipe = Pipe()
+    assert isinstance(pipe.reg_0, family.RegBase)
+    assert isinstance(pipe.reg_1, family.RegBase)
+
+
+@pytest.mark.parametrize("family", [PyFamily(), SMTFamily()])
+def test_attr_reg_base(family):
+    @family_closure
+    def pipe_fc(family):
+        Data = family.BitVector[16]
+        Reg = family.gen_attr_register(Data, 0)
+
+        @family.assemble(locals(), globals())
+        class Pipe(Peak):
+            def __init__(self):
+                self.reg_0 = Reg()
+                self.reg_1 = Reg()
+
+            @name_outputs(out=Data)
+            def __call__(self, i: Data) -> Data:
+                out = self.reg_1
+                self.reg_1 = self.reg_0
+                self.reg_0 = i
+                return out
+
+        return Pipe
+
+    Pipe = pipe_fc(family)
+    pipe = Pipe()
+    # look up through dict as normal access returns the contents of the register
+    assert isinstance(pipe.__dict__['reg_0'], family.AttrRegBase)
+    assert isinstance(pipe.__dict__['reg_1'], family.AttrRegBase)
+
