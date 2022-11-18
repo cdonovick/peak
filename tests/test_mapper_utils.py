@@ -42,9 +42,6 @@ def test_SMTForms():
     aadt_val = free_var(AT)
     for value in (None, aadt_val):
         forms, varmap, _ = SMTForms()(AT, value=value)
-        if value is not None:
-            for form in forms:
-                assert form.value == value
 
         #expected_paths should be exactly in varmap
         assert len(expected_paths) == len(varmap)

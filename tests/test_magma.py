@@ -51,7 +51,8 @@ def test_basic(named_outputs, set_port_names):
     PE_smt = PE_fc(family.SMTFamily())
     vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
     for i0, i1 in itertools.product(vals, vals):
-        assert PE_smt()(i0, i1) == i0 & i1
+        # we can't assert anything without using a solver
+        PE_smt()(i0, i1)
 
     #verify magma works
     PE_magma = PE_fc(family.MagmaFamily())
@@ -115,16 +116,15 @@ def test_enum(AssembledADT, Assembler):
             gold = PE_bv()(op, i0, i1)
             assert res == gold
 
-    # verify BV works
+    # verify SMT works
     PE_smt  = PE_fc(family.SMTFamily())
     Op_aadt = AssembledADT[Op, Assembler, SMTBitVector]
     vals = [SMTBit(0), SMTBit(1), SMTBit(), SMTBit()]
     for op in Op.enumerate():
         op = Op_aadt(op)
         for i0, i1 in itertools.product(vals, vals):
+            # we can't assert anything without using a solver
             res = PE_smt()(op, i0, i1)
-            gold = (i0 & i1 ) if (op is Op.And) else (i0 | i1)
-            assert res == gold
 
     # verify magma works
     asm = Assembler(Op)
