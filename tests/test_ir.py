@@ -1,4 +1,5 @@
 from peak import family_closure
+from peak.family import PyFamily, SMTFamily
 from peak.ir import IR
 from hwtypes import BitVector, Bit, UIntVector
 from hwtypes import SMTBit
@@ -44,7 +45,7 @@ def test_add_peak_instruction():
     assert x == BV16(5)
     assert y == Bit(1)
 
-@pytest.mark.parametrize("family", [Bit.get_family(), SMTBit.get_family()])
+@pytest.mark.parametrize("family", [PyFamily(), SMTFamily()])
 @pytest.mark.parametrize("args", [
     (rand_value(16), rand_value(16))
         for _ in range(20)
@@ -77,4 +78,10 @@ def test_smallir(family, args):
         else:
             gold = fun(args[0], args[1])
             ret = instr(args[0], args[1])
-        assert gold == ret
+        if isinstance(family, PyFamily):
+            assert gold == ret
+        else:
+            # We can't assert anything without using a solver
+            gold == ret
+
+

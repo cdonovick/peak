@@ -137,7 +137,8 @@ def _enum(isa: tp.Type[Enum]) -> int:
         layout[inst] = (0, width)
 
     assemble = asm.__getitem__
-    disassemble = dsm.__getitem__
+    def disassemble(opcode: BitVector[width]):
+        return dsm[opcode.value]
     is_valid = _gen_is_valid(opcodes, width)
     return assemble, disassemble, is_valid, width, layout
 
