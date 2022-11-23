@@ -160,8 +160,14 @@ class _RewriterFamily(AbstractFamily):
 _REG_CACHE = {}
 _ATTR_REG_CACHE = {}
 class _RegFamily(AbstractFamily):
+    # Base classes for register types
+    class RegBase: pass
+
+    class AttrRegBase: pass
+
     def gen_register(self, T, init):
-        key = (type(self), T, init)
+        cls = type(self)
+        key = (cls, T, init)
         try:
             return _REG_CACHE[key]
         except KeyError:
@@ -173,7 +179,7 @@ class _RegFamily(AbstractFamily):
         from peak import Peak
 
         @family.assemble(locals(), globals())
-        class Register(Peak):
+        class Register(Peak, cls.RegBase):
             def __init__(self):
                 self.value: T = T(init)
 
@@ -193,7 +199,8 @@ class _RegFamily(AbstractFamily):
         return _REG_CACHE.setdefault(key, Register)
 
     def gen_attr_register(self, T, init):
-        key = (type(self), T, init)
+        cls = type(self)
+        key = (cls, T, init)
         try:
             return _ATTR_REG_CACHE[key]
         except KeyError:
@@ -203,7 +210,7 @@ class _RegFamily(AbstractFamily):
         # avoids circular import
         from peak import Peak
 
-        class Register(Peak):
+        class Register(Peak, cls.AttrRegBase):
             def __init__(self):
                 self.value: T = T(init)
 
