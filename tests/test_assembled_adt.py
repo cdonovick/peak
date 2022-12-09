@@ -1,3 +1,6 @@
+import functools as ft
+
+import hwtypes as hw
 from hwtypes import BitVector, Bit
 from hwtypes import make_modifier
 from hwtypes.adt import TaggedUnion, Product, Tuple, Sum, Enum
@@ -24,8 +27,11 @@ BarBV = make_modifier('Bar')(BitVector)
 
 _, _, min_isa = gen_min_isa(BitVector.get_family())
 
+
+
 @pytest.mark.parametrize("AssembledADT, Assembler", [
-        (AssembledADT, Assembler), (AssembledADT2, Assembler2)
+        (AssembledADT, Assembler),
+        (AssembledADT2, Assembler2),
     ])
 @pytest.mark.parametrize("isa", [pe5_isa, arm_isa, pico_isa, min_isa])
 @pytest.mark.parametrize("bv_type", [BarBV, FooBV])
@@ -55,21 +61,28 @@ def test_assembled_adt(isa, bv_type, AssembledADT, Assembler):
             assert type(asm_adt(opcode) == opcode) is Bit
             assert isinstance(asm_adt(opcode), BitVectorProtocol)
 
+        asm_val = asm_adt(bv_type[asm.width](0))
         if _issubclass(isa, Sum):
             for field in isa.fields:
-                assert asm_adt[field] is AssembledADT[field, Assembler, bv_type]
+                field_t = AssembledADT[field, Assembler, bv_type]
+                assert asm_adt[field] is field_t
+                assert isinstance(asm_val[field].value, field_t)
                 if isinstance(field, (Sum, Tuple, Product)):
                     _check_recursive(field, bv_type)
 
         elif _issubclass(isa, Product):
             for name, field in isa.field_dict.items():
-                assert getattr(asm_adt, name) is AssembledADT[field, Assembler, bv_type]
+                field_t = AssembledADT[field, Assembler, bv_type]
+                assert getattr(asm_adt, name) is field_t
+                assert isinstance(getattr(asm_val, name), field_t)
                 if isinstance(field, (Sum, Tuple, Product)):
                     _check_recursive(field, bv_type)
 
         elif _issubclass(isa, Tuple):
             for idx, field in isa.field_dict.items():
-                assert asm_adt[idx] is AssembledADT[field, Assembler, bv_type]
+                field_t = AssembledADT[idx, Assembler, bv_type]
+                assert asm_adt[idx] is field_t
+                assert isinstance(asm_val[idx].value, field_t)
                 if isinstance(field, (Sum, Tuple, Product)):
                     _check_recursive(field, bv_type)
 

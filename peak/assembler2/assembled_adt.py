@@ -137,14 +137,16 @@ class AssembledADT(metaclass=AssembledADTMeta):
         cls = type(self)
         asm = cls._assembler_
         field = asm.extract(self._value_, key)
+        asm_t = getter(cls, key)
+
+        if issubclass(asm_t, AbstractBit):
+            assert field.size == 1
+            asm_field = asm_t(field[0])
+        else:
+            asm_field = asm_t(field)
 
         if not _issubclass(cls.adt_t, Sum):
-            if issubclass(getter(cls.adt_t, key), AbstractBit):
-                assert field.size == 1
-                return field[0]
-            return field
-
-        asm_field = getter(cls, key)(field)
+            return asm_field
 
         match = asm.match(self._value_, key)
         return cls.adt_t.Match(match, asm_field, safe=False)
