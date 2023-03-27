@@ -418,7 +418,7 @@ class MagmaBitVector(AbstractBitVector):
     def bvneg(self):
         return MagmaBit(self._value.bvneg())
 
-    # BOOKMARK #
+     # BOOKMARK #
 
     def adc(self, other : 'MagmaBitVector', carry : SMTBit) -> tp.Tuple['BitVector', SMTBit]:
         """
