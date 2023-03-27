@@ -167,7 +167,7 @@ class MagmaBit(AbstractBit, m.MagmaProtocol, metaclass=MagmaBitMeta):
 # class AbstractBitVectorMeta(type): #:(ABCMeta):
 class MagmaVectorMeta(AbstractBitVectorMeta, m.MagmaProtocolMeta): #:(ABCMeta):
     # BitVectorType, size :  BitVectorType[size]
-    _class_cache = weakref.WeakValueDictionary()
+    # _class_cache = weakref.WeakValueDictionary()
 
     def __new__(mcs, name, bases, namespace, info=(None, None, None), **kwargs):
 
@@ -185,20 +185,30 @@ class MagmaVectorMeta(AbstractBitVectorMeta, m.MagmaProtocolMeta): #:(ABCMeta):
         return t
 
 
-    def __getitem__(cls, idx : tp.Tuple[int, m.Direction]) -> 'MagmaVectorMeta':
+    # def __getitem__(cls, idx : tp.Tuple[int, m.Direction]) -> 'MagmaVectorMeta':
+    def __getitem__(cls, idx : tp.Union[int, tp.Tuple[int, m.Direction]]) -> 'MagmaVectorMeta':
         mcs = type(cls)
         try:
             return mcs._class_cache[cls, idx]
         except KeyError:
             pass
 
-        if not isinstance(idx, int):
-            raise TypeError('Size of BitVectors must be of type int not {}'.format(type(idx)))
-        if idx < 0:
+        if isinstance(idx, int):
+            size, direction = idx, m.Direction.Undirected
+        elif isinstance(idx, tuple):
+            if len(idx) != 2:
+                raise TypeError('Expected (size,direction) tuple')
+            size, direction = idx
+        else:
+            raise TypeError('BitVectors must be bound to int, [Direction]')
+            
+        if size < 0:
             raise ValueError('Size of BitVectors must be positive')
 
         if cls.is_sized:
             raise TypeError('{} is already sized'.format(cls))
+
+        idx = size, direction
 
         bases = [cls]
         bases.extend(b[idx] for b in cls.__bases__ if isinstance(b, mcs))
