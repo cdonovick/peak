@@ -94,14 +94,9 @@ class MagmaBitMeta(m.MagmaProtocolMeta):
             return cls
 
     def _from_magma_value_(cls, value):
-        d = cls._info_[1]
-        if d == m.Direction.In:
-            return cls.undirected_t[m.Direction.Out]
-        elif d == m.Direction.Out:
-            return cls.undirected_t[m.Direction.In]
-        else:
-            return cls
-
+        if not value.is_oriented(cls._info_[1]):
+            raise TypeError('value is not properly oriented')
+        return cls(value)
 
 def bit_cast(fn):
     @ft.wraps(fn)
@@ -260,13 +255,9 @@ class MagmaVectorMeta(AbstractBitVectorMeta, m.MagmaProtocolMeta): #:(ABCMeta):
             return cls
 
     def _from_magma_value_(cls, value):
-        d = cls._info_[2]
-        if d == m.Direction.In:
-            return cls.unbound_t[cls.size, m.Direction.Out]
-        elif d == m.Direction.Out:
-            return cls.unbound_t[cls.size, m.Direction.In]
-        else:
-            return cls
+        if not value.is_oriented(cls._info_[2]):
+            raise TypeError('value is not properly oriented')
+        return cls(value)
 
 # END class MagmaVectorMeta
 
@@ -316,58 +307,13 @@ class MagmaBitVector(AbstractBitVector):
         return self._value.__repr__()
 
     def __getitem__(self, index):
-        size = self.size
-        if isinstance(index, slice):
-            start, stop, step = index.start, index.stop, index.step
+        v = self._value.__getitem__(index)
 
-            if start is None:
-                start = 0
-            elif start < 0:
-                start = size + start
-
-            if stop is None:
-                stop = size
-            elif stop < 0:
-                stop = size + stop
-
-            stop = min(stop, size)
-
-            if step is None:
-                step = 1
-            elif step != 1:
-                raise IndexError('SMT extract does not support step != 1')
-
-            v = self.value[start:stop-1]
-            return type(self).unsized_t[v.get_type().width](v)
-        elif isinstance(index, int):
-            if index < 0:
-                index = size+index
-
-            if not (0 <= index < size):
-                raise IndexError()
-
-            v = self.value[index]
-            return self.get_family().Bit(smt.Equals(v, smt.BV(1, 1)))
+        if isinstance(v, m.Bit):
+            return MagmaBit(v)
         else:
-            raise TypeError()
-
-
-    def __setitem__(self, index, value):
-        if isinstance(index, slice):
-            raise NotImplementedError()
-        else:
-            if not (isinstance(value, bool) or isinstance(value, SMTBit) or (isinstance(value, int) and value in {0, 1})):
-                raise ValueError("Second argument __setitem__ on a single BitVector index should be a bit, boolean or 0 or 1, not {value}".format(value=value))
-
-            if index < 0:
-                index = self.size+index
-
-            if not (0 <= index < self.size):
-                raise IndexError()
-
-            mask = type(self)(1 << index)
-            self._value = SMTBit(value).ite(self | mask,  self & ~mask)._value
-
+            cls = type(self)
+            return cls.unbound_t[v.size](v)
 
     def __len__(self):
         return self.size
