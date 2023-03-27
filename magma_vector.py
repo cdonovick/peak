@@ -301,28 +301,19 @@ class MagmaBitVector(AbstractBitVector):
 #     def get_family() -> TypeFamily:
 #         return _Family_
 # 
-
     def __init__(self, *args, **kwargs):
-        self._value=m.Bits(*args, **kwargs)
+        cls = type(self)
+        self._value = cls._to_magma_(*args, **kwargs)
 
-    def make_constant(self, value, size:tp.Optional[int]=None):
-        if size is None:
-            size = self.size
-        return type(self).unsized_t[size](value)
-
-    @property
-    def value(self):
-        return self._value
+    def make_constant(self, value):
+        return type(self)(value)
 
     @property
     def num_bits(self):
         return self.size
 
     def __repr__(self):
-        if self._name is not AUTOMATIC:
-            return f'{type(self)}({self._name})'
-        else:
-            return f'{type(self)}({self._value})'
+        return self._value.__repr__()
 
     def __getitem__(self, index):
         size = self.size
