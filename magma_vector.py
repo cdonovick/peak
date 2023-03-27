@@ -319,104 +319,106 @@ class MagmaBitVector(AbstractBitVector):
         return self.size
 
     def concat(self, other):
-        T = type(self).unsized_t
+        T = type(self).unbound_t
         if not isinstance(other, T):
             raise TypeError(f'value must of type {T} not {type(other)}')
-        return T[self.size + other.size](smt.BVConcat(other.value, self.value))
+        return T[self.size + other.size](self._value.concat(other._value))
 
     def bvnot(self):
-        return type(self)(smt.BVNot(self.value))
+        return type(self)(self._value.bvnot())
 
     @bv_cast
     def bvand(self, other):
-        return type(self)(smt.BVAnd(self.value, other.value))
+        return type(self)(self._value.bvand(other._value))
 
     @bv_cast
     def bvnand(self, other):
-        return type(self)(smt.BVNot(smt.BVAnd(self.value, other.value)))
+        return type(self)(self._value.bvnand(other._value))
 
     @bv_cast
     def bvor(self, other):
-        return type(self)(smt.BVOr(self.value, other.value))
+        return type(self)(self._value.bvor(other._value))
 
     @bv_cast
     def bvnor(self, other):
-        return type(self)(smt.BVNot(smt.BVOr(self.value, other.value)))
+        return type(self)(self._value.bvnor(other._value))
 
     @bv_cast
     def bvxor(self, other):
-        return type(self)(smt.BVXor(self.value, other.value))
+        return type(self)(self._value.bvxor(other._value))
 
     @bv_cast
     def bvxnor(self, other):
-        return type(self)(smt.BVNot(smt.BVXor(self.value, other.value)))
+        return type(self)(self._value.bvxnor(other._value))
 
     @bv_cast
     def bvshl(self, other):
-        return type(self)(smt.BVLShl(self.value, other.value))
+        return type(self)(self._value.bvshl(other._value))
 
     @bv_cast
     def bvlshr(self, other):
-        return type(self)(smt.BVLShr(self.value, other.value))
+        return type(self)(self._value.bvlshr(other._value))
 
     @bv_cast
     def bvashr(self, other):
-        return type(self)(smt.BVAShr(self.value, other.value))
+        return type(self)(self._value.bvashr(other._value))
 
     @int_cast
     def bvrol(self, other):
-        return type(self)(smt.get_env().formula_manager.BVRol(self.value, other))
+        return type(self)(self._value.bvrol(other._value))
 
     @int_cast
     def bvror(self, other):
-        return type(self)(smt.get_env().formula_manager.BVRor(self.value, other))
+        return type(self)(self._value.bvror(other._value))
 
     @bv_cast
     def bvcomp(self, other):
-        return type(self).unsized_t[1](smt.BVComp(self.value, other.value))
+        return type(self).unbound_t[1](self._value.bvcomp(other._value))
 
     @bv_cast
     def bveq(self,  other):
-        return self.get_family().Bit(smt.Equals(self.value, other.value))
+        return MagmaBit(self._value.bveq(other._value))
 
     @bv_cast
     def bvne(self, other):
-        return self.get_family().Bit(smt.NotEquals(self.value, other.value))
+        return MagmaBit(self._value.bvne(other._value))
 
     @bv_cast
     def bvult(self, other):
-        return self.get_family().Bit(smt.BVULT(self.value, other.value))
+        return MagmaBit(self._value.bvult(other._value))
 
     @bv_cast
     def bvule(self, other):
-        return self.get_family().Bit(smt.BVULE(self.value, other.value))
+        return MagmaBit(self._value.bvule(other._value))
 
     @bv_cast
     def bvugt(self, other):
-        return self.get_family().Bit(smt.BVUGT(self.value, other.value))
+        return MagmaBit(self._value.bvugt(other._value))
 
     @bv_cast
     def bvuge(self, other):
-        return self.get_family().Bit(smt.BVUGE(self.value, other.value))
+        return MagmaBit(self._value.bvuge(other._value))
 
     @bv_cast
     def bvslt(self, other):
-        return self.get_family().Bit(smt.BVSLT(self.value, other.value))
+        return MagmaBit(self._value.bvslt(other._value))
 
     @bv_cast
     def bvsle(self, other):
-        return self.get_family().Bit(smt.BVSLE(self.value, other.value))
+        return MagmaBit(self._value.bvsle(other._value))
 
     @bv_cast
     def bvsgt(self, other):
-        return self.get_family().Bit(smt.BVSGT(self.value, other.value))
+        return MagmaBit(self._value.bvsgt(other._value))
 
     @bv_cast
     def bvsge(self, other):
-        return self.get_family().Bit(smt.BVSGE(self.value, other.value))
+        return MagmaBit(self._value.bvsge(other._value))
 
     def bvneg(self):
-        return type(self)(smt.BVNeg(self.value))
+        return MagmaBit(self._value.bvneg())
+
+    # BOOKMARK #
 
     def adc(self, other : 'MagmaBitVector', carry : SMTBit) -> tp.Tuple['BitVector', SMTBit]:
         """
@@ -441,31 +443,31 @@ class MagmaBitVector(AbstractBitVector):
 
     @bv_cast
     def bvadd(self, other):
-        return type(self)(smt.BVAdd(self.value, other.value))
+        return type(self)(self._value.bvadd(other._value))
 
     @bv_cast
     def bvsub(self, other):
-        return type(self)(smt.BVSub(self.value, other.value))
+        return type(self)(self._value.bvsub(other._value))
 
     @bv_cast
     def bvmul(self, other):
-        return type(self)(smt.BVMul(self.value, other.value))
+        return type(self)(self._value.bvmul(other._value))
 
     @bv_cast
     def bvudiv(self, other):
-        return type(self)(smt.BVUDiv(self.value, other.value))
+        return type(self)(self._value.bvudiv(other._value))
 
     @bv_cast
     def bvurem(self, other):
-        return type(self)(smt.BVURem(self.value, other.value))
+        return type(self)(self._value.bvurem(other._value))
 
     @bv_cast
     def bvsdiv(self, other):
-        return type(self)(smt.BVSDiv(self.value, other.value))
+        return type(self)(self._value.bvsdiv(other._value))
 
     @bv_cast
     def bvsrem(self, other):
-        return type(self)(smt.BVSRem(self.value, other.value))
+        return type(self)(self._value.bvsrem(other._value))
 
     def __invert__(self): return self.bvnot()
 
