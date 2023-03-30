@@ -429,14 +429,8 @@ class MagmaBitVector(AbstractBitVector):
         """
         T = type(self)
         other = _coerce(T, other)
-        carry = _coerce(T.unsized_t[1], carry)
-
-        a = self.zext(1)
-        b = other.zext(1)
-        c = carry.zext(T.size)
-
-        res = a + b + c
-        return res[0:-1], res[-1]
+        sum, carry = self._value.adc(other._value, carry._value)
+        return T(sum), MagmaBit(carry)
 
     def ite(self, t_branch, f_branch):
         return self.bvne(0).ite(t_branch, f_branch)
@@ -606,19 +600,23 @@ class MagmaBitVector(AbstractBitVector):
 
     @int_cast
     def repeat(self, other):
-        return type(self)(smt.get_env().formula_manager.BVRepeat(self.value, other))
-
+        T = type(self).unbound_t
+        return T[self.size * other](self._value.repeat(other))
+        
     @int_cast
     def sext(self, ext):
-        if ext < 0:
-            raise ValueError()
-        return type(self).unsized_t[self.size + ext](smt.BVSExt(self.value, ext))
+        r = self._value.sext(ext)
+        return type(self).unbound_t[r.size](r)
 
     def ext(self, ext):
         return self.zext(ext)
 
     @int_cast
     def zext(self, ext):
+        r = self._value.zext(ext)
+        return type(self).unbound_t[r.size](r)
+
+
         if ext < 0:
             raise ValueError()
         return type(self).unsized_t[self.size + ext](smt.BVZExt(self.value, ext))
