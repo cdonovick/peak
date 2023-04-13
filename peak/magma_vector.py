@@ -3,6 +3,8 @@ from hwtypes import  AbstractBitVector, AbstractBit, TypeFamily, InconsistentSiz
 from hwtypes import build_ite
 import functools as ft
 import typing as tp
+import weakref
+from hwtypes import AbstractBitVectorMeta
 
 class MagmaBitMeta(m.MagmaProtocolMeta):
     _class_cache = weakref.WeakValueDictionary()
@@ -34,14 +36,14 @@ class MagmaBitMeta(m.MagmaProtocolMeta):
 
         return type_
 
-    def __getitem__(cls, direction: Direction) -> 'MagmaBitMeta':
+    def __getitem__(cls, direction: m.Direction) -> 'MagmaBitMeta':
         mcs = type(cls)
         try:
             return mcs._class_cache[cls, direction]
         except KeyError:
             pass
 
-        if not isinstance(direction, Direction):
+        if not isinstance(direction, m.Direction):
             raise TypeError('Direction of Digital must be an instance of '
                             'm.Direction')
 
@@ -52,6 +54,7 @@ class MagmaBitMeta(m.MagmaProtocolMeta):
                 return cls
             else:
                 return cls.undirected_t[direction]
+
         if direction == direction.Undirected:
             return cls
 
@@ -66,8 +69,9 @@ class MagmaBitMeta(m.MagmaProtocolMeta):
         mcs._class_cache[cls, direction] = type_
         return type_
 
-
-
+    @property
+    def is_directed(cls) ->  'Bool':
+        return cls._info_[1] is not None
 
     @property
     def undirected_t(cls) -> 'MagmaBitMeta':
@@ -111,7 +115,16 @@ def bit_cast(fn):
             return fn(self, other)
     return wrapped
 
-class MagmaBit(AbstractBit, m.MagmaProtocol, metaclass=MagmaBitMeta):
+# E TypeError: metaclass conflict: the metaclass of a derived class
+# must be a (non-strict) subclass of the metaclasses of all its bases
+
+# class MagmaBit(AbstractBit, m.MagmaProtocol, metaclass=MagmaBitMeta):
+class MagmaBit(m.MagmaProtocol, metaclass=MagmaBitMeta):
+
+    def _get_magma_value_(self):
+        # To access underlying magma value.
+        return self._value
+
     @staticmethod
     def get_family() -> TypeFamily:
         return _Family_
@@ -159,10 +172,14 @@ class MagmaBit(AbstractBit, m.MagmaProtocol, metaclass=MagmaBitMeta):
     def __bool__(self):
         raise TypeError('MagmaBit cannot be converted to bool')
 
+AbstractBit.register(MagmaBit)
+
+
+
 # class AbstractBitVectorMeta(type): #:(ABCMeta):
 class MagmaVectorMeta(AbstractBitVectorMeta, m.MagmaProtocolMeta): #:(ABCMeta):
     # BitVectorType, size :  BitVectorType[size]
-    # _class_cache = weakref.WeakValueDictionary()
+    _class_cache = weakref.WeakValueDictionary()
 
     def __new__(mcs, name, bases, namespace, info=(None, None, None), **kwargs):
 
@@ -288,10 +305,14 @@ def int_cast(fn : tp.Callable[['MagmaBitVector', int], tp.Any]) -> tp.Callable[[
 
 class MagmaBitVector(AbstractBitVector):
 
-#     @staticmethod
-#     def get_family() -> TypeFamily:
-#         return _Family_
-# 
+    def _get_magma_value_(self):
+        # To access underlying magma value.
+        return self._value
+
+    @staticmethod
+    def get_family() -> TypeFamily:
+        return _Family_
+
     def __init__(self, *args, **kwargs):
         cls = type(self)
         self._value = cls._to_magma_(*args, **kwargs)
@@ -420,7 +441,7 @@ class MagmaBitVector(AbstractBitVector):
 
      # BOOKMARK #
 
-    def adc(self, other : 'MagmaBitVector', carry : SMTBit) -> tp.Tuple['BitVector', SMTBit]:
+    def adc(self, other : 'MagmaBitVector', carry : MagmaBit) -> tp.Tuple['MagmaBitVector', MagmaBit]:
         """
         add with carry
 
@@ -623,171 +644,74 @@ class MagmaBitVector(AbstractBitVector):
 
 # END PASTE-UP from hwtypes_leonardt/hwtypes/smt_bit_vector.py
 
-# class AbstractBitVector(metaclass=MagmaVectorMeta):
-#     @staticmethod
-#     def get_family() -> TypeFamily:
-#         return _Family_
-# 
-#     @property
-#     def size(self) -> int:
-#         return  type(self).size
-# 
-#     @classmethod
-#     @abstractmethod
-#     def make_constant(self, value, num_bits:tp.Optional[int]=None) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def __getitem__(self, index) -> AbstractBit:
-#         pass
-# 
-#     @abstractmethod
-#     def __setitem__(self, index : int, value : AbstractBit):
-#         pass
-# 
-#     @abstractmethod
-#     def __len__(self) -> int:
-#         pass
-# 
-#     @abstractmethod
-#     def concat(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvnot(self) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvand(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     def bvnand(self, other) -> 'AbstractBitVector':
-#         return self.bvand(other).bvnot()
-# 
-#     @abstractmethod
-#     def bvor(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     def bvnor(self, other) -> 'AbstractBitVector':
-#         return self.bvor(other).bvnot()
-# 
-#     @abstractmethod
-#     def bvxor(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     def bvxnor(self, other) -> 'AbstractBitVector':
-#         return self.bvxor(other).bvnot()
-# 
-#     @abstractmethod
-#     def bvshl(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvlshr(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvashr(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvrol(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvror(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvcomp(self, other) -> 'AbstractBitVector[1]':
-#         pass
-# 
-#     @abstractmethod
-#     def bveq(self, other) -> AbstractBit:
-#         pass
-# 
-#     def bvne(self, other) -> AbstractBit:
-#         return ~self.bveq(other)
-# 
-#     @abstractmethod
-#     def bvult(self, other) -> AbstractBit:
-#         pass
-# 
-#     def bvule(self, other) -> AbstractBit:
-#         return self.bvult(other) | self.bveq(other)
-# 
-#     def bvugt(self, other) -> AbstractBit:
-#         return ~self.bvule(other)
-# 
-#     def bvuge(self, other) -> AbstractBit:
-#         return ~self.bvult(other)
-# 
-#     @abstractmethod
-#     def bvslt(self, other) -> AbstractBit:
-#         pass
-# 
-#     def bvsle(self, other) -> AbstractBit:
-#         return self.bvslt(other) | self.bveq(other)
-# 
-#     def bvsgt(self, other) -> AbstractBit:
-#         return ~self.bvsle(other)
-# 
-#     def bvsge(self, other) -> AbstractBit:
-#         return ~self.bvslt(other)
-# 
-#     @abstractmethod
-#     def bvneg(self) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def adc(self, other, carry) -> tp.Tuple['AbstractBitVector', AbstractBit]:
-#         pass
-# 
-#     @abstractmethod
-#     def ite(i,t,e) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvadd(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvsub(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvmul(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvudiv(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvurem(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvsdiv(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def bvsrem(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def repeat(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def sext(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def ext(self, other) -> 'AbstractBitVector':
-#         pass
-# 
-#     @abstractmethod
-#     def zext(self, other) -> 'AbstractBitVector':
-#         pass
-# 
+class MagmaNumVector(MagmaBitVector):
+    pass
+
+class MagmaUIntVector(MagmaNumVector):
+    pass
+
+class MagmaSIntVector(MagmaNumVector):
+
+    def __int__(self):
+        return self.as_sint()
+
+    def __rshift__(self, other):
+        try:
+            return self.bvashr(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def __floordiv__(self, other):
+        try:
+            return self.bvsdiv(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def __mod__(self, other):
+        try:
+            return self.bvsrem(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def __ge__(self, other):
+        try:
+            return self.bvsge(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def __gt__(self, other):
+        try:
+            return self.bvsgt(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def __lt__(self, other):
+        try:
+            return self.bvslt(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def __le__(self, other):
+        try:
+            return self.bvsle(other)
+        except InconsistentSizeError as e:
+            raise e from None
+        except TypeError:
+            return NotImplemented
+
+    def ext(self, other):
+        return self.sext(other)
+
+_Family_ = TypeFamily(MagmaBit, MagmaBitVector, MagmaUIntVector, MagmaSIntVector)

@@ -1,3 +1,5 @@
+from . import magma_vector
+
 from abc import ABCMeta, abstractmethod
 import functools as ft
 import logging
@@ -344,19 +346,19 @@ class MagmaFamily(_AsmFamily):
 
     @property
     def Bit(self):
-        return m.Bit
+        return magma_vector.MagmaBit
 
     @property
     def BitVector(self):
-        return m.Bits
+        return magma_vector.MagmaBitVector
 
     @property
     def Signed(self):
-        return m.SInt
+        return magma_vector.MagmaSIntVector
 
     @property
     def Unsigned(self):
-        return m.UInt
+        return magma_vector.MagmaUIntVector
 
     def gen_register(self, T, init):
         return m.Register(T, init,
