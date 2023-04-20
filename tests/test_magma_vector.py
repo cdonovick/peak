@@ -9,6 +9,7 @@ from hwtypes import Bit, SMTBit, SMTBitVector, BitVector, Enum
 
 import fault
 import magma as m
+# from peak.magma_vector import MagmaBit  # , MagmaBitVector
 from peak.magma_vector import MagmaBit, MagmaBitVector
 import itertools
 
@@ -24,11 +25,18 @@ from peak import name_outputs
 from examples.demo_pes.pe6 import PE_fc
 from examples.demo_pes.pe6.sim import Inst
 
+version=0
+
 class SimpleMagmaProtocolMeta(MagmaProtocolMeta):
     _CACHE = {}
 
-#     def __new__(cls, name, bases, namespace, info=(None, None), **kwargs):
-#         pass
+    def __new__(cls, name, bases, namespace, info=(None, None), **kwargs):
+        type_ = super().__new__(cls, name, bases, namespace, **kwargs)
+        return type_
+
+
+
+
 #     def __getitem__(cls, direction: m.Direction) -> 'MagmaBitMeta':
 
     @property
@@ -169,13 +177,15 @@ class SimpleMagmaProtocol(MagmaProtocol, metaclass=SimpleMagmaProtocolMeta):
 
 def test_foo():
     class bitfoo(m.Circuit):
-        io = m.IO(
-            I=m.In( SimpleMagmaProtocol[m.Bit]), 
-            O=m.Out(SimpleMagmaProtocol[m.Bit])
-        )
-#          io = m.IO(
-#              I=m.In( MagmaBit ), 
-#              O=m.Out(MagmaBit )
-#          )
+        if version:
+            io = m.IO(
+                I=m.In( SimpleMagmaProtocol[m.Bit]), 
+                O=m.Out(SimpleMagmaProtocol[m.Bit])
+            )
+        else:
+            io = m.IO(
+                I=m.In( MagmaBit ), 
+                O=m.Out(MagmaBit )
+            )
         
-        
+# test_foo()        

@@ -20,8 +20,8 @@ class MagmaBitMeta(m.MagmaProtocolMeta):
         for base in bases:
             if getattr(base, 'is_directed', False):
                 if direction is None:
-                    direction = base.direction
-                elif direction != base.direction:
+                    direction = base._info_[1]
+                elif direction != base._info_[1]:
                     raise TypeError(
                         "Can't inherit from multiple different directions")
 
@@ -48,14 +48,14 @@ class MagmaBitMeta(m.MagmaProtocolMeta):
                             'm.Direction')
 
         if cls.is_directed:
-            if direction == direction.Undirected:
+            if direction == m.Direction.Undirected:
                 return cls.undirected_t
-            if direction == cls.direction:
+            if direction == cls._info_[1]:
                 return cls
             else:
                 return cls.undirected_t[direction]
 
-        if direction == direction.Undirected:
+        if direction == m.Direction.Undirected:
             return cls
 
         bases = [cls]
@@ -121,6 +121,9 @@ def bit_cast(fn):
 # class MagmaBit(AbstractBit, m.MagmaProtocol, metaclass=MagmaBitMeta):
 class MagmaBit(m.MagmaProtocol, metaclass=MagmaBitMeta):
 
+    def __init__(self, *args, **kwargs):
+        self._value=m.Bit(*args, **kwargs)
+
     def _get_magma_value_(self):
         # To access underlying magma value.
         return self._value
@@ -128,9 +131,6 @@ class MagmaBit(m.MagmaProtocol, metaclass=MagmaBitMeta):
     @staticmethod
     def get_family() -> TypeFamily:
         return _Family_
-
-    def __init__(self, *args, **kwargs):
-        self._value=m.Bit(*args, **kwargs)
 
     def __repr__(self):
         return self._value.__repr__()
