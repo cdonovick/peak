@@ -2,6 +2,7 @@ from operator import getitem
 
 from hwtypes.adt_util import ADTVisitor
 from hwtypes.adt_meta import GetitemSyntax, AttrSyntax
+import hwtypes as ht
 
 
 
@@ -35,10 +36,33 @@ class Path:
         path = self._p[:-1]
         return Path(path=path)
 
-    def select(self, adt):
+    def select_type(self, adt):
         for getter, key in self._path:
             adt = getter(adt, key)
         return adt
+
+    def select_value(self, adt):
+        for getter, key in self._path:
+            adt = getter(adt, key)
+            if isinstance(adt, ht.Sum.Match):
+                adt = adt.value
+        return adt
+
+    def match(self, adt):
+        match = None
+        for getter, key in self._path:
+            adt = getter(adt, key)
+            if isinstance(adt, ht.Sum.Match):
+                if match is None:
+                    match = adt.match
+                else:
+                    match &= adt.match
+                try:
+                    adt = adt.value
+                except TypeError:
+                    assert adt._safe
+                    return match
+        return match
 
 def solve(ir_fc, arch_fc, family_group):
     smt_fam = family_group.SMTFamily()
@@ -46,8 +70,6 @@ def solve(ir_fc, arch_fc, family_group):
     arch_t = arch_fc(smt_fam)
     arch_input_t = arch_t.input_t
     arch_output_t = arch_t.ouput_t
-
-
 
 class LeafPaths(ADTVisitor):
     def __init__(self):
@@ -68,11 +90,8 @@ class LeafPaths(ADTVisitor):
         path = self.current_path
 
         for k, v in adt_t.field_dict.items():
-            assert getter(k, adt_t) == v
+            assert getter(adt_t, k) == v
             self.current_path = path.push(getter, k)
             self.visit(v)
 
         self.current_path = path
-
-
-
