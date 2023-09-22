@@ -27,6 +27,22 @@ def test_register():
         tester.step(2)
     tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
+def test_register_no_en():
+    m_family = MagmaFamily()
+    py_family = PyFamily()
+    Data = py_family.BitVector[16]
+    Bit = py_family.Bit
+    m_Reg = m_family.gen_register(m_family.BitVector[16], 0, has_enable=False)
+    py_reg = py_family.gen_register(Data, 0, has_enable=False)()
+    tester = fault.Tester(m_Reg, m_Reg.CLK)
+
+    for _ in range(32):
+        val = Data.random(16)
+        gold = py_reg(val)
+        tester.circuit.value = val
+        tester.circuit.O.expect(gold)
+        tester.step(2)
+    tester.compile_and_run("verilator", flags=["-Wno-fatal"])
 
 def test_attr_register():
     @family_closure
