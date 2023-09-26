@@ -165,9 +165,9 @@ class _RegFamily(AbstractFamily):
 
     class AttrRegBase: pass
 
-    def gen_register(self, T, init):
+    def gen_register(self, T, init, has_enable=True):
         cls = type(self)
-        key = (cls, T, init)
+        key = (cls, T, init, has_enable)
         try:
             return _REG_CACHE[key]
         except KeyError:
@@ -178,23 +178,41 @@ class _RegFamily(AbstractFamily):
         # avoids circular import
         from peak import Peak
 
-        @family.assemble(locals(), globals())
-        class Register(Peak, cls.RegBase):
-            def __init__(self):
-                self.value: T = T(init)
+        if has_enable:
+            @family.assemble(locals(), globals())
+            class Register(Peak, cls.RegBase):
+                def __init__(self):
+                    self.value: T = T(init)
 
-            def __call__(self, value: T, en: family.Bit) -> T:
-                assert value is not None
-                retvalue = self.value
-                if en:
+                def __call__(self, value: T, en: family.Bit) -> T:
+                    assert value is not None
+                    retvalue = self.value
+                    if en:
+                        self.value = value
+                    return retvalue
+
+                def prev(self) -> T:
+                    # This is not quite right and doesn't match
+                    # magma semantics completely. May only be used
+                    # as a peak method prior to __call__
+                    return self.value
+        else:
+            @family.assemble(locals(), globals())
+            class Register(Peak, cls.RegBase):
+                def __init__(self):
+                    self.value: T = T(init)
+
+                def __call__(self, value: T) -> T:
+                    retvalue = self.value
                     self.value = value
-                return retvalue
+                    return retvalue
 
-            def prev(self) -> T:
-                # This is not quite right and doesn't match
-                # magma semantics completely. May only be used
-                # as a peak method prior to __call__
-                return self.value
+                def prev(self) -> T:
+                    # This is not quite right and doesn't match
+                    # magma semantics completely. May only be used
+                    # as a peak method prior to __call__
+                    return self.value
+
 
         return _REG_CACHE.setdefault(key, Register)
 
@@ -215,6 +233,8 @@ class _RegFamily(AbstractFamily):
                 self.value: T = T(init)
 
             def _poke_(self, value):
+                if not isinstance(value, T):
+                    raise TypeError(f'Expected value of type {T}')
                 self.value = value
 
             def _peak_(self):
@@ -358,9 +378,9 @@ class MagmaFamily(_AsmFamily):
     def Unsigned(self):
         return m.UInt
 
-    def gen_register(self, T, init):
+    def gen_register(self, T, init, has_enable=True):
         return m.Register(T, init,
-            has_enable=True,
+            has_enable=has_enable,
             reset_type=m.AsyncReset,
             name_map=m.generator.ParamDict(CE='en', I='value'),
         )
