@@ -474,7 +474,6 @@ class IRMapper(SMTMapper):
             if not simple_formula:
                 raise ValueError("Simple Formula required for black boxes")
 
-        # should be a param to __init__ but this works for now
         self.archmapper = archmapper
 
         # Create input bindings
