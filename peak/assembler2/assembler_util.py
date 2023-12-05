@@ -118,6 +118,6 @@ def _gen_is_valid(
                 return ft.reduce(
                         operator.or_,
                         (f(opcode) for f in range_validators),
-                        opcode.get_family().Bit(1))
+                        opcode.get_family().Bit(0))
 
     return _validator_cache.setdefault(opcodes, is_valid)
